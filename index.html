@@ -1,0 +1,899 @@
+<title>Sobrecarga</title>
+<meta charset="utf-8">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<style>
+:root{
+  --bg:#eef0f2;
+  --surface:#ffffff;
+  --surface-2:#e4e7ea;
+  --surface-3:#d9dde1;
+  --border:#d0d5da;
+  --text:#1a1d21;
+  --text-dim:#5c636b;
+  --text-faint:#8a9098;
+  --accent:#c8ff3d;
+  --accent-strong:#5e7a00;
+  --accent-ink:#1a1d21;
+  --up:#1f9d55;
+  --down:#c8402f;
+  --shadow: 0 1px 2px rgba(20,22,25,.06), 0 8px 24px -12px rgba(20,22,25,.18);
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#131519;
+    --surface:#1b1e23;
+    --surface-2:#23262c;
+    --surface-3:#2c3037;
+    --border:#34383f;
+    --text:#edeef0;
+    --text-dim:#9aa0a8;
+    --text-faint:#6c7278;
+    --accent:#d4ff4d;
+    --accent-strong:#d4ff4d;
+    --accent-ink:#12140a;
+    --up:#4ade80;
+    --down:#f87171;
+    --shadow: 0 1px 2px rgba(0,0,0,.4), 0 12px 32px -14px rgba(0,0,0,.6);
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#131519;
+  --surface:#1b1e23;
+  --surface-2:#23262c;
+  --surface-3:#2c3037;
+  --border:#34383f;
+  --text:#edeef0;
+  --text-dim:#9aa0a8;
+  --text-faint:#6c7278;
+  --accent:#d4ff4d;
+  --accent-strong:#d4ff4d;
+  --accent-ink:#12140a;
+  --up:#4ade80;
+  --down:#f87171;
+  --shadow: 0 1px 2px rgba(0,0,0,.4), 0 12px 32px -14px rgba(0,0,0,.6);
+  color-scheme: dark;
+}
+*{box-sizing:border-box;}
+body{
+  margin:0;
+  background:var(--bg);
+  color:var(--text);
+  font-family:'Inter',system-ui,-apple-system,sans-serif;
+  -webkit-font-smoothing:antialiased;
+}
+.wrap{max-width:1040px;margin:0 auto;padding:28px 20px 80px;}
+.hero{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;margin-bottom:28px;flex-wrap:wrap;}
+.brand{display:flex;align-items:center;gap:12px;}
+.mark{width:40px;height:40px;flex:none;}
+h1{
+  font-family:'Bebas Neue',system-ui,sans-serif;
+  font-size:44px;
+  letter-spacing:.5px;
+  margin:0;
+  line-height:.9;
+}
+.tagline{color:var(--text-dim);font-size:13.5px;margin-top:4px;max-width:34ch;}
+.stat-row{display:flex;gap:22px;flex-wrap:wrap;}
+.stat{text-align:right;}
+.stat .n{font-family:'IBM Plex Mono',monospace;font-size:22px;font-weight:600;font-variant-numeric:tabular-nums;}
+.stat .l{font-size:10.5px;text-transform:uppercase;letter-spacing:.08em;color:var(--text-faint);}
+
+.card{
+  background:var(--surface);
+  border:1px solid var(--border);
+  border-radius:14px;
+  box-shadow:var(--shadow);
+  padding:22px;
+  margin-bottom:22px;
+}
+.card-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:16px;flex-wrap:wrap;}
+.card-head h2{
+  font-family:'Bebas Neue',sans-serif;
+  font-size:22px;
+  letter-spacing:.4px;
+  margin:0;
+  display:flex;align-items:center;gap:9px;
+}
+.chip{
+  display:inline-flex;align-items:center;justify-content:center;
+  background:var(--accent);color:var(--accent-ink);
+  width:22px;height:22px;border-radius:6px;
+  font-family:'IBM Plex Mono',monospace;font-size:11.5px;font-weight:600;
+}
+.hint{font-size:12.5px;color:var(--text-faint);}
+
+.drop{
+  border:1.5px dashed var(--border);
+  border-radius:11px;
+  padding:26px 18px;
+  text-align:center;
+  color:var(--text-dim);
+  font-size:13.5px;
+  cursor:pointer;
+  transition:border-color .15s, background .15s;
+}
+.drop:hover, .drop.drag{border-color:var(--accent-strong);background:var(--surface-2);}
+.drop strong{color:var(--text);}
+.drop input{display:none;}
+
+table{width:100%;border-collapse:collapse;font-size:13.5px;}
+th{
+  text-align:left;font-size:10.5px;text-transform:uppercase;letter-spacing:.07em;
+  color:var(--text-faint);font-weight:600;padding:0 8px 8px;border-bottom:1px solid var(--border);
+}
+td{padding:6px 8px;border-bottom:1px solid var(--surface-2);vertical-align:middle;}
+tr:last-child td{border-bottom:none;}
+.num{font-variant-numeric:tabular-nums;font-family:'IBM Plex Mono',monospace;}
+.tbl-scroll{overflow-x:auto;}
+
+input[type=text], input[type=number], input[type=date]{
+  width:100%;background:var(--surface-2);border:1px solid var(--border);color:var(--text);
+  border-radius:7px;padding:6px 8px;font-family:inherit;font-size:13px;
+}
+input[type=number]{font-family:'IBM Plex Mono',monospace;text-align:right;}
+input:focus, .drop:focus-visible, button:focus-visible{
+  outline:2px solid var(--accent-strong);outline-offset:1px;
+}
+
+button{
+  font-family:'Inter',sans-serif;font-weight:600;font-size:12.5px;border-radius:8px;
+  border:1px solid var(--border);background:var(--surface-2);color:var(--text);
+  padding:7px 12px;cursor:pointer;transition:transform .08s, background .12s;
+  display:inline-flex;align-items:center;gap:6px;
+}
+button:hover{background:var(--surface-3);}
+button:active{transform:scale(.97);}
+button.primary{background:var(--accent);color:var(--accent-ink);border-color:transparent;}
+button.primary:hover{filter:brightness(1.05);}
+button.ghost{background:transparent;border-color:transparent;color:var(--text-faint);padding:5px 7px;}
+button.ghost:hover{color:var(--down);background:var(--surface-2);}
+button.small{padding:4px 9px;font-size:11.5px;}
+button:disabled{opacity:.4;cursor:not-allowed;}
+
+.row-fields{display:grid;grid-template-columns:1fr 140px 100px;gap:10px;margin-bottom:14px;}
+@media (max-width:560px){.row-fields{grid-template-columns:1fr 1fr;}}
+
+.month-group{border:1px solid var(--border);border-radius:12px;margin-bottom:12px;overflow:hidden;background:var(--surface-2);}
+.month-head{
+  display:flex;align-items:center;gap:9px;padding:12px 15px;cursor:pointer;
+  font-family:'Bebas Neue',sans-serif;font-size:17px;letter-spacing:.3px;
+}
+.month-head:hover{background:var(--surface-3);}
+.month-group.open .month-head .chev{transform:rotate(90deg);}
+.month-body{padding:0 12px 12px;}
+.week-group{border-top:1px solid var(--border);padding-top:10px;margin-top:2px;}
+.week-group:first-child{border-top:none;margin-top:0;padding-top:0;}
+.week-head{
+  display:flex;align-items:center;gap:8px;padding:8px 6px;cursor:pointer;
+  font-size:12.5px;font-weight:600;color:var(--text-dim);text-transform:uppercase;letter-spacing:.05em;
+}
+.week-head:hover{color:var(--text);}
+.week-group.open .week-head .chev{transform:rotate(90deg);}
+.week-body{padding:2px 0 4px;}
+.group-label{flex:1;}
+.group-meta{font-size:11px;color:var(--text-faint);font-weight:500;text-transform:none;letter-spacing:0;font-family:'IBM Plex Mono',monospace;}
+.month-head .chev, .week-head .chev{color:var(--text-faint);transition:transform .15s;font-size:13px;}
+
+.session{border:1px solid var(--border);border-radius:11px;margin-bottom:10px;overflow:hidden;background:var(--surface);}
+.session-head{
+  display:flex;align-items:center;justify-content:space-between;gap:10px;
+  padding:13px 16px;cursor:pointer;background:var(--surface-2);
+}
+.session-head:hover{background:var(--surface-3);}
+.session-title{display:flex;align-items:baseline;gap:10px;}
+.session-date{font-family:'IBM Plex Mono',monospace;font-size:13.5px;font-weight:600;}
+.session-name{color:var(--text-dim);font-size:13px;}
+.session-meta{font-size:11.5px;color:var(--text-faint);}
+.session-body{padding:14px 16px 16px;display:none;}
+.session.open .session-body{display:block;}
+.session.open .chev{transform:rotate(90deg);}
+.chev{transition:transform .15s;color:var(--text-faint);}
+
+.ex-block{margin-bottom:14px;}
+.ex-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;}
+.ex-name-input{font-weight:600;font-size:14px;max-width:260px;background:transparent;border:none;padding:2px 0;}
+.ex-name-input:focus{background:var(--surface-2);border-radius:6px;padding:2px 6px;}
+.set-row{display:grid;grid-template-columns:26px 1fr 1fr 30px;gap:8px;align-items:center;margin-bottom:5px;}
+.set-idx{font-family:'IBM Plex Mono',monospace;font-size:11.5px;color:var(--text-faint);text-align:center;}
+.set-add{margin-top:2px;}
+
+.trend{display:inline-flex;align-items:center;gap:5px;font-weight:600;font-variant-numeric:tabular-nums;}
+.trend.up{color:var(--up);}
+.trend.down{color:var(--down);}
+.trend.flat{color:var(--text-faint);}
+.spark{display:block;}
+.ex-toggle{
+  background:transparent;border:1px solid var(--border);color:var(--text-faint);
+  padding:2px 8px;font-size:11px;border-radius:20px;margin-left:8px;
+}
+.ex-toggle:hover{color:var(--text);border-color:var(--text-faint);}
+tr.sub-row td{background:var(--surface-2);font-size:12.5px;color:var(--text-dim);}
+tr.sub-row td:first-child{padding-left:22px;color:var(--text-faint);}
+
+.empty{
+  text-align:center;padding:34px 18px;color:var(--text-faint);font-size:13.5px;
+}
+.empty strong{color:var(--text-dim);display:block;font-size:14.5px;margin-bottom:4px;}
+
+.stage-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:14px;}
+.badge-count{
+  background:var(--surface-3);color:var(--text-dim);font-size:11px;font-family:'IBM Plex Mono',monospace;
+  padding:2px 7px;border-radius:20px;
+}
+footer{text-align:center;color:var(--text-faint);font-size:11.5px;margin-top:32px;}
+</style>
+
+<div class="wrap">
+  <div class="hero">
+    <div class="brand">
+      <svg class="mark" viewBox="0 0 40 40" fill="none">
+        <rect x="2" y="17" width="6" height="6" rx="1.5" fill="var(--text-faint)"/>
+        <rect x="8" y="13" width="4" height="14" rx="1.5" fill="var(--text-dim)"/>
+        <rect x="12" y="18.5" width="16" height="3" rx="1.5" fill="var(--accent)"/>
+        <rect x="28" y="13" width="4" height="14" rx="1.5" fill="var(--text-dim)"/>
+        <rect x="32" y="17" width="6" height="6" rx="1.5" fill="var(--text-faint)"/>
+      </svg>
+      <div>
+        <h1>SOBRECARGA</h1>
+        <div class="tagline">Seu diário de treino: importe do PDF, edite séries e peso, acompanhe se o rendimento está subindo ou caindo.</div>
+      </div>
+    </div>
+    <div class="stat-row">
+      <div class="stat"><div class="n" id="statSessions">0</div><div class="l">Sessões</div></div>
+      <div class="stat"><div class="n" id="statExercises">0</div><div class="l">Exercícios</div></div>
+      <div class="stat"><div class="n" id="statUp">0</div><div class="l">Em alta</div></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-head">
+      <h2><span class="chip">↥</span>Importar PDF</h2>
+      <span class="hint">Extrai texto do PDF e sugere exercícios, séries, repetições e carga</span>
+    </div>
+    <label class="drop" id="drop" tabindex="0">
+      <input type="file" id="fileInput" accept="application/pdf">
+      <div id="dropLabel"><strong>Clique para escolher</strong> ou arraste um PDF de treino aqui</div>
+    </label>
+    <div id="stageWrap" style="display:none;margin-top:18px;">
+      <div class="row-fields">
+        <div>
+          <label class="hint">Nome da sessão</label>
+          <input type="text" id="stageName" placeholder="ex.: Treino A — Peito/Tríceps">
+        </div>
+        <div>
+          <label class="hint">Data</label>
+          <input type="date" id="stageDate">
+        </div>
+        <div style="display:flex;align-items:flex-end;">
+          <span class="badge-count" id="stageCount">0 linhas</span>
+        </div>
+      </div>
+      <div class="tbl-scroll">
+        <table id="stageTable">
+          <thead><tr><th>Exercício</th><th style="width:70px">Séries</th><th style="width:80px">Reps</th><th style="width:90px">Carga (kg)</th><th></th></tr></thead>
+          <tbody id="stageBody"></tbody>
+        </table>
+      </div>
+      <div class="stage-actions">
+        <button class="small" id="stageAddRow">+ linha</button>
+        <button class="ghost small" id="stageCancel">Cancelar</button>
+        <button class="primary small" id="stageConfirm">Adicionar à agenda</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-head">
+      <h2><span class="chip">✎</span>Sessões</h2>
+      <button class="small" id="addSessionBtn">+ nova sessão manual</button>
+    </div>
+    <div id="sessionsList"></div>
+  </div>
+
+  <div class="card">
+    <div class="card-head">
+      <h2><span class="chip">Δ</span>Rendimento</h2>
+      <span class="hint">1RM estimado (Epley) — compara a última sessão com a anterior</span>
+    </div>
+    <div id="progressWrap"></div>
+  </div>
+
+  <footer>Os dados ficam salvos só neste navegador.</footer>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script>
+pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+
+const STORE_KEY = 'sobrecarga_v1';
+let state = load();
+let stageRows = [];
+
+function load(){
+  try{
+    const raw = localStorage.getItem(STORE_KEY);
+    if(raw) return JSON.parse(raw);
+  }catch(e){}
+  return { sessions: [] };
+}
+function save(){
+  try{ localStorage.setItem(STORE_KEY, JSON.stringify(state)); }catch(e){}
+}
+function uid(){ return Math.random().toString(36).slice(2,10); }
+function todayISO(){ return new Date().toISOString().slice(0,10); }
+function fmtDate(iso){
+  const d = new Date(iso+'T00:00:00');
+  return d.toLocaleDateString('pt-BR',{day:'2-digit',month:'short',year:'numeric'});
+}
+function epley1RM(weight,reps){
+  if(!weight||!reps) return 0;
+  return weight*(1+reps/30);
+}
+
+/* ---------- PDF import ---------- */
+const fileInput = document.getElementById('fileInput');
+const drop = document.getElementById('drop');
+const dropLabel = document.getElementById('dropLabel');
+
+drop.addEventListener('dragover', e=>{ e.preventDefault(); drop.classList.add('drag'); });
+drop.addEventListener('dragleave', ()=> drop.classList.remove('drag'));
+drop.addEventListener('drop', e=>{
+  e.preventDefault(); drop.classList.remove('drag');
+  const f = e.dataTransfer.files && e.dataTransfer.files[0];
+  if(f) handleFile(f);
+});
+fileInput.addEventListener('change', e=>{
+  const f = e.target.files[0];
+  if(f) handleFile(f);
+});
+
+async function handleFile(file){
+  if(file.type !== 'application/pdf'){ alert('Envie um arquivo PDF.'); return; }
+  dropLabel.innerHTML = `<strong>Lendo…</strong> ${file.name}`;
+  try{
+    const buf = await file.arrayBuffer();
+    const pdf = await pdfjsLib.getDocument({data:buf}).promise;
+    let lines = [];
+    for(let p=1;p<=pdf.numPages;p++){
+      const page = await pdf.getPage(p);
+      const content = await page.getTextContent();
+      lines = lines.concat(groupIntoLines(content.items));
+    }
+    const rows = parseLines(lines);
+    dropLabel.innerHTML = `<strong>${file.name}</strong> — clique para trocar o arquivo`;
+    openStage(rows, file.name);
+  }catch(err){
+    console.error(err);
+    dropLabel.innerHTML = '<strong>Não consegui ler esse PDF.</strong> Clique para tentar outro';
+  }
+}
+
+function groupIntoLines(items){
+  const byY = {};
+  items.forEach(it=>{
+    const y = Math.round(it.transform[5]);
+    if(!byY[y]) byY[y] = [];
+    byY[y].push(it);
+  });
+  const ys = Object.keys(byY).map(Number).sort((a,b)=> b-a);
+  return ys.map(y=> byY[y].sort((a,b)=> a.transform[4]-b.transform[4]).map(it=> it.str).join(' ').replace(/\s+/g,' ').trim())
+           .filter(Boolean);
+}
+
+function parseLines(lines){
+  const rows = [];
+  let pendingName = null;
+  const weightRe = /(\d{1,3}(?:[.,]\d)?)\s*(?:kg|kgs|kilos)\b/i;
+  const setsxRepsRe = /(\d{1,2})\s*[xX×]\s*(\d{1,3})/;
+  const repsWordRe = /(\d{1,3})\s*rep/i;
+  const bareNumRe = /^\d{1,3}([.,]\d)?$/;
+  const headerWordsRe = /^(exerc[ií]cio|s[ée]ries?|reps?|repeti[cç][oõ]es?|carga|peso|kg)$/i;
+
+  lines.forEach(line=>{
+    if(!line || line.length<2 || headerWordsRe.test(line.trim())) return;
+
+    let rest = line;
+    let sets=null, reps=null, weight=null;
+
+    const weightM = rest.match(weightRe);
+    if(weightM){ weight = parseFloat(weightM[1].replace(',','.')); rest = rest.replace(weightRe,''); }
+
+    const setsxM = rest.match(setsxRepsRe);
+    if(setsxM){
+      sets = parseInt(setsxM[1],10); reps = parseInt(setsxM[2],10);
+      rest = rest.replace(setsxRepsRe,'');
+    }else{
+      const repsWordM = rest.match(repsWordRe);
+      if(repsWordM){ reps = parseInt(repsWordM[1],10); rest = rest.replace(repsWordRe,''); }
+    }
+
+    // table-style rows: "Exercício  4  10" (sets and reps as separate trailing columns, no 'x')
+    if(sets===null && reps===null){
+      const twoTrailing = rest.match(/(\d{1,2})\s+(\d{1,3})\s*$/);
+      if(twoTrailing && /[a-zA-Zà-úÀ-Ú]/.test(rest.slice(0, twoTrailing.index))){
+        sets = parseInt(twoTrailing[1],10); reps = parseInt(twoTrailing[2],10);
+        rest = rest.slice(0, twoTrailing.index);
+      }else{
+        const oneTrailing = rest.match(/(\d{1,3})\s*$/);
+        if(oneTrailing && /[a-zA-Zà-úÀ-Ú]/.test(rest.slice(0, oneTrailing.index))){
+          reps = parseInt(oneTrailing[1],10);
+          rest = rest.slice(0, oneTrailing.index);
+        }
+      }
+    }
+
+    let name = rest
+      .replace(/[-–—:|]+/g,' ')
+      .replace(/\s{2,}/g,' ')
+      .trim();
+
+    const hasData = sets!==null || reps!==null || weight!==null;
+
+    if(!hasData){
+      if(bareNumRe.test(line.trim())) return;
+      pendingName = line.trim();
+      return;
+    }
+    if(!name && pendingName) name = pendingName;
+    if(!name) name = 'Exercício';
+    pendingName = null;
+    rows.push({ name, sets: sets||1, reps: reps||10, weight: weight||0 });
+  });
+
+  if(rows.length===0){
+    lines.forEach(l=>{ if(l.length>2 && l.length<60) rows.push({name:l, sets:1, reps:10, weight:0}); });
+  }
+  return rows.slice(0,60);
+}
+
+/* ---------- Staging table ---------- */
+const stageWrap = document.getElementById('stageWrap');
+const stageBody = document.getElementById('stageBody');
+const stageName = document.getElementById('stageName');
+const stageDate = document.getElementById('stageDate');
+const stageCount = document.getElementById('stageCount');
+
+function openStage(rows, fileName){
+  stageRows = rows.length? rows : [{name:'', sets:1, reps:10, weight:0}];
+  stageName.value = fileName.replace(/\.pdf$/i,'').slice(0,60);
+  stageDate.value = todayISO();
+  stageWrap.style.display = 'block';
+  renderStage();
+  stageWrap.scrollIntoView({behavior:'smooth', block:'nearest'});
+}
+function renderStage(){
+  stageBody.innerHTML = '';
+  stageRows.forEach((r,i)=>{
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td><input type="text" data-i="${i}" data-f="name" value="${escapeAttr(r.name)}"></td>
+      <td><input type="number" min="1" data-i="${i}" data-f="sets" value="${r.sets}"></td>
+      <td><input type="number" min="0" data-i="${i}" data-f="reps" value="${r.reps}"></td>
+      <td><input type="number" min="0" step="0.5" data-i="${i}" data-f="weight" value="${r.weight}"></td>
+      <td><button class="ghost small" data-del="${i}" title="Remover linha">✕</button></td>`;
+    stageBody.appendChild(tr);
+  });
+  stageCount.textContent = stageRows.length + ' linhas';
+}
+stageBody.addEventListener('input', e=>{
+  const t = e.target;
+  if(t.dataset.i===undefined) return;
+  const i = +t.dataset.i, f = t.dataset.f;
+  stageRows[i][f] = (f==='name') ? t.value : parseFloat(t.value)||0;
+});
+stageBody.addEventListener('click', e=>{
+  if(e.target.dataset.del!==undefined){
+    stageRows.splice(+e.target.dataset.del,1);
+    renderStage();
+  }
+});
+document.getElementById('stageAddRow').addEventListener('click', ()=>{
+  stageRows.push({name:'', sets:1, reps:10, weight:0});
+  renderStage();
+});
+document.getElementById('stageCancel').addEventListener('click', ()=>{
+  stageWrap.style.display='none';
+  fileInput.value='';
+  dropLabel.innerHTML = '<strong>Clique para escolher</strong> ou arraste um PDF de treino aqui';
+});
+document.getElementById('stageConfirm').addEventListener('click', ()=>{
+  const validRows = stageRows.filter(r=> r.name && r.name.trim());
+  if(validRows.length===0){ alert('Adicione ao menos um exercício com nome.'); return; }
+  const session = {
+    id: uid(),
+    date: stageDate.value || todayISO(),
+    name: stageName.value.trim() || 'Sessão',
+    exercises: validRows.map(r=> ({
+      id: uid(), name: r.name.trim(),
+      sets: Array.from({length: Math.max(1,r.sets||1)}, ()=> ({reps: r.reps||0, weight: r.weight||0}))
+    }))
+  };
+  state.sessions.push(session);
+  openMonths.add(getMonthKey(session.date));
+  openWeeks.add(getWeekKey(session.date));
+  save();
+  stageWrap.style.display='none';
+  fileInput.value='';
+  dropLabel.innerHTML = '<strong>Clique para escolher</strong> ou arraste um PDF de treino aqui';
+  renderAll();
+  document.getElementById('sessionsList').scrollIntoView({behavior:'smooth', block:'nearest'});
+});
+
+/* ---------- Sessions render (agrupado por mês > semana > dia) ---------- */
+const sessionsList = document.getElementById('sessionsList');
+let openSessionId = null;
+const openMonths = new Set();
+const openWeeks = new Set();
+
+document.getElementById('addSessionBtn').addEventListener('click', ()=>{
+  const session = { id: uid(), date: todayISO(), name: 'Nova sessão', exercises: [
+    { id: uid(), name: 'Exercício', sets:[{reps:10, weight:0}] }
+  ]};
+  state.sessions.push(session);
+  openSessionId = session.id;
+  openMonths.add(getMonthKey(session.date));
+  openWeeks.add(getWeekKey(session.date));
+  save(); renderAll();
+});
+
+function getMonthKey(iso){ return iso.slice(0,7); }
+function getMonthLabel(iso){
+  const d = new Date(iso+'T00:00:00');
+  const s = d.toLocaleDateString('pt-BR',{month:'long', year:'numeric'});
+  return s.charAt(0).toUpperCase()+s.slice(1);
+}
+function getWeekKey(iso){
+  const d = new Date(iso+'T00:00:00');
+  const day = d.getDay();
+  const diff = (day===0 ? -6 : 1-day);
+  d.setDate(d.getDate()+diff);
+  return d.toISOString().slice(0,10);
+}
+function getWeekLabel(mondayIso){
+  const start = new Date(mondayIso+'T00:00:00');
+  const end = new Date(start); end.setDate(start.getDate()+6);
+  const f = d=> d.toLocaleDateString('pt-BR',{day:'2-digit',month:'short'});
+  return `Semana de ${f(start)} a ${f(end)}`;
+}
+
+function groupSessions(sessions){
+  const sorted = [...sessions].sort((a,b)=> b.date.localeCompare(a.date));
+  const months = [];
+  const monthIdx = {};
+  sorted.forEach(session=>{
+    const mKey = getMonthKey(session.date);
+    if(!(mKey in monthIdx)){ monthIdx[mKey] = months.length; months.push({key:mKey, label:getMonthLabel(session.date), weeks:[], weekIdx:{}}); }
+    const month = months[monthIdx[mKey]];
+    const wKey = getWeekKey(session.date);
+    if(!(wKey in month.weekIdx)){ month.weekIdx[wKey] = month.weeks.length; month.weeks.push({key:wKey, label:getWeekLabel(wKey), sessions:[]}); }
+    month.weeks[month.weekIdx[wKey]].sessions.push(session);
+  });
+  return months;
+}
+
+function renderSessions(){
+  if(state.sessions.length===0){
+    sessionsList.innerHTML = `<div class="empty"><strong>Nenhuma sessão ainda</strong>Importe um PDF acima ou crie uma sessão manual.</div>`;
+    return;
+  }
+  const months = groupSessions(state.sessions);
+  if(openMonths.size===0) openMonths.add(months[0].key);
+  months.forEach(month=>{
+    if(openMonths.has(month.key) && !month.weeks.some(w=> openWeeks.has(w.key))){
+      openWeeks.add(month.weeks[0].key);
+    }
+  });
+
+  sessionsList.innerHTML = '';
+  months.forEach(month=>{
+    const sessionCount = month.weeks.reduce((n,w)=> n+w.sessions.length, 0);
+    const monthOpen = openMonths.has(month.key);
+    const monthEl = document.createElement('div');
+    monthEl.className = 'month-group' + (monthOpen ? ' open':'');
+    monthEl.innerHTML = `
+      <div class="month-head" data-month="${month.key}">
+        <span class="chev">›</span><span class="group-label">${month.label}</span>
+        <span class="group-meta">${sessionCount} ${sessionCount===1?'sessão':'sessões'}</span>
+      </div>
+      <div class="month-body"></div>`;
+    sessionsList.appendChild(monthEl);
+    if(!monthOpen) return;
+    const monthBody = monthEl.querySelector('.month-body');
+
+    month.weeks.forEach(week=>{
+      const weekOpen = openWeeks.has(week.key);
+      const weekEl = document.createElement('div');
+      weekEl.className = 'week-group' + (weekOpen ? ' open':'');
+      weekEl.innerHTML = `
+        <div class="week-head" data-week="${week.key}">
+          <span class="chev">›</span><span class="group-label">${week.label}</span>
+          <span class="group-meta">${week.sessions.length} ${week.sessions.length===1?'sessão':'sessões'}</span>
+        </div>
+        <div class="week-body"></div>`;
+      monthBody.appendChild(weekEl);
+      if(!weekOpen) return;
+      const weekBody = weekEl.querySelector('.week-body');
+
+      week.sessions.forEach(session=>{
+        const div = document.createElement('div');
+        div.className = 'session' + (openSessionId===session.id ? ' open':'');
+        const setCount = session.exercises.reduce((n,e)=> n+e.sets.length, 0);
+        div.innerHTML = `
+          <div class="session-head" data-open="${session.id}">
+            <div class="session-title">
+              <span class="session-date">${fmtDate(session.date)}</span>
+              <span class="session-name">${escapeHtml(session.name)}</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:12px;">
+              <span class="session-meta">${session.exercises.length} exerc. · ${setCount} séries</span>
+              <span class="chev">›</span>
+            </div>
+          </div>
+          <div class="session-body"></div>`;
+        weekBody.appendChild(div);
+        if(openSessionId===session.id) renderSessionBody(div.querySelector('.session-body'), session);
+      });
+    });
+  });
+}
+
+function renderSessionBody(container, session){
+  container.innerHTML = `
+    <div class="row-fields" style="grid-template-columns:1fr 160px 90px;">
+      <div><label class="hint">Nome</label><input type="text" data-sfield="name" value="${escapeAttr(session.name)}"></div>
+      <div><label class="hint">Data</label><input type="date" data-sfield="date" value="${session.date}"></div>
+      <div style="display:flex;align-items:flex-end;"><button class="ghost small" data-delsession="1">✕ excluir sessão</button></div>
+    </div>
+    <div id="exList-${session.id}"></div>
+    <button class="small" data-addex="1">+ exercício</button>`;
+
+  container.querySelectorAll('[data-sfield]').forEach(inp=>{
+    inp.addEventListener('input', ()=>{
+      session[inp.dataset.sfield] = inp.value;
+      save();
+      if(inp.dataset.sfield==='date'){
+        openMonths.add(getMonthKey(session.date));
+        openWeeks.add(getWeekKey(session.date));
+        renderSessions();
+        refreshComputed();
+        return;
+      }
+      const head = container.parentElement.querySelector('.session-head');
+      head.querySelector('.session-name').textContent = session.name;
+      refreshComputed();
+    });
+  });
+  container.querySelector('[data-delsession]').addEventListener('click', ()=>{
+    if(!confirm('Excluir esta sessão?')) return;
+    state.sessions = state.sessions.filter(s=> s.id!==session.id);
+    save(); renderAll();
+  });
+  container.querySelector('[data-addex]').addEventListener('click', ()=>{
+    session.exercises.push({id:uid(), name:'Exercício', sets:[{reps:10,weight:0}]});
+    save(); renderExList();
+  });
+
+  const exListEl = container.querySelector(`#exList-${session.id}`);
+  function renderExList(){
+    exListEl.innerHTML = '';
+    session.exercises.forEach(ex=>{
+      const block = document.createElement('div');
+      block.className = 'ex-block';
+      block.innerHTML = `
+        <div class="ex-head">
+          <input type="text" class="ex-name-input" value="${escapeAttr(ex.name)}">
+          <button class="ghost small" data-delex="${ex.id}">✕</button>
+        </div>
+        <div class="set-rows"></div>
+        <button class="ghost small set-add" data-addset="${ex.id}">+ série</button>`;
+      exListEl.appendChild(block);
+
+      block.querySelector('.ex-name-input').addEventListener('input', e=>{
+        ex.name = e.target.value; save(); refreshComputed();
+      });
+      block.querySelector('[data-delex]').addEventListener('click', ()=>{
+        session.exercises = session.exercises.filter(e=> e.id!==ex.id);
+        save(); renderExList(); refreshComputed();
+      });
+      block.querySelector('[data-addset]').addEventListener('click', ()=>{
+        const last = ex.sets[ex.sets.length-1];
+        ex.sets.push({reps:last?last.reps:10, weight:last?last.weight:0});
+        save(); renderSetRows();
+      });
+
+      const setRowsEl = block.querySelector('.set-rows');
+      function renderSetRows(){
+        setRowsEl.innerHTML = '';
+        ex.sets.forEach((s,i)=>{
+          const row = document.createElement('div');
+          row.className = 'set-row';
+          row.innerHTML = `
+            <span class="set-idx">${i+1}</span>
+            <input type="number" min="0" placeholder="reps" value="${s.reps}" data-k="reps">
+            <input type="number" min="0" step="0.5" placeholder="kg" value="${s.weight}" data-k="weight">
+            <button class="ghost small" data-delset="${i}">✕</button>`;
+          setRowsEl.appendChild(row);
+          row.querySelector('[data-k="reps"]').addEventListener('input', e=>{ s.reps=parseFloat(e.target.value)||0; save(); refreshComputed(); });
+          row.querySelector('[data-k="weight"]').addEventListener('input', e=>{ s.weight=parseFloat(e.target.value)||0; save(); refreshComputed(); });
+          row.querySelector('[data-delset]').addEventListener('click', ()=>{
+            ex.sets.splice(i,1);
+            if(ex.sets.length===0) ex.sets.push({reps:10,weight:0});
+            save(); renderSetRows(); refreshComputed();
+          });
+        });
+      }
+      renderSetRows();
+    });
+  }
+  renderExList();
+}
+
+sessionsList.addEventListener('click', e=>{
+  const monthHead = e.target.closest('[data-month]');
+  if(monthHead){
+    const k = monthHead.dataset.month;
+    if(openMonths.has(k)) openMonths.delete(k); else openMonths.add(k);
+    renderSessions();
+    return;
+  }
+  const weekHead = e.target.closest('[data-week]');
+  if(weekHead){
+    const k = weekHead.dataset.week;
+    if(openWeeks.has(k)) openWeeks.delete(k); else openWeeks.add(k);
+    renderSessions();
+    return;
+  }
+  const head = e.target.closest('[data-open]');
+  if(!head) return;
+  const id = head.dataset.open;
+  openSessionId = (openSessionId===id) ? null : id;
+  renderSessions();
+});
+
+/* ---------- Progress table (com ramificação por série) ---------- */
+function computeProgress(){
+  const byExercise = {};
+  state.sessions.forEach(session=>{
+    session.exercises.forEach(ex=>{
+      const key = ex.name.trim().toLowerCase();
+      if(!key) return;
+      if(!byExercise[key]) byExercise[key] = { label: ex.name.trim(), sessionsData: [] };
+      byExercise[key].sessionsData.push({
+        date: session.date,
+        sets: ex.sets.map(s=> ({reps:s.reps, weight:s.weight, rm: epley1RM(s.weight,s.reps)}))
+      });
+    });
+  });
+
+  return Object.values(byExercise).map(e=>{
+    e.sessionsData.sort((a,b)=> a.date.localeCompare(b.date));
+
+    const points = e.sessionsData.map(sd=>{
+      const top = sd.sets.reduce((best,s)=> (!best || s.rm>best.rm) ? s : best, null);
+      return (top && top.rm>0) ? {date: sd.date, ...top} : null;
+    }).filter(Boolean);
+
+    const maxSets = e.sessionsData.reduce((n,sd)=> Math.max(n, sd.sets.length), 0);
+    const bySet = [];
+    for(let i=0;i<maxSets;i++){
+      const pts = e.sessionsData
+        .filter(sd=> sd.sets[i] && sd.sets[i].rm>0)
+        .map(sd=> ({date: sd.date, ...sd.sets[i]}));
+      if(pts.length>0) bySet.push(pts);
+    }
+
+    return { label: e.label, points, bySet };
+  }).filter(e=> e.points.length>0)
+    .sort((a,b)=> a.label.localeCompare(b.label,'pt-BR'));
+}
+
+function trendDelta(pts){
+  const cur = pts[pts.length-1];
+  const prev = pts.length>1 ? pts[pts.length-2] : null;
+  let deltaHtml = '<span class="hint">—</span>';
+  if(prev){
+    const diff = cur.rm - prev.rm;
+    const pct = (diff/prev.rm)*100;
+    const dir = Math.abs(pct)<0.5 ? 'flat' : (diff>0?'up':'down');
+    const arrow = dir==='up' ? '▲' : dir==='down' ? '▼' : '▬';
+    deltaHtml = `<span class="trend ${dir}">${arrow} ${Math.abs(pct).toFixed(1)}%</span>`;
+  }
+  return { cur, prev, deltaHtml };
+}
+
+function sparkline(points){
+  const w=110, h=32, pad=4;
+  const vals = points.map(p=> p.rm);
+  const min = Math.min(...vals), max = Math.max(...vals);
+  const span = (max-min)||1;
+  const step = (w-pad*2)/Math.max(1,points.length-1);
+  const pts = vals.map((v,i)=> [pad+i*step, h-pad-((v-min)/span)*(h-pad*2)]);
+  const path = pts.map((p,i)=> (i===0?'M':'L')+p[0].toFixed(1)+','+p[1].toFixed(1)).join(' ');
+  const last = pts[pts.length-1];
+  const rising = vals[vals.length-1] >= vals[0];
+  const color = rising ? 'var(--up)' : 'var(--down)';
+  return `<svg class="spark" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}">
+    <path d="${path}" fill="none" stroke="${color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+    <circle cx="${last[0]}" cy="${last[1]}" r="2.6" fill="${color}"/>
+  </svg>`;
+}
+
+const expandedExercises = new Set();
+
+function progressRow(label, pts, opts={}){
+  const {cur, prev, deltaHtml} = trendDelta(pts);
+  return `<tr class="${opts.sub?'sub-row':''}">
+    <td>${opts.control||''}${escapeHtml(label)}</td>
+    <td class="num">${cur.weight}kg × ${cur.reps}</td>
+    <td class="num">${prev? prev.weight+'kg × '+prev.reps : '—'}</td>
+    <td class="num">${cur.rm.toFixed(1)}kg</td>
+    <td>${deltaHtml}</td>
+    <td>${pts.length>1 ? sparkline(pts.slice(-8)) : '<span class="hint">1 registro</span>'}</td>
+  </tr>`;
+}
+
+function renderProgress(){
+  const wrap = document.getElementById('progressWrap');
+  const data = computeProgress();
+  if(data.length===0){
+    wrap.innerHTML = `<div class="empty"><strong>Sem dados suficientes</strong>Registre pelo menos uma sessão para ver a evolução do rendimento.</div>`;
+    return;
+  }
+  const rows = data.map(e=>{
+    const key = e.label.toLowerCase();
+    const hasBranches = e.bySet.length>1;
+    const isOpen = hasBranches && expandedExercises.has(key);
+    const control = hasBranches
+      ? `<button class="ghost small ex-toggle" data-ex="${escapeAttr(key)}">${isOpen?'▾':'▸'} ${e.bySet.length} séries</button> `
+      : '';
+    let html = progressRow(e.label, e.points, {control});
+    if(isOpen){
+      html += e.bySet.map((pts,i)=> progressRow(`Série ${i+1}`, pts, {sub:true})).join('');
+    }
+    return html;
+  }).join('');
+  wrap.innerHTML = `<div class="tbl-scroll"><table>
+    <thead><tr><th>Exercício</th><th>Atual</th><th>Anterior</th><th>1RM est.</th><th>Variação</th><th>Tendência</th></tr></thead>
+    <tbody>${rows}</tbody></table></div>`;
+
+  wrap.querySelectorAll('.ex-toggle').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      const k = btn.dataset.ex;
+      if(expandedExercises.has(k)) expandedExercises.delete(k); else expandedExercises.add(k);
+      renderProgress();
+    });
+  });
+}
+
+/* ---------- Stats + helpers ---------- */
+function refreshComputed(){
+  renderProgress();
+  renderStats();
+}
+
+function renderStats(){
+  const exSet = new Set();
+  let up=0;
+  state.sessions.forEach(s=> s.exercises.forEach(e=> { if(e.name.trim()) exSet.add(e.name.trim().toLowerCase()); }));
+  computeProgress().forEach(e=>{
+    if(e.points.length>1 && e.points[e.points.length-1].rm > e.points[e.points.length-2].rm) up++;
+  });
+  document.getElementById('statSessions').textContent = state.sessions.length;
+  document.getElementById('statExercises').textContent = exSet.size;
+  document.getElementById('statUp').textContent = up;
+}
+
+function escapeHtml(s){ return String(s).replace(/[&<>"']/g, c=> ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function escapeAttr(s){ return escapeHtml(s); }
+
+function renderAll(){
+  renderSessions();
+  renderProgress();
+  renderStats();
+}
+renderAll();
+</script>
