@@ -834,7 +834,10 @@ function renderSessions(){
         div.innerHTML = `
           <div class="session-head" data-open="${session.id}">
             <span class="session-name">${escapeHtml(session.name)}</span>
-            <span class="chev">›</span>
+            <div style="display:flex;align-items:center;gap:4px;">
+              <button class="ghost small" data-quickdel="${session.id}" title="Excluir sessão">✕</button>
+              <span class="chev">›</span>
+            </div>
           </div>
           <div class="session-body"></div>`;
         weekBody.appendChild(div);
@@ -936,6 +939,17 @@ function renderSessionBody(container, session){
 }
 
 sessionsList.addEventListener('click', e=>{
+  const quickDel = e.target.closest('[data-quickdel]');
+  if(quickDel){
+    const id = quickDel.dataset.quickdel;
+    const session = state.sessions.find(s=> s.id===id);
+    if(session && confirm(`Excluir a sessão "${session.name}"?`)){
+      state.sessions = state.sessions.filter(s=> s.id!==id);
+      if(openSessionId===id) openSessionId = null;
+      save(); renderAll();
+    }
+    return;
+  }
   const monthHead = e.target.closest('[data-month]');
   if(monthHead){
     const k = monthHead.dataset.month;
