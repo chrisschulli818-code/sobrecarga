@@ -78,6 +78,13 @@ h1{
 }
 .tagline{color:var(--text-dim);font-size:13.5px;margin-top:4px;max-width:34ch;}
 .stat-row{display:flex;gap:22px;flex-wrap:wrap;}
+.sync-badge{
+  font-size:10.5px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;
+  padding:3px 9px;border-radius:20px;border:1px solid var(--border);color:var(--text-faint);
+}
+.sync-badge[data-status="synced"]{color:var(--up);border-color:var(--up);}
+.sync-badge[data-status="offline"]{color:var(--down);border-color:var(--down);}
+.sync-badge[data-status="syncing"]{color:var(--text-dim);}
 .stat{text-align:right;}
 .stat .n{font-family:'IBM Plex Mono',monospace;font-size:22px;font-weight:600;font-variant-numeric:tabular-nums;}
 .stat .l{font-size:10.5px;text-transform:uppercase;letter-spacing:.08em;color:var(--text-faint);}
@@ -242,10 +249,13 @@ footer{text-align:center;color:var(--text-faint);font-size:11.5px;margin-top:32p
         <div class="tagline">Seu diário de treino: importe do PDF, edite séries e peso, acompanhe se o rendimento está subindo ou caindo.</div>
       </div>
     </div>
-    <div class="stat-row">
-      <div class="stat"><div class="n" id="statSessions">0</div><div class="l">Sessões</div></div>
-      <div class="stat"><div class="n" id="statExercises">0</div><div class="l">Exercícios</div></div>
-      <div class="stat"><div class="n" id="statUp">0</div><div class="l">Em alta</div></div>
+    <div style="display:flex;flex-direction:column;align-items:flex-end;gap:10px;">
+      <span class="sync-badge" id="syncBadge" data-status="syncing">Sincronizando…</span>
+      <div class="stat-row">
+        <div class="stat"><div class="n" id="statSessions">0</div><div class="l">Sessões</div></div>
+        <div class="stat"><div class="n" id="statExercises">0</div><div class="l">Exercícios</div></div>
+        <div class="stat"><div class="n" id="statUp">0</div><div class="l">Em alta</div></div>
+      </div>
     </div>
   </div>
 
@@ -310,18 +320,61 @@ footer{text-align:center;color:var(--text-faint);font-size:11.5px;margin-top:32p
 pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
 
 const STORE_KEY = 'sobrecarga_v1';
-let state = load();
+let state = loadLocal();
 let stageRows = [];
+let syncTimer = null;
+const syncBadge = () => document.getElementById('syncBadge');
 
-function load(){
+function loadLocal(){
   try{
     const raw = localStorage.getItem(STORE_KEY);
     if(raw) return JSON.parse(raw);
   }catch(e){}
   return { sessions: [] };
 }
-function save(){
+function saveLocal(){
   try{ localStorage.setItem(STORE_KEY, JSON.stringify(state)); }catch(e){}
+}
+function setSyncStatus(status){
+  const el = syncBadge();
+  if(!el) return;
+  el.dataset.status = status;
+  el.textContent = status==='synced' ? 'Sincronizado' : status==='syncing' ? 'Sincronizando…' : status==='offline' ? 'Só neste aparelho' : 'Erro ao sincronizar';
+}
+async function loadRemote(){
+  try{
+    setSyncStatus('syncing');
+    const res = await fetch('/api/state');
+    if(!res.ok) throw new Error('bad status');
+    const data = await res.json();
+    if(data && Array.isArray(data.sessions)){
+      state = data;
+      saveLocal();
+      renderAll();
+    }
+    setSyncStatus('synced');
+  }catch(e){
+    setSyncStatus('offline');
+  }
+}
+function save(){
+  saveLocal();
+  clearTimeout(syncTimer);
+  syncTimer = setTimeout(syncRemote, 500);
+}
+async function syncRemote(){
+  try{
+    setSyncStatus('syncing');
+    const res = await fetch('/api/state', {
+      method: 'PUT',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify(state)
+    });
+    if(!res.ok) throw new Error('bad status');
+    setSyncStatus('synced');
+  }catch(e){
+    setSyncStatus('offline');
+  }
 }
 function uid(){ return Math.random().toString(36).slice(2,10); }
 function todayISO(){ return new Date().toISOString().slice(0,10); }
@@ -896,4 +949,5 @@ function renderAll(){
   renderStats();
 }
 renderAll();
+loadRemote();
 </script>

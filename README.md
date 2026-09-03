@@ -2,14 +2,12 @@
 
 Diário de treino: importe PDFs, edite séries de reps e peso, e acompanhe a evolução do rendimento por exercício (1RM estimado, ramificado por série).
 
-Site estático de arquivo único (`index.html`). Sem build, sem backend — os dados ficam salvos no `localStorage` do navegador de quem acessa.
+Backend Node/Express (`server.js`) servindo o app (`index.html`) e uma API (`/api/state`) que lê e grava num banco Postgres — assim os dados sincronizam entre celular, computador etc. O navegador ainda guarda uma cópia em `localStorage` como cache local (funciona offline; sincroniza quando volta a conexão).
 
 ## Deploy no Render
 
-Este repositório já vem com `render.yaml` (Blueprint). No Render:
+Este repositório vem com `render.yaml` (Blueprint) que cria o serviço web **e** o banco Postgres juntos:
 
-1. **New +** → **Blueprint**
-2. Selecione este repositório
-3. Confirme — o Render detecta o `render.yaml` e cria o site estático automaticamente
-
-Ou manualmente: **New +** → **Static Site** → selecione o repositório → Build Command vazio → Publish Directory `.`
+1. Se já existir um Static Site antigo chamado `sobrecarga`, apague-o antes (Settings → Delete) para liberar o nome.
+2. **New +** → **Blueprint**
+3. Selecione este repositório e confirme — o Render cria o banco `sobrecarga-db` e o serviço web `sobrecarga`, já conectados via `DATABASE_URL`.
