@@ -191,10 +191,7 @@ button:disabled{opacity:.4;cursor:not-allowed;}
   padding:13px 16px;cursor:pointer;background:var(--surface-2);
 }
 .session-head:hover{background:var(--surface-3);}
-.session-title{display:flex;align-items:baseline;gap:10px;}
-.session-date{font-family:'IBM Plex Mono',monospace;font-size:13.5px;font-weight:600;}
-.session-name{color:var(--text-dim);font-size:13px;}
-.session-meta{font-size:11.5px;color:var(--text-faint);}
+.session-name{color:var(--text);font-size:14px;font-weight:600;}
 .session-body{padding:14px 16px 16px;display:none;}
 .session.open .session-body{display:block;}
 .session.open .chev{transform:rotate(90deg);}
@@ -836,14 +833,8 @@ function renderSessions(){
         const setCount = session.exercises.reduce((n,e)=> n+e.sets.length, 0);
         div.innerHTML = `
           <div class="session-head" data-open="${session.id}">
-            <div class="session-title">
-              <span class="session-date">${fmtDate(session.date)}</span>
-              <span class="session-name">${escapeHtml(session.name)}</span>
-            </div>
-            <div style="display:flex;align-items:center;gap:12px;">
-              <span class="session-meta">${session.exercises.length} exerc. · ${setCount} séries</span>
-              <span class="chev">›</span>
-            </div>
+            <span class="session-name">${escapeHtml(session.name)}</span>
+            <span class="chev">›</span>
           </div>
           <div class="session-body"></div>`;
         weekBody.appendChild(div);
