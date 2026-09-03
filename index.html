@@ -227,6 +227,7 @@ tr.sub-row td:first-child{padding-left:22px;color:var(--text-faint);}
 .empty strong{color:var(--text-dim);display:block;font-size:14.5px;margin-bottom:4px;}
 
 .stage-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:14px;}
+.stage-group{border:1px solid var(--border);border-radius:11px;padding:16px;margin-bottom:14px;background:var(--surface-2);}
 .badge-count{
   background:var(--surface-3);color:var(--text-dim);font-size:11px;font-family:'IBM Plex Mono',monospace;
   padding:2px 7px;border-radius:20px;
@@ -262,36 +263,17 @@ footer{text-align:center;color:var(--text-faint);font-size:11.5px;margin-top:32p
   <div class="card">
     <div class="card-head">
       <h2><span class="chip">↥</span>Importar PDF</h2>
-      <span class="hint">Extrai texto do PDF e sugere exercícios, séries, repetições e carga</span>
+      <span class="hint">Detecta cada treino do PDF como uma sessão separada. Fichas de prescrição não têm carga — preencha depois de treinar</span>
     </div>
     <label class="drop" id="drop" tabindex="0">
       <input type="file" id="fileInput" accept="application/pdf">
       <div id="dropLabel"><strong>Clique para escolher</strong> ou arraste um PDF de treino aqui</div>
     </label>
     <div id="stageWrap" style="display:none;margin-top:18px;">
-      <div class="row-fields">
-        <div>
-          <label class="hint">Nome da sessão</label>
-          <input type="text" id="stageName" placeholder="ex.: Treino A — Peito/Tríceps">
-        </div>
-        <div>
-          <label class="hint">Data</label>
-          <input type="date" id="stageDate">
-        </div>
-        <div style="display:flex;align-items:flex-end;">
-          <span class="badge-count" id="stageCount">0 linhas</span>
-        </div>
-      </div>
-      <div class="tbl-scroll">
-        <table id="stageTable">
-          <thead><tr><th>Exercício</th><th style="width:70px">Séries</th><th style="width:80px">Reps</th><th style="width:90px">Carga (kg)</th><th></th></tr></thead>
-          <tbody id="stageBody"></tbody>
-        </table>
-      </div>
+      <div id="stageGroupsWrap"></div>
       <div class="stage-actions">
-        <button class="small" id="stageAddRow">+ linha</button>
         <button class="ghost small" id="stageCancel">Cancelar</button>
-        <button class="primary small" id="stageConfirm">Adicionar à agenda</button>
+        <button class="primary small" id="stageConfirm">Adicionar sessões</button>
       </div>
     </div>
   </div>
@@ -312,7 +294,7 @@ footer{text-align:center;color:var(--text-faint);font-size:11.5px;margin-top:32p
     <div id="progressWrap"></div>
   </div>
 
-  <footer>Os dados ficam salvos só neste navegador.</footer>
+  <footer>Os dados sincronizam entre seus aparelhos. Uma cópia fica salva neste navegador para funcionar offline.</footer>
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
@@ -410,31 +392,143 @@ async function handleFile(file){
   try{
     const buf = await file.arrayBuffer();
     const pdf = await pdfjsLib.getDocument({data:buf}).promise;
-    let lines = [];
-    for(let p=1;p<=pdf.numPages;p++){
-      const page = await pdf.getPage(p);
-      const content = await page.getTextContent();
-      lines = lines.concat(groupIntoLines(content.items));
+
+    const gridGroups = await extractGridWorkouts(pdf);
+
+    let groups;
+    if(gridGroups.length){
+      groups = gridGroups;
+    }else{
+      // fallback: PDF não tem o formato de grade (Séries/Aquec/Prep/1ª..5ª) — usa leitura linha a linha genérica
+      let lines = [];
+      for(let p=1;p<=pdf.numPages;p++){
+        const page = await pdf.getPage(p);
+        const content = await page.getTextContent();
+        lines = lines.concat(groupIntoLines(content.items, 8));
+      }
+      groups = [{ title: file.name.replace(/\.pdf$/i,''), rows: parseLines(lines) }];
     }
-    const rows = parseLines(lines);
+
     dropLabel.innerHTML = `<strong>${file.name}</strong> — clique para trocar o arquivo`;
-    openStage(rows, file.name);
+    openStage(groups, file.name);
   }catch(err){
     console.error(err);
     dropLabel.innerHTML = '<strong>Não consegui ler esse PDF.</strong> Clique para tentar outro';
   }
 }
 
-function groupIntoLines(items){
-  const byY = {};
-  items.forEach(it=>{
-    const y = Math.round(it.transform[5]);
-    if(!byY[y]) byY[y] = [];
-    byY[y].push(it);
+/* Reconstrói tabelas no formato "grade de treino" (colunas Aquec/Prep/1ª..5ª por
+   série), agrupando por posição x/y dos textos — esse tipo de PDF não tem "kg",
+   só faixas de repetição prescritas (ex.: "6 a 10", "max"), sem carga. */
+async function extractGridWorkouts(pdf){
+  const groups = [];
+  const COLS = ['aquec','prep','1','2','3','4','5'];
+
+  for(let p=1;p<=pdf.numPages;p++){
+    const page = await pdf.getPage(p);
+    const content = await page.getTextContent();
+    const items = content.items
+      .map(it=> ({ x: it.transform[4], y: it.transform[5], str: it.str }))
+      .filter(it=> it.str && it.str.trim());
+    if(!items.length) continue;
+
+    const rows = clusterByY(items, 18, true);
+
+    let headerIdx=-1, anchors=null;
+    for(let i=0;i<rows.length;i++){
+      // pdf.js às vezes extrai "AQUEC" como "A Q U E C" (letras espaçadas) — remove espaços antes de comparar
+      const upper = rows[i].map(w=> w.str.toUpperCase().replace(/\s+/g,''));
+      if(upper.some(t=>t.includes('AQUEC')) && upper.some(t=>t.includes('PREP'))){
+        anchors = {};
+        rows[i].forEach((w,wi)=>{
+          const t = upper[wi];
+          if(t.includes('AQUEC')) anchors.aquec = w.x;
+          else if(t.includes('PREP')) anchors.prep = w.x;
+          else{ const m = t.match(/^([1-5])/); if(m) anchors[m[1]] = w.x; }
+        });
+        headerIdx = i;
+        break;
+      }
+    }
+    if(!anchors) continue;
+
+    const titleParts = [];
+    for(let i=0;i<headerIdx;i++){
+      const line = rows[i].slice().sort((a,b)=> a.x-b.x).map(w=> w.str).join(' ').replace(/\s+/g,' ').trim();
+      if(line) titleParts.push(line);
+    }
+    const title = titleParts.join(' — ').trim() || `Treino ${groups.length+1}`;
+    const group = { title, rows: [] };
+    groups.push(group);
+
+    function nearestCol(x){
+      let best=null, bestd=Infinity;
+      COLS.forEach(c=>{
+        if(!(c in anchors)) return;
+        const d = Math.abs(x-anchors[c]);
+        if(d<bestd){ best=c; bestd=d; }
+      });
+      return bestd<32 ? best : null;
+    }
+
+    for(let i=headerIdx+1;i<rows.length;i++){
+      const nameToks=[], colToks={aquec:[],prep:[],'1':[],'2':[],'3':[],'4':[],'5':[]};
+      let setsCount=null;
+      rows[i].forEach(w=>{
+        const t = w.str.trim();
+        if(!t) return;
+        if(w.x < 160){ nameToks.push(w); }
+        else if(w.x>=175 && w.x<=215 && /^\d+$/.test(t)){ setsCount = t; }
+        else{
+          const c = nearestCol(w.x);
+          if(c) colToks[c].push(w);
+        }
+      });
+      const name = nameToks.slice().sort((a,b)=> (b.y-a.y) || (a.x-b.x)).map(w=> w.str).join(' ').replace(/\s+/g,' ').trim();
+      if(!name) continue;
+
+      const populated = COLS.filter(c=> colToks[c].length);
+      if(populated.length===0){
+        group.rows.push({ name, sets: parseInt(setsCount,10)||1, reps: 10, weight: 0 });
+        continue;
+      }
+      populated.forEach(c=>{
+        const text = colToks[c].slice().sort((a,b)=> (b.y-a.y) || (a.x-b.x)).map(w=> w.str).join(' ').replace(/\s+/g,' ').trim();
+        group.rows.push({ name, sets: 1, reps: parseRepsTarget(text), weight: 0 });
+      });
+    }
+  }
+  return groups.filter(g=> g.rows.length>0);
+}
+
+// Agrupa itens de texto em "linhas" por proximidade de Y (não Y exato — uma
+// linha de tabela real varia alguns pontos entre células/baseline).
+function clusterByY(items, gap, topFirst){
+  const sorted = [...items].sort((a,b)=> topFirst ? b.y-a.y : a.y-b.y);
+  const rows = [];
+  let cur=[], lastY=null;
+  sorted.forEach(it=>{
+    if(lastY!==null && Math.abs(lastY-it.y) > gap){ rows.push(cur); cur=[]; }
+    cur.push(it);
+    lastY = it.y;
   });
-  const ys = Object.keys(byY).map(Number).sort((a,b)=> b-a);
-  return ys.map(y=> byY[y].sort((a,b)=> a.transform[4]-b.transform[4]).map(it=> it.str).join(' ').replace(/\s+/g,' ').trim())
-           .filter(Boolean);
+  if(cur.length) rows.push(cur);
+  return rows;
+}
+
+function parseRepsTarget(text){
+  const nums = (text.match(/\d+/g)||[]).map(n=> parseInt(n,10));
+  if(!nums.length) return 10; // ex.: "max"
+  return nums[nums.length-1];
+}
+
+function groupIntoLines(items, gap){
+  const rows = clusterByY(
+    items.map(it=> ({x: it.transform[4], y: it.transform[5], str: it.str})),
+    gap!==undefined ? gap : 3, true
+  );
+  return rows.map(r=> r.slice().sort((a,b)=> a.x-b.x).map(w=> w.str).join(' ').replace(/\s+/g,' ').trim())
+             .filter(Boolean);
 }
 
 function parseLines(lines){
@@ -464,7 +558,7 @@ function parseLines(lines){
       if(repsWordM){ reps = parseInt(repsWordM[1],10); rest = rest.replace(repsWordRe,''); }
     }
 
-    // table-style rows: "Exercício  4  10" (sets and reps as separate trailing columns, no 'x')
+    // table-style rows: "Exercício  4  10" (sets e reps em colunas separadas, sem 'x')
     if(sets===null && reps===null){
       const twoTrailing = rest.match(/(\d{1,2})\s+(\d{1,3})\s*$/);
       if(twoTrailing && /[a-zA-Zà-úÀ-Ú]/.test(rest.slice(0, twoTrailing.index))){
@@ -503,75 +597,140 @@ function parseLines(lines){
   return rows.slice(0,60);
 }
 
-/* ---------- Staging table ---------- */
-const stageWrap = document.getElementById('stageWrap');
-const stageBody = document.getElementById('stageBody');
-const stageName = document.getElementById('stageName');
-const stageDate = document.getElementById('stageDate');
-const stageCount = document.getElementById('stageCount');
+/* Junta linhas de mesmo exercício (mesmo nome) em UM exercício com várias séries —
+   necessário porque a grade de treino gera uma linha por coluna (1ª,2ª,3ª...). */
+function buildExercisesFromRows(rows){
+  const byKey = new Map();
+  const order = [];
+  rows.forEach(r=>{
+    if(!r.name || !r.name.trim()) return;
+    const key = r.name.trim().toLowerCase();
+    if(!byKey.has(key)){
+      byKey.set(key, { id: uid(), name: r.name.trim(), sets: [] });
+      order.push(key);
+    }
+    const ex = byKey.get(key);
+    const n = Math.max(1, r.sets||1);
+    for(let i=0;i<n;i++) ex.sets.push({ reps: r.reps||0, weight: r.weight||0 });
+  });
+  return order.map(k=> byKey.get(k));
+}
 
-function openStage(rows, fileName){
-  stageRows = rows.length? rows : [{name:'', sets:1, reps:10, weight:0}];
-  stageName.value = fileName.replace(/\.pdf$/i,'').slice(0,60);
-  stageDate.value = todayISO();
+function addDaysISO(iso, n){
+  const d = new Date(iso+'T00:00:00');
+  d.setDate(d.getDate()+n);
+  return d.toISOString().slice(0,10);
+}
+
+/* ---------- Staging (múltiplas sessões por PDF) ---------- */
+const stageWrap = document.getElementById('stageWrap');
+const stageGroupsWrap = document.getElementById('stageGroupsWrap');
+let stageGroups = [];
+
+function openStage(groups, fileName){
+  const today = todayISO();
+  stageGroups = (groups.length? groups : [{title: fileName.replace(/\.pdf$/i,''), rows:[]}]).map((g,i)=> ({
+    id: uid(),
+    name: (g.title || `Treino ${i+1}`).slice(0,80),
+    date: addDaysISO(today, i),
+    rows: g.rows.length? g.rows : [{name:'', sets:1, reps:10, weight:0}]
+  }));
   stageWrap.style.display = 'block';
-  renderStage();
+  renderStageGroups();
   stageWrap.scrollIntoView({behavior:'smooth', block:'nearest'});
 }
-function renderStage(){
-  stageBody.innerHTML = '';
-  stageRows.forEach((r,i)=>{
-    const tr = document.createElement('tr');
-    tr.innerHTML = `
-      <td><input type="text" data-i="${i}" data-f="name" value="${escapeAttr(r.name)}"></td>
-      <td><input type="number" min="1" data-i="${i}" data-f="sets" value="${r.sets}"></td>
-      <td><input type="number" min="0" data-i="${i}" data-f="reps" value="${r.reps}"></td>
-      <td><input type="number" min="0" step="0.5" data-i="${i}" data-f="weight" value="${r.weight}"></td>
-      <td><button class="ghost small" data-del="${i}" title="Remover linha">✕</button></td>`;
-    stageBody.appendChild(tr);
+
+function renderStageGroups(){
+  stageGroupsWrap.innerHTML = '';
+  stageGroups.forEach((group, gi)=>{
+    const card = document.createElement('div');
+    card.className = 'stage-group';
+    card.innerHTML = `
+      <div class="row-fields" style="grid-template-columns:1fr 160px 90px;">
+        <div><label class="hint">Nome da sessão</label><input type="text" data-gfield="name" value="${escapeAttr(group.name)}"></div>
+        <div><label class="hint">Data</label><input type="date" data-gfield="date" value="${group.date}"></div>
+        <div style="display:flex;align-items:flex-end;gap:8px;">
+          <span class="badge-count">${group.rows.length} linhas</span>
+          ${stageGroups.length>1 ? `<button class="ghost small" data-delgroup="1" title="Remover este treino">✕</button>` : ''}
+        </div>
+      </div>
+      <div class="tbl-scroll">
+        <table>
+          <thead><tr><th>Exercício</th><th style="width:70px">Séries</th><th style="width:80px">Reps</th><th style="width:90px">Carga (kg)</th><th></th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+      <button class="ghost small" data-addrow="1" style="margin-top:8px;">+ linha</button>`;
+    stageGroupsWrap.appendChild(card);
+
+    card.querySelector('[data-gfield="name"]').addEventListener('input', e=>{ group.name = e.target.value; });
+    card.querySelector('[data-gfield="date"]').addEventListener('input', e=>{ group.date = e.target.value; });
+    const delBtn = card.querySelector('[data-delgroup]');
+    if(delBtn) delBtn.addEventListener('click', ()=>{
+      stageGroups = stageGroups.filter(g=> g.id!==group.id);
+      renderStageGroups();
+    });
+
+    const tbody = card.querySelector('tbody');
+    function renderRows(){
+      tbody.innerHTML = '';
+      group.rows.forEach((r,i)=>{
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td><input type="text" data-i="${i}" data-f="name" value="${escapeAttr(r.name)}"></td>
+          <td><input type="number" min="1" data-i="${i}" data-f="sets" value="${r.sets}"></td>
+          <td><input type="number" min="0" data-i="${i}" data-f="reps" value="${r.reps}"></td>
+          <td><input type="number" min="0" step="0.5" data-i="${i}" data-f="weight" value="${r.weight}"></td>
+          <td><button class="ghost small" data-del="${i}" title="Remover linha">✕</button></td>`;
+        tbody.appendChild(tr);
+      });
+      card.querySelector('.badge-count').textContent = group.rows.length + ' linhas';
+    }
+    tbody.addEventListener('input', e=>{
+      const t = e.target;
+      if(t.dataset.i===undefined) return;
+      const i = +t.dataset.i, f = t.dataset.f;
+      group.rows[i][f] = (f==='name') ? t.value : parseFloat(t.value)||0;
+    });
+    tbody.addEventListener('click', e=>{
+      if(e.target.dataset.del!==undefined){
+        group.rows.splice(+e.target.dataset.del,1);
+        renderRows();
+      }
+    });
+    card.querySelector('[data-addrow]').addEventListener('click', ()=>{
+      group.rows.push({name:'', sets:1, reps:10, weight:0});
+      renderRows();
+    });
+    renderRows();
   });
-  stageCount.textContent = stageRows.length + ' linhas';
 }
-stageBody.addEventListener('input', e=>{
-  const t = e.target;
-  if(t.dataset.i===undefined) return;
-  const i = +t.dataset.i, f = t.dataset.f;
-  stageRows[i][f] = (f==='name') ? t.value : parseFloat(t.value)||0;
-});
-stageBody.addEventListener('click', e=>{
-  if(e.target.dataset.del!==undefined){
-    stageRows.splice(+e.target.dataset.del,1);
-    renderStage();
-  }
-});
-document.getElementById('stageAddRow').addEventListener('click', ()=>{
-  stageRows.push({name:'', sets:1, reps:10, weight:0});
-  renderStage();
-});
-document.getElementById('stageCancel').addEventListener('click', ()=>{
+
+function closeStage(){
   stageWrap.style.display='none';
   fileInput.value='';
   dropLabel.innerHTML = '<strong>Clique para escolher</strong> ou arraste um PDF de treino aqui';
-});
+}
+document.getElementById('stageCancel').addEventListener('click', closeStage);
 document.getElementById('stageConfirm').addEventListener('click', ()=>{
-  const validRows = stageRows.filter(r=> r.name && r.name.trim());
-  if(validRows.length===0){ alert('Adicione ao menos um exercício com nome.'); return; }
-  const session = {
-    id: uid(),
-    date: stageDate.value || todayISO(),
-    name: stageName.value.trim() || 'Sessão',
-    exercises: validRows.map(r=> ({
-      id: uid(), name: r.name.trim(),
-      sets: Array.from({length: Math.max(1,r.sets||1)}, ()=> ({reps: r.reps||0, weight: r.weight||0}))
-    }))
-  };
-  state.sessions.push(session);
-  openMonths.add(getMonthKey(session.date));
-  openWeeks.add(getWeekKey(session.date));
+  let added = 0;
+  stageGroups.forEach(group=>{
+    const exercises = buildExercisesFromRows(group.rows);
+    if(exercises.length===0) return;
+    const session = {
+      id: uid(),
+      date: group.date || todayISO(),
+      name: group.name.trim() || 'Sessão',
+      exercises
+    };
+    state.sessions.push(session);
+    openMonths.add(getMonthKey(session.date));
+    openWeeks.add(getWeekKey(session.date));
+    added++;
+  });
+  if(added===0){ alert('Adicione ao menos um exercício com nome.'); return; }
   save();
-  stageWrap.style.display='none';
-  fileInput.value='';
-  dropLabel.innerHTML = '<strong>Clique para escolher</strong> ou arraste um PDF de treino aqui';
+  closeStage();
   renderAll();
   document.getElementById('sessionsList').scrollIntoView({behavior:'smooth', block:'nearest'});
 });
