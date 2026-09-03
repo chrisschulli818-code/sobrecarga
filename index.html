@@ -230,6 +230,17 @@ tr.sub-row td:first-child{padding-left:22px;color:var(--text-faint);}
   padding:2px 7px;border-radius:20px;
 }
 footer{text-align:center;color:var(--text-faint);font-size:11.5px;margin-top:32px;}
+
+.confirm-overlay{
+  position:fixed;inset:0;background:rgba(0,0,0,.55);
+  display:flex;align-items:center;justify-content:center;z-index:1000;padding:20px;
+}
+.confirm-box{
+  background:var(--surface);border:1px solid var(--border);border-radius:12px;
+  padding:20px;max-width:340px;width:100%;box-shadow:var(--shadow);
+}
+.confirm-box p{margin:0 0 16px;font-size:14px;color:var(--text);}
+.confirm-actions{display:flex;justify-content:flex-end;gap:10px;}
 </style>
 
 <div class="wrap">
@@ -355,6 +366,29 @@ async function syncRemote(){
     setSyncStatus('offline');
   }
 }
+function confirmDialog(message){
+  return new Promise(resolve=>{
+    const overlay = document.createElement('div');
+    overlay.className = 'confirm-overlay';
+    overlay.innerHTML = `
+      <div class="confirm-box">
+        <p>${escapeHtml(message)}</p>
+        <div class="confirm-actions">
+          <button class="ghost small" data-act="cancel">Cancelar</button>
+          <button class="primary small" data-act="ok" style="background:var(--down);color:#fff;">Excluir</button>
+        </div>
+      </div>`;
+    document.body.appendChild(overlay);
+    function done(result){ overlay.remove(); resolve(result); }
+    overlay.addEventListener('click', e=>{
+      if(e.target===overlay) done(false);
+      const act = e.target.dataset && e.target.dataset.act;
+      if(act==='cancel') done(false);
+      if(act==='ok') done(true);
+    });
+  });
+}
+
 function uid(){ return Math.random().toString(36).slice(2,10); }
 function todayISO(){ return new Date().toISOString().slice(0,10); }
 function fmtDate(iso){
@@ -873,8 +907,8 @@ function renderSessionBody(container, session){
       refreshComputed();
     });
   });
-  container.querySelector('[data-delsession]').addEventListener('click', ()=>{
-    if(!confirm('Excluir esta sessão?')) return;
+  container.querySelector('[data-delsession]').addEventListener('click', async ()=>{
+    if(!(await confirmDialog(`Excluir a sessão "${session.name}"?`))) return;
     state.sessions = state.sessions.filter(s=> s.id!==session.id);
     save(); renderAll();
   });
@@ -938,12 +972,12 @@ function renderSessionBody(container, session){
   renderExList();
 }
 
-sessionsList.addEventListener('click', e=>{
+sessionsList.addEventListener('click', async e=>{
   const quickDel = e.target.closest('[data-quickdel]');
   if(quickDel){
     const id = quickDel.dataset.quickdel;
     const session = state.sessions.find(s=> s.id===id);
-    if(session && confirm(`Excluir a sessão "${session.name}"?`)){
+    if(session && (await confirmDialog(`Excluir a sessão "${session.name}"?`))){
       state.sessions = state.sessions.filter(s=> s.id!==id);
       if(openSessionId===id) openSessionId = null;
       save(); renderAll();
