@@ -251,10 +251,13 @@ footer{text-align:center;color:var(--text-faint);font-size:11.5px;margin-top:32p
         <div class="stat"><div class="n" id="statExercises">0</div><div class="l">Exercícios</div></div>
         <div class="stat"><div class="n" id="statUp">0</div><div class="l">Em alta</div></div>
       </div>
+      <a href="?professor=1" target="_blank" class="hint" id="professorLink" style="text-decoration:underline;">Área do professor (somente leitura) ↗</a>
     </div>
   </div>
 
-  <div class="card">
+  <div id="readonlyBanner" style="display:none;" class="hint"></div>
+
+  <div class="card" id="importCard">
     <div class="card-head">
       <h2><span class="chip">↥</span>Importar PDF</h2>
       <span class="hint">Detecta cada treino do PDF como uma sessão separada. Fichas de prescrição não têm carga — preencha depois de treinar</span>
@@ -305,6 +308,7 @@ footer{text-align:center;color:var(--text-faint);font-size:11.5px;margin-top:32p
 <script>
 pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
 
+const READONLY = new URLSearchParams(location.search).get('professor') === '1';
 const STORE_KEY = 'sobrecarga_v1';
 let state = loadLocal();
 let stageRows = [];
@@ -865,7 +869,7 @@ function renderSessions(){
           <div class="session-head" data-open="${session.id}">
             <span class="session-name">${escapeHtml(session.name)}</span>
             <div style="display:flex;align-items:center;gap:4px;">
-              <button class="ghost small" data-quickdel="${session.id}" title="Excluir sessão">✕</button>
+              ${READONLY ? '' : `<button class="ghost small" data-quickdel="${session.id}" title="Excluir sessão">✕</button>`}
               <span class="chev">›</span>
             </div>
           </div>
@@ -878,40 +882,44 @@ function renderSessions(){
 }
 
 function renderSessionBody(container, session){
+  const ro = READONLY;
+  const roAttr = ro ? 'disabled' : '';
   container.innerHTML = `
     <div class="row-fields" style="grid-template-columns:1fr 160px 90px;">
-      <div><label class="hint">Nome</label><input type="text" data-sfield="name" value="${escapeAttr(session.name)}"></div>
-      <div><label class="hint">Data</label><input type="date" data-sfield="date" value="${session.date}"></div>
-      <div style="display:flex;align-items:flex-end;"><button class="ghost small" data-delsession="1">✕ excluir sessão</button></div>
+      <div><label class="hint">Nome</label><input type="text" data-sfield="name" value="${escapeAttr(session.name)}" ${roAttr}></div>
+      <div><label class="hint">Data</label><input type="date" data-sfield="date" value="${session.date}" ${roAttr}></div>
+      <div style="display:flex;align-items:flex-end;">${ro?'':'<button class="ghost small" data-delsession="1">✕ excluir sessão</button>'}</div>
     </div>
     <div id="exList-${session.id}"></div>
-    <button class="small" data-addex="1">+ exercício</button>`;
+    ${ro?'':'<button class="small" data-addex="1">+ exercício</button>'}`;
 
-  container.querySelectorAll('[data-sfield]').forEach(inp=>{
-    inp.addEventListener('input', ()=>{
-      session[inp.dataset.sfield] = inp.value;
-      save();
-      if(inp.dataset.sfield==='date'){
-        openMonths.add(getMonthKey(session.date));
-        openWeeks.add(getWeekKey(session.date));
-        renderSessions();
+  if(!ro){
+    container.querySelectorAll('[data-sfield]').forEach(inp=>{
+      inp.addEventListener('input', ()=>{
+        session[inp.dataset.sfield] = inp.value;
+        save();
+        if(inp.dataset.sfield==='date'){
+          openMonths.add(getMonthKey(session.date));
+          openWeeks.add(getWeekKey(session.date));
+          renderSessions();
+          refreshComputed();
+          return;
+        }
+        const head = container.parentElement.querySelector('.session-head');
+        head.querySelector('.session-name').textContent = session.name;
         refreshComputed();
-        return;
-      }
-      const head = container.parentElement.querySelector('.session-head');
-      head.querySelector('.session-name').textContent = session.name;
-      refreshComputed();
+      });
     });
-  });
-  container.querySelector('[data-delsession]').addEventListener('click', async ()=>{
-    if(!(await confirmDialog(`Excluir a sessão "${session.name}"?`))) return;
-    state.sessions = state.sessions.filter(s=> s.id!==session.id);
-    save(); renderAll();
-  });
-  container.querySelector('[data-addex]').addEventListener('click', ()=>{
-    session.exercises.push({id:uid(), name:'Exercício', sets:[{reps:10,weight:0}]});
-    save(); renderExList();
-  });
+    container.querySelector('[data-delsession]').addEventListener('click', async ()=>{
+      if(!(await confirmDialog(`Excluir a sessão "${session.name}"?`))) return;
+      state.sessions = state.sessions.filter(s=> s.id!==session.id);
+      save(); renderAll();
+    });
+    container.querySelector('[data-addex]').addEventListener('click', ()=>{
+      session.exercises.push({id:uid(), name:'Exercício', sets:[{reps:10,weight:0}]});
+      save(); renderExList();
+    });
+  }
 
   const exListEl = container.querySelector(`#exList-${session.id}`);
   function renderExList(){
@@ -921,25 +929,27 @@ function renderSessionBody(container, session){
       block.className = 'ex-block';
       block.innerHTML = `
         <div class="ex-head">
-          <input type="text" class="ex-name-input" value="${escapeAttr(ex.name)}">
-          <button class="ghost small" data-delex="${ex.id}">✕</button>
+          <input type="text" class="ex-name-input" value="${escapeAttr(ex.name)}" ${roAttr}>
+          ${ro?'':`<button class="ghost small" data-delex="${ex.id}">✕</button>`}
         </div>
         <div class="set-rows"></div>
-        <button class="ghost small set-add" data-addset="${ex.id}">+ série</button>`;
+        ${ro?'':`<button class="ghost small set-add" data-addset="${ex.id}">+ série</button>`}`;
       exListEl.appendChild(block);
 
-      block.querySelector('.ex-name-input').addEventListener('input', e=>{
-        ex.name = e.target.value; save(); refreshComputed();
-      });
-      block.querySelector('[data-delex]').addEventListener('click', ()=>{
-        session.exercises = session.exercises.filter(e=> e.id!==ex.id);
-        save(); renderExList(); refreshComputed();
-      });
-      block.querySelector('[data-addset]').addEventListener('click', ()=>{
-        const last = ex.sets[ex.sets.length-1];
-        ex.sets.push({reps:last?last.reps:10, weight:last?last.weight:0});
-        save(); renderSetRows();
-      });
+      if(!ro){
+        block.querySelector('.ex-name-input').addEventListener('input', e=>{
+          ex.name = e.target.value; save(); refreshComputed();
+        });
+        block.querySelector('[data-delex]').addEventListener('click', ()=>{
+          session.exercises = session.exercises.filter(e=> e.id!==ex.id);
+          save(); renderExList(); refreshComputed();
+        });
+        block.querySelector('[data-addset]').addEventListener('click', ()=>{
+          const last = ex.sets[ex.sets.length-1];
+          ex.sets.push({reps:last?last.reps:10, weight:last?last.weight:0});
+          save(); renderSetRows();
+        });
+      }
 
       const setRowsEl = block.querySelector('.set-rows');
       function renderSetRows(){
@@ -949,17 +959,19 @@ function renderSessionBody(container, session){
           row.className = 'set-row';
           row.innerHTML = `
             <span class="set-idx">${i+1}</span>
-            <input type="number" min="0" placeholder="reps" value="${s.reps}" data-k="reps">
-            <input type="number" min="0" step="0.5" placeholder="kg" value="${s.weight}" data-k="weight">
-            <button class="ghost small" data-delset="${i}">✕</button>`;
+            <input type="number" min="0" placeholder="reps" value="${s.reps}" data-k="reps" ${roAttr}>
+            <input type="number" min="0" step="0.5" placeholder="kg" value="${s.weight}" data-k="weight" ${roAttr}>
+            ${ro?'':`<button class="ghost small" data-delset="${i}">✕</button>`}`;
           setRowsEl.appendChild(row);
-          row.querySelector('[data-k="reps"]').addEventListener('input', e=>{ s.reps=parseFloat(e.target.value)||0; save(); refreshComputed(); });
-          row.querySelector('[data-k="weight"]').addEventListener('input', e=>{ s.weight=parseFloat(e.target.value)||0; save(); refreshComputed(); });
-          row.querySelector('[data-delset]').addEventListener('click', ()=>{
-            ex.sets.splice(i,1);
-            if(ex.sets.length===0) ex.sets.push({reps:10,weight:0});
-            save(); renderSetRows(); refreshComputed();
-          });
+          if(!ro){
+            row.querySelector('[data-k="reps"]').addEventListener('input', e=>{ s.reps=parseFloat(e.target.value)||0; save(); refreshComputed(); });
+            row.querySelector('[data-k="weight"]').addEventListener('input', e=>{ s.weight=parseFloat(e.target.value)||0; save(); refreshComputed(); });
+            row.querySelector('[data-delset]').addEventListener('click', ()=>{
+              ex.sets.splice(i,1);
+              if(ex.sets.length===0) ex.sets.push({reps:10,weight:0});
+              save(); renderSetRows(); refreshComputed();
+            });
+          }
         });
       }
       renderSetRows();
@@ -1142,6 +1154,16 @@ function renderAll(){
   renderProgress();
   renderStats();
 }
+
+if(READONLY){
+  document.getElementById('importCard').style.display = 'none';
+  document.getElementById('addSessionBtn').style.display = 'none';
+  document.getElementById('professorLink').style.display = 'none';
+  const banner = document.getElementById('readonlyBanner');
+  banner.style.display = 'block';
+  banner.innerHTML = '<div class="card" style="border-color:var(--accent);padding:12px 16px;margin-bottom:22px;">👁 <strong style="color:var(--text);">Área do professor</strong> — modo somente leitura, nada pode ser editado ou excluído aqui.</div>';
+}
+
 renderAll();
 loadRemote();
 
