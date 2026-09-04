@@ -288,10 +288,20 @@ footer{text-align:center;color:var(--text-faint);font-size:11.5px;margin-top:32p
     <div id="progressWrap"></div>
   </div>
 
+  <div class="card">
+    <div class="card-head">
+      <h2><span class="chip">⬇</span>Exportar</h2>
+      <span class="hint">Gera um PDF com todas as sessões registradas e o relatório de rendimento</span>
+    </div>
+    <button class="primary small" id="exportPdfBtn">Baixar relatório em PDF</button>
+  </div>
+
   <footer>Os dados sincronizam entre seus aparelhos. Uma cópia fica salva neste navegador para funcionar offline.</footer>
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
 <script>
 pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
 
@@ -1134,4 +1144,105 @@ function renderAll(){
 }
 renderAll();
 loadRemote();
+
+/* ---------- Exportar PDF ---------- */
+function fmtW(w){ return w>0 ? (w+'kg') : '—'; }
+
+document.getElementById('exportPdfBtn').addEventListener('click', ()=>{
+  if(state.sessions.length===0){ alert('Registre pelo menos uma sessão antes de exportar.'); return; }
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF();
+  const pageW = doc.internal.pageSize.getWidth();
+  const marginX = 14;
+  let y = 20;
+
+  doc.setFont('helvetica','bold');
+  doc.setFontSize(20);
+  doc.text('SOBRECARGA', marginX, y);
+  y += 7;
+  doc.setFont('helvetica','normal');
+  doc.setFontSize(10);
+  doc.setTextColor(110);
+  doc.text('Relatório de treinos — gerado em ' + fmtDate(todayISO()), marginX, y);
+  y += 10;
+
+  const sorted = [...state.sessions].sort((a,b)=> a.date.localeCompare(b.date));
+  const exSet = new Set();
+  sorted.forEach(s=> s.exercises.forEach(e=> { if(e.name.trim()) exSet.add(e.name.trim().toLowerCase()); }));
+  const totalSets = sorted.reduce((n,s)=> n+s.exercises.reduce((m,e)=> m+e.sets.length,0), 0);
+
+  doc.setTextColor(20);
+  doc.setFontSize(11);
+  doc.text(`${sorted.length} sessões · ${exSet.size} exercícios · ${totalSets} séries registradas`, marginX, y);
+  if(sorted.length){
+    doc.setFontSize(9); doc.setTextColor(110);
+    doc.text(`Período: ${fmtDate(sorted[0].date)} a ${fmtDate(sorted[sorted.length-1].date)}`, marginX, y+5);
+  }
+  y += 14;
+
+  // Rendimento
+  const progress = computeProgress();
+  doc.setTextColor(20);
+  doc.setFont('helvetica','bold'); doc.setFontSize(13);
+  doc.text('Rendimento', marginX, y);
+  y += 4;
+  if(progress.length===0){
+    doc.setFont('helvetica','normal'); doc.setFontSize(9); doc.setTextColor(110);
+    doc.text('Sem carga registrada ainda.', marginX, y+4);
+    y += 10;
+  }else{
+    const rows = progress.map(e=>{
+      const cur = e.points[e.points.length-1];
+      const prev = e.points.length>1 ? e.points[e.points.length-2] : null;
+      let variacao = '—';
+      if(prev){
+        const pct = ((cur.rm-prev.rm)/prev.rm)*100;
+        variacao = (pct>0?'+':'') + pct.toFixed(1) + '%';
+      }
+      return [e.label, `${fmtW(cur.weight)} × ${cur.reps}`, prev?`${fmtW(prev.weight)} × ${prev.reps}`:'—', cur.rm.toFixed(1)+'kg', variacao];
+    });
+    doc.autoTable({
+      startY: y, margin:{left:marginX, right:marginX},
+      head: [['Exercício','Atual','Anterior','1RM est.','Variação']],
+      body: rows,
+      styles:{fontSize:8.5, cellPadding:2.5},
+      headStyles:{fillColor:[36,35,32], textColor:255},
+      alternateRowStyles:{fillColor:[245,243,238]}
+    });
+    y = doc.lastAutoTable.finalY + 12;
+  }
+
+  // Sessões
+  if(y > 260){ doc.addPage(); y = 20; }
+  doc.setFont('helvetica','bold'); doc.setFontSize(13); doc.setTextColor(20);
+  doc.text('Sessões registradas', marginX, y);
+  y += 8;
+
+  sorted.forEach(session=>{
+    if(y > 265){ doc.addPage(); y = 20; }
+    doc.setFont('helvetica','bold'); doc.setFontSize(10.5); doc.setTextColor(20);
+    doc.text(`${fmtDate(session.date)} — ${session.name}`, marginX, y);
+    y += 5;
+
+    const rows = [];
+    session.exercises.forEach(ex=>{
+      ex.sets.forEach((s,i)=>{
+        rows.push([i===0?ex.name:'', String(i+1), String(s.reps||0), fmtW(s.weight)]);
+      });
+    });
+    if(rows.length===0) rows.push(['—','—','—','—']);
+
+    doc.autoTable({
+      startY: y, margin:{left:marginX, right:marginX},
+      head: [['Exercício','Série','Reps','Carga']],
+      body: rows,
+      styles:{fontSize:8.5, cellPadding:2.2},
+      headStyles:{fillColor:[244,191,31], textColor:20},
+      columnStyles:{1:{cellWidth:16},2:{cellWidth:20},3:{cellWidth:22}}
+    });
+    y = doc.lastAutoTable.finalY + 10;
+  });
+
+  doc.save(`sobrecarga-relatorio-${todayISO()}.pdf`);
+});
 </script>
