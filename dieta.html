@@ -1,0 +1,732 @@
+<title>Sobrecarga — Dieta</title>
+<meta charset="utf-8">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Stencil+Display:wght@700;900&family=Big+Shoulders+Display:wght@600;700;800&family=Archivo:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<style>
+:root{
+  --bg:#18191a;
+  --surface:#212223;
+  --surface-2:#2a2b2b;
+  --surface-3:#343534;
+  --border:#3f4041;
+  --text:#eae7e0;
+  --text-dim:#a6a29a;
+  --text-faint:#726e65;
+  --accent:#f4bf1f;
+  --accent-strong:#f4bf1f;
+  --accent-ink:#181510;
+  --up:#7cb342;
+  --down:#e0654a;
+  --hazard-a:var(--accent);
+  --hazard-b:#18191a;
+  --shadow: 0 1px 2px rgba(0,0,0,.45), 0 14px 32px -16px rgba(0,0,0,.65);
+  color-scheme: dark;
+}
+*{box-sizing:border-box;}
+body{
+  margin:0;
+  background:var(--bg);
+  color:var(--text);
+  font-family:'Archivo',system-ui,-apple-system,sans-serif;
+  -webkit-font-smoothing:antialiased;
+}
+.hazard{
+  height:6px;
+  background:repeating-linear-gradient(45deg, var(--hazard-a) 0 10px, var(--hazard-b) 10px 20px);
+}
+.wrap{max-width:1040px;margin:0 auto;padding:0 20px 80px;}
+.hero{
+  display:flex;align-items:flex-end;justify-content:space-between;gap:16px;
+  margin:0 -20px 28px;padding:22px 20px 20px;flex-wrap:wrap;
+  background:var(--surface);border-bottom:1px solid var(--border);
+}
+.brand{display:flex;align-items:center;gap:12px;}
+.mark{width:40px;height:40px;flex:none;}
+h1{
+  font-family:'Big Shoulders Stencil Display',system-ui,sans-serif;
+  font-weight:900;
+  font-size:46px;
+  letter-spacing:.5px;
+  margin:0;
+  line-height:.85;
+}
+.tagline{color:var(--text-dim);font-size:13.5px;margin-top:4px;max-width:34ch;}
+.backlink{font-size:12.5px;color:var(--text-dim);text-decoration:none;display:inline-flex;align-items:center;gap:4px;}
+.backlink:hover{color:var(--text);}
+.sync-badge{
+  font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;
+  padding:4px 10px 4px 8px;border-radius:3px;border:1px solid var(--border);color:var(--text-faint);
+  display:inline-flex;align-items:center;gap:6px;font-family:'IBM Plex Mono',monospace;
+}
+.sync-badge::before{content:'';width:7px;height:7px;border-radius:50%;background:currentColor;flex:none;}
+.sync-badge[data-status="synced"]{color:var(--up);border-color:var(--up);}
+.sync-badge[data-status="offline"]{color:var(--down);border-color:var(--down);}
+.sync-badge[data-status="syncing"]{color:var(--text-dim);}
+
+.card{
+  background:var(--surface);
+  border:1px solid var(--border);
+  border-radius:3px;
+  box-shadow:var(--shadow);
+  padding:22px;
+  margin-bottom:22px;
+  position:relative;
+}
+.card-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:16px;flex-wrap:wrap;}
+.card-head h2{
+  font-family:'Big Shoulders Display',sans-serif;
+  font-weight:800;
+  font-size:22px;
+  letter-spacing:.3px;
+  text-transform:uppercase;
+  margin:0;
+  display:flex;align-items:center;gap:10px;
+}
+.chip{
+  display:inline-flex;align-items:center;justify-content:center;
+  background:var(--accent);color:var(--accent-ink);
+  width:24px;height:24px;border-radius:3px;
+  font-family:'IBM Plex Mono',monospace;font-size:11.5px;font-weight:700;
+  box-shadow:1px 1px 0 var(--border);
+}
+.hint{font-size:12.5px;color:var(--text-faint);}
+
+.drop{
+  display:block;
+  border:2px dashed var(--border);
+  border-radius:3px;
+  padding:26px 18px;
+  text-align:center;
+  color:var(--text-dim);
+  font-size:13.5px;
+  cursor:pointer;
+  transition:border-color .15s, background .15s;
+}
+.drop:hover, .drop.drag{border-color:var(--accent-strong);background:var(--surface-2);}
+.drop strong{color:var(--text);}
+.drop input{display:none;}
+
+table{width:100%;border-collapse:collapse;font-size:13.5px;}
+th{
+  text-align:left;font-size:10.5px;text-transform:uppercase;letter-spacing:.07em;
+  color:var(--text-faint);font-weight:600;padding:0 8px 8px;border-bottom:1px solid var(--border);
+}
+td{padding:6px 8px;border-bottom:1px solid var(--surface-2);vertical-align:middle;}
+tr:last-child td{border-bottom:none;}
+.tbl-scroll{overflow-x:auto;}
+
+input[type=text], input[type=number], input[type=date]{
+  width:100%;background:var(--surface-2);border:1px solid var(--border);color:var(--text);
+  border-radius:3px;padding:6px 8px;font-family:inherit;font-size:13px;
+}
+input[type=number]{font-family:'IBM Plex Mono',monospace;text-align:right;}
+input:focus, .drop:focus-visible, button:focus-visible{
+  outline:2px solid var(--accent-strong);outline-offset:1px;
+}
+
+button{
+  font-family:'Archivo',sans-serif;font-weight:700;font-size:12px;border-radius:3px;
+  text-transform:uppercase;letter-spacing:.04em;
+  border:1px solid var(--border);background:var(--surface-2);color:var(--text);
+  padding:7px 12px;cursor:pointer;transition:transform .08s, background .12s;
+  display:inline-flex;align-items:center;gap:6px;
+}
+button:hover{background:var(--surface-3);}
+button:active{transform:scale(.97);}
+button.primary{background:var(--accent);color:var(--accent-ink);border-color:transparent;font-weight:800;}
+button.primary:hover{filter:brightness(1.08);}
+button.ghost{background:transparent;border-color:transparent;color:var(--text-faint);padding:5px 7px;text-transform:none;letter-spacing:0;font-weight:600;}
+button.ghost:hover{color:var(--down);background:var(--surface-2);}
+button.small{padding:4px 9px;font-size:11px;}
+button:disabled{opacity:.4;cursor:not-allowed;}
+
+.trend{display:inline-flex;align-items:center;gap:5px;font-weight:600;font-variant-numeric:tabular-nums;}
+.trend.up{color:var(--up);}
+.trend.down{color:var(--down);}
+.trend.flat{color:var(--text-faint);}
+
+.stage-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:14px;}
+footer{text-align:center;color:var(--text-faint);font-size:11.5px;margin-top:32px;font-family:'IBM Plex Mono',monospace;text-transform:uppercase;letter-spacing:.04em;}
+
+.confirm-overlay{
+  position:fixed;inset:0;background:rgba(0,0,0,.6);
+  display:flex;align-items:center;justify-content:center;z-index:1000;padding:20px;
+}
+.confirm-box{
+  background:var(--surface);border:1px solid var(--border);border-radius:3px;
+  padding:20px;max-width:340px;width:100%;box-shadow:var(--shadow);
+}
+.confirm-box p{margin:0 0 16px;font-size:14px;color:var(--text);}
+.confirm-actions{display:flex;justify-content:flex-end;gap:10px;}
+</style>
+
+<div class="hazard"></div>
+<div class="wrap">
+  <div class="hero">
+    <div class="brand">
+      <svg class="mark" viewBox="0 0 40 40" fill="none">
+        <rect x="2" y="17" width="6" height="6" rx="1.5" fill="var(--text-faint)"/>
+        <rect x="8" y="13" width="4" height="14" rx="1.5" fill="var(--text-dim)"/>
+        <rect x="12" y="18.5" width="16" height="3" rx="1.5" fill="var(--accent)"/>
+        <rect x="28" y="13" width="4" height="14" rx="1.5" fill="var(--text-dim)"/>
+        <rect x="32" y="17" width="6" height="6" rx="1.5" fill="var(--text-faint)"/>
+      </svg>
+      <div>
+        <h1>DIETA</h1>
+        <div class="tagline">Peso corporal, calorias, proteína e a lista de compras da sua dieta.</div>
+      </div>
+    </div>
+    <div style="display:flex;flex-direction:column;align-items:flex-end;gap:10px;">
+      <span class="sync-badge" id="syncBadge" data-status="syncing">Sincronizando…</span>
+      <a href="index.html" id="backLink" class="backlink">← Treinos</a>
+    </div>
+  </div>
+
+  <div id="readonlyBanner" style="display:none;"></div>
+
+  <div class="card">
+    <div class="card-head">
+      <h2><span class="chip">⚖</span>Dieta</h2>
+      <span class="hint">Peso corporal, calorias e proteína — anexe uma foto por registro</span>
+    </div>
+    <div id="dietTrend" class="hint" style="margin-bottom:12px;"></div>
+    <div class="tbl-scroll">
+      <table>
+        <thead><tr><th>Data</th><th style="width:80px">Peso (kg)</th><th style="width:90px">Calorias</th><th style="width:90px">Proteína (g)</th><th style="width:70px">Foto</th><th></th></tr></thead>
+        <tbody id="dietBody"></tbody>
+      </table>
+    </div>
+    <button class="small" id="addDietBtn" style="margin-top:12px;">+ novo registro</button>
+  </div>
+
+  <div class="card" id="shoppingCard">
+    <div class="card-head">
+      <h2><span class="chip">🛒</span>Lista de Compras</h2>
+      <span class="hint">Importe o PDF da sua dieta — junta os alimentos repetidos e soma as medidas</span>
+    </div>
+    <label class="drop" id="dietDrop" tabindex="0">
+      <input type="file" id="dietFileInput" accept="application/pdf">
+      <div id="dietDropLabel"><strong>Clique para escolher</strong> ou arraste o PDF da dieta aqui</div>
+    </label>
+    <div id="shoppingStageWrap" style="display:none;margin-top:18px;">
+      <div class="tbl-scroll">
+        <table>
+          <thead><tr><th>Alimento</th><th style="width:120px">Medida</th><th></th></tr></thead>
+          <tbody id="shoppingStageBody"></tbody>
+        </table>
+      </div>
+      <div class="stage-actions">
+        <button class="ghost small" id="shoppingStageCancel">Cancelar</button>
+        <button class="primary small" id="shoppingStageConfirm">Adicionar à lista</button>
+      </div>
+    </div>
+    <div class="tbl-scroll" style="margin-top:16px;">
+      <table>
+        <thead><tr><th></th><th>Alimento</th><th style="width:120px">Medida</th><th></th></tr></thead>
+        <tbody id="shoppingBody"></tbody>
+      </table>
+    </div>
+    <button class="small" id="addShoppingBtn" style="margin-top:12px;">+ item manual</button>
+  </div>
+
+  <footer>Os dados sincronizam entre seus aparelhos. Uma cópia fica salva neste navegador para funcionar offline.</footer>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script>
+pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+
+const READONLY = new URLSearchParams(location.search).get('professor') === '1';
+document.getElementById('backLink').href = READONLY ? 'index.html?professor=1' : 'index.html';
+
+const STORE_KEY = 'sobrecarga_v1';
+let state = loadLocal();
+let syncTimer = null;
+const syncBadge = () => document.getElementById('syncBadge');
+
+function loadLocal(){
+  try{
+    const raw = localStorage.getItem(STORE_KEY);
+    if(raw){
+      const d = JSON.parse(raw);
+      if(!Array.isArray(d.sessions)) d.sessions = [];
+      if(!Array.isArray(d.diet)) d.diet = [];
+      if(!Array.isArray(d.shoppingList)) d.shoppingList = [];
+      return d;
+    }
+  }catch(e){}
+  return { sessions: [], diet: [], shoppingList: [] };
+}
+function saveLocal(){
+  try{ localStorage.setItem(STORE_KEY, JSON.stringify(state)); }catch(e){}
+}
+function setSyncStatus(status){
+  const el = syncBadge();
+  if(!el) return;
+  el.dataset.status = status;
+  el.textContent = status==='synced' ? 'Sincronizado' : status==='syncing' ? 'Sincronizando…' : status==='offline' ? 'Só neste aparelho' : 'Erro ao sincronizar';
+}
+async function loadRemote(){
+  try{
+    setSyncStatus('syncing');
+    const res = await fetch('/api/state');
+    if(!res.ok) throw new Error('bad status');
+    const data = await res.json();
+    if(data && Array.isArray(data.sessions)){
+      if(!Array.isArray(data.diet)) data.diet = [];
+      if(!Array.isArray(data.shoppingList)) data.shoppingList = [];
+      state = data;
+      saveLocal();
+      renderAll();
+    }
+    setSyncStatus('synced');
+  }catch(e){
+    setSyncStatus('offline');
+  }
+}
+function save(){
+  saveLocal();
+  clearTimeout(syncTimer);
+  syncTimer = setTimeout(syncRemote, 500);
+}
+async function syncRemote(){
+  try{
+    setSyncStatus('syncing');
+    const res = await fetch('/api/state', {
+      method: 'PUT',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify(state)
+    });
+    if(!res.ok) throw new Error('bad status');
+    setSyncStatus('synced');
+  }catch(e){
+    setSyncStatus('offline');
+  }
+}
+function confirmDialog(message){
+  return new Promise(resolve=>{
+    const overlay = document.createElement('div');
+    overlay.className = 'confirm-overlay';
+    overlay.innerHTML = `
+      <div class="confirm-box">
+        <p>${escapeHtml(message)}</p>
+        <div class="confirm-actions">
+          <button class="ghost small" data-act="cancel">Cancelar</button>
+          <button class="primary small" data-act="ok" style="background:var(--down);color:#fff;">Excluir</button>
+        </div>
+      </div>`;
+    document.body.appendChild(overlay);
+    function done(result){ overlay.remove(); resolve(result); }
+    overlay.addEventListener('click', e=>{
+      if(e.target===overlay) done(false);
+      const act = e.target.dataset && e.target.dataset.act;
+      if(act==='cancel') done(false);
+      if(act==='ok') done(true);
+    });
+  });
+}
+
+function uid(){ return Math.random().toString(36).slice(2,10); }
+function todayISO(){ return new Date().toISOString().slice(0,10); }
+function escapeHtml(s){ return String(s).replace(/[&<>"']/g, c=> ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function escapeAttr(s){ return escapeHtml(s); }
+
+// Agrupa itens de texto em "linhas" por proximidade de Y (não Y exato — uma
+// linha de tabela real varia alguns pontos entre células/baseline).
+function clusterByY(items, gap, topFirst){
+  const sorted = [...items].sort((a,b)=> topFirst ? b.y-a.y : a.y-b.y);
+  const rows = [];
+  let cur=[], lastY=null;
+  sorted.forEach(it=>{
+    if(lastY!==null && Math.abs(lastY-it.y) > gap){ rows.push(cur); cur=[]; }
+    cur.push(it);
+    lastY = it.y;
+  });
+  if(cur.length) rows.push(cur);
+  return rows;
+}
+
+/* ---------- Dieta ---------- */
+const dietBody = document.getElementById('dietBody');
+const dietTrendEl = document.getElementById('dietTrend');
+
+document.getElementById('addDietBtn').addEventListener('click', ()=>{
+  state.diet.unshift({ id: uid(), date: todayISO(), weight: 0, calories: 0, protein: 0, photoId: null });
+  save();
+  renderDiet();
+});
+
+function resizeImageFile(file){
+  return new Promise((resolve, reject)=>{
+    const reader = new FileReader();
+    reader.onerror = ()=> reject(new Error('read failed'));
+    reader.onload = ()=>{
+      const img = new Image();
+      img.onerror = ()=> reject(new Error('decode failed'));
+      img.onload = ()=>{
+        const maxDim = 900;
+        const scale = Math.min(1, maxDim / Math.max(img.width, img.height));
+        const canvas = document.createElement('canvas');
+        canvas.width = Math.round(img.width*scale);
+        canvas.height = Math.round(img.height*scale);
+        canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+        const dataUrl = canvas.toDataURL('image/jpeg', 0.72);
+        resolve(dataUrl.split(',')[1]);
+      };
+      img.src = reader.result;
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
+async function uploadDietPhoto(entry, file){
+  try{
+    const base64 = await resizeImageFile(file);
+    const res = await fetch('/api/photos', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ data: base64, mime: 'image/jpeg' })
+    });
+    if(!res.ok) throw new Error('upload failed');
+    const { id } = await res.json();
+    const oldId = entry.photoId;
+    entry.photoId = id;
+    save();
+    renderDiet();
+    if(oldId) fetch('/api/photos/'+oldId, { method:'DELETE' }).catch(()=>{});
+  }catch(e){
+    alert('Não consegui enviar a foto. Tente de novo.');
+  }
+}
+
+function updateDietTrend(){
+  const byDateAsc = [...state.diet].filter(d=> d.weight>0).sort((a,b)=> a.date.localeCompare(b.date));
+  if(byDateAsc.length>1){
+    const cur = byDateAsc[byDateAsc.length-1], prev = byDateAsc[byDateAsc.length-2];
+    const diff = cur.weight - prev.weight;
+    const dir = Math.abs(diff)<0.05 ? 'flat' : (diff>0?'up':'down');
+    const arrow = dir==='up' ? '▲' : dir==='down' ? '▼' : '▬';
+    dietTrendEl.innerHTML = `Peso atual: <strong style="color:var(--text);">${cur.weight}kg</strong> · <span class="trend ${dir}">${arrow} ${Math.abs(diff).toFixed(1)}kg desde o registro anterior</span>`;
+  }else if(byDateAsc.length===1){
+    dietTrendEl.textContent = `Peso atual: ${byDateAsc[0].weight}kg (1º registro)`;
+  }else{
+    dietTrendEl.textContent = 'Sem registros de peso ainda.';
+  }
+}
+
+function renderDiet(){
+  updateDietTrend();
+  const sorted = [...state.diet].sort((a,b)=> b.date.localeCompare(a.date));
+  dietBody.innerHTML = '';
+  if(sorted.length===0){
+    dietBody.innerHTML = `<tr><td colspan="6"><span class="hint">Nenhum registro ainda.</span></td></tr>`;
+    return;
+  }
+  sorted.forEach(entry=>{
+    const tr = document.createElement('tr');
+    const roAttr = READONLY ? 'disabled' : '';
+    const photoCell = entry.photoId
+      ? `<a href="/api/photos/${entry.photoId}" target="_blank"><img src="/api/photos/${entry.photoId}" style="width:36px;height:36px;object-fit:cover;border-radius:4px;border:1px solid var(--border);"></a>`
+      : (READONLY ? '<span class="hint">—</span>' : `<input type="file" accept="image/*" data-photo="${entry.id}" style="max-width:70px;font-size:10px;">`);
+    tr.innerHTML = `
+      <td><input type="date" value="${entry.date}" data-f="date" ${roAttr} style="min-width:130px;"></td>
+      <td><input type="number" min="0" step="0.1" value="${entry.weight||0}" data-f="weight" ${roAttr}></td>
+      <td><input type="number" min="0" value="${entry.calories||0}" data-f="calories" ${roAttr}></td>
+      <td><input type="number" min="0" value="${entry.protein||0}" data-f="protein" ${roAttr}></td>
+      <td>${photoCell}</td>
+      <td>${READONLY ? '' : `<button class="ghost small" data-deldiet="${entry.id}" title="Excluir registro">✕</button>`}</td>`;
+    dietBody.appendChild(tr);
+
+    if(!READONLY){
+      tr.querySelectorAll('[data-f]').forEach(inp=>{
+        inp.addEventListener('input', ()=>{
+          const f = inp.dataset.f;
+          entry[f] = f==='date' ? inp.value : (parseFloat(inp.value)||0);
+          save();
+          if(f==='date'){ renderDiet(); return; }
+          updateDietTrend();
+        });
+      });
+      const photoInput = tr.querySelector('[data-photo]');
+      if(photoInput){
+        photoInput.addEventListener('change', e=>{
+          const file = e.target.files[0];
+          if(file) uploadDietPhoto(entry, file);
+        });
+      }
+      tr.querySelector('[data-deldiet]').addEventListener('click', async ()=>{
+        if(!(await confirmDialog('Excluir este registro de dieta?'))) return;
+        const photoId = entry.photoId;
+        state.diet = state.diet.filter(d=> d.id!==entry.id);
+        save();
+        renderDiet();
+        if(photoId) fetch('/api/photos/'+photoId, { method:'DELETE' }).catch(()=>{});
+      });
+    }
+  });
+}
+
+/* ---------- Lista de Compras (importa PDF da dieta) ---------- */
+const dietFileInput = document.getElementById('dietFileInput');
+const dietDrop = document.getElementById('dietDrop');
+const dietDropLabel = document.getElementById('dietDropLabel');
+const shoppingStageWrap = document.getElementById('shoppingStageWrap');
+const shoppingStageBody = document.getElementById('shoppingStageBody');
+const shoppingBody = document.getElementById('shoppingBody');
+let shoppingStageRows = [];
+
+dietDrop.addEventListener('dragover', e=>{ e.preventDefault(); dietDrop.classList.add('drag'); });
+dietDrop.addEventListener('dragleave', ()=> dietDrop.classList.remove('drag'));
+dietDrop.addEventListener('drop', e=>{
+  e.preventDefault(); dietDrop.classList.remove('drag');
+  const f = e.dataTransfer.files && e.dataTransfer.files[0];
+  if(f) handleDietFile(f);
+});
+dietFileInput.addEventListener('change', e=>{
+  const f = e.target.files[0];
+  if(f) handleDietFile(f);
+});
+
+async function handleDietFile(file){
+  if(file.type !== 'application/pdf'){ alert('Envie um arquivo PDF.'); return; }
+  dietDropLabel.innerHTML = `<strong>Lendo…</strong> ${file.name}`;
+  try{
+    const buf = await file.arrayBuffer();
+    const pdf = await pdfjsLib.getDocument({data:buf}).promise;
+    const rawRows = await extractDietShoppingItems(pdf);
+    const aggregated = aggregateShoppingRows(rawRows);
+    dietDropLabel.innerHTML = `<strong>${file.name}</strong> — clique para trocar o arquivo`;
+    if(aggregated.length===0){
+      alert('Não encontrei uma tabela de MEDIDA/ALIMENTO nesse PDF. Você pode adicionar os itens manualmente na lista abaixo.');
+      return;
+    }
+    openShoppingStage(aggregated);
+  }catch(err){
+    console.error(err);
+    dietDropLabel.innerHTML = '<strong>Não consegui ler esse PDF.</strong> Clique para tentar outro';
+  }
+}
+
+/* Extrai pares MEDIDA/ALIMENTO de um plano alimentar em PDF, ignorando as
+   colunas de substituição e observações. As colunas variam de posição por
+   documento, então os limites de cada uma são recalculados a cada cabeçalho
+   "MEDIDA/ALIMENTO" encontrado (um por refeição). */
+async function extractDietShoppingItems(pdf){
+  const rows = [];
+
+  function flushSection(medidaLines, alimentoEntries){
+    const blocks = [];
+    medidaLines.forEach(m=>{
+      const last = blocks[blocks.length-1];
+      if(last && Math.abs(last.yLast - m.y) < 14){
+        last.text += ' ' + m.text;
+        last.yLast = m.y;
+      }else{
+        blocks.push({ yLast: m.y, text: m.text });
+      }
+    });
+    alimentoEntries.forEach((text,i)=>{
+      rows.push({ medida: blocks[i] ? blocks[i].text.trim() : '', alimento: text });
+    });
+  }
+
+  // Estado do "cabeçalho" (MEDIDA/ALIMENTO) atual — persiste entre páginas,
+  // já que uma refeição pode continuar numa página seguinte sem repetir o
+  // cabeçalho nem a marcação "REFEIÇÃO: N".
+  let sectionOpen = false;
+  let bands = null;
+  let medidaLines = [];
+  let alimentoEntries = [];
+
+  for(let p=1;p<=pdf.numPages;p++){
+    const page = await pdf.getPage(p);
+    const content = await page.getTextContent();
+    const items = content.items
+      .map(it=> ({ x: it.transform[4], y: it.transform[5], str: it.str }))
+      .filter(it=> it.str && it.str.trim());
+    if(!items.length) continue;
+
+    const lines = clusterByY(items, 4, true);
+
+    lines.forEach(line=>{
+      const sortedLine = line.slice().sort((a,b)=> a.x-b.x);
+      const fullText = sortedLine.map(t=> t.str).join(' ');
+      if(/REFEI[ÇC][ÃA]O\s*:/i.test(fullText)){
+        flushSection(medidaLines, alimentoEntries);
+        medidaLines = []; alimentoEntries = [];
+        sectionOpen = false;
+        return;
+      }
+
+      const medidaIdx = sortedLine.findIndex(t=> t.str.trim().toUpperCase()==='MEDIDA');
+      if(medidaIdx!==-1){
+        const alimentoToks = sortedLine.filter(t=> t.str.trim().toUpperCase()==='ALIMENTO');
+        if(alimentoToks.length){
+          flushSection(medidaLines, alimentoEntries);
+          medidaLines = []; alimentoEntries = [];
+          const medidaX = sortedLine[medidaIdx].x;
+          const alimentoX = alimentoToks[0].x;
+          const mid = (medidaX+alimentoX)/2;
+          bands = {
+            mmin: medidaX-35, mmax: mid,
+            amin: mid, amax: alimentoX + 0.75*(alimentoX-medidaX)
+          };
+          sectionOpen = true;
+        }
+        return;
+      }
+      if(!sectionOpen || !bands) return;
+
+      const medidaText = sortedLine.filter(t=> t.x>=bands.mmin && t.x<bands.mmax).map(t=> t.str).join(' ').trim();
+      const alimentoText = sortedLine.filter(t=> t.x>=bands.amin && t.x<bands.amax).map(t=> t.str).join(' ').trim();
+      const y = sortedLine[0].y;
+      if(medidaText) medidaLines.push({ y, text: medidaText });
+      if(alimentoText) alimentoEntries.push(alimentoText);
+    });
+  }
+  flushSection(medidaLines, alimentoEntries);
+  return rows;
+}
+
+function parseQtyText(text){
+  const m = String(text||'').trim().match(/^(\d+(?:[.,]\d+)?)\s*([a-zà-öø-ÿ%]*)/i);
+  if(!m) return null;
+  return { qty: parseFloat(m[1].replace(',','.')), unit: (m[2]||'').toLowerCase() };
+}
+function mergeQtyText(a, b){
+  a = (a||'').trim(); b = (b||'').trim();
+  if(!a) return b;
+  if(!b) return a;
+  const pa = parseQtyText(a), pb = parseQtyText(b);
+  if(pa && pb && pa.unit===pb.unit){
+    const total = pa.qty + pb.qty;
+    return (Number.isInteger(total) ? total : total.toFixed(1)) + pb.unit;
+  }
+  const parts = a.split(' + ').map(s=> s.trim()).filter(Boolean);
+  if(!parts.includes(b)) parts.push(b);
+  return parts.join(' + ');
+}
+function aggregateShoppingRows(rows){
+  const map = new Map();
+  const order = [];
+  rows.forEach(r=>{
+    if(!r.alimento || !r.alimento.trim()) return;
+    const key = r.alimento.trim().toLowerCase();
+    if(!map.has(key)){ map.set(key, { name: r.alimento.trim(), qty: r.medida||'' }); order.push(key); }
+    else{
+      const item = map.get(key);
+      item.qty = mergeQtyText(item.qty, r.medida||'');
+    }
+  });
+  return order.map(k=> map.get(k));
+}
+
+function openShoppingStage(items){
+  shoppingStageRows = items.map(it=> ({ name: it.name, qty: it.qty }));
+  shoppingStageWrap.style.display = 'block';
+  renderShoppingStage();
+  shoppingStageWrap.scrollIntoView({behavior:'smooth', block:'nearest'});
+}
+function renderShoppingStage(){
+  shoppingStageBody.innerHTML = '';
+  shoppingStageRows.forEach((r,i)=>{
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td><input type="text" data-i="${i}" data-f="name" value="${escapeAttr(r.name)}"></td>
+      <td><input type="text" data-i="${i}" data-f="qty" value="${escapeAttr(r.qty)}"></td>
+      <td><button class="ghost small" data-delstage="${i}" title="Remover">✕</button></td>`;
+    shoppingStageBody.appendChild(tr);
+  });
+}
+shoppingStageBody.addEventListener('input', e=>{
+  const t = e.target;
+  if(t.dataset.i===undefined) return;
+  shoppingStageRows[+t.dataset.i][t.dataset.f] = t.value;
+});
+shoppingStageBody.addEventListener('click', e=>{
+  if(e.target.dataset.delstage!==undefined){
+    shoppingStageRows.splice(+e.target.dataset.delstage, 1);
+    renderShoppingStage();
+  }
+});
+document.getElementById('shoppingStageCancel').addEventListener('click', ()=>{
+  shoppingStageWrap.style.display = 'none';
+  dietFileInput.value = '';
+  dietDropLabel.innerHTML = '<strong>Clique para escolher</strong> ou arraste o PDF da dieta aqui';
+});
+document.getElementById('shoppingStageConfirm').addEventListener('click', ()=>{
+  const valid = shoppingStageRows.filter(r=> r.name && r.name.trim());
+  valid.forEach(r=>{
+    const key = r.name.trim().toLowerCase();
+    const existing = state.shoppingList.find(s=> s.name.trim().toLowerCase()===key);
+    if(existing){
+      existing.qty = mergeQtyText(existing.qty, r.qty);
+      existing.checked = false;
+    }else{
+      state.shoppingList.push({ id: uid(), name: r.name.trim(), qty: r.qty||'', checked: false });
+    }
+  });
+  save();
+  shoppingStageWrap.style.display = 'none';
+  dietFileInput.value = '';
+  dietDropLabel.innerHTML = '<strong>Clique para escolher</strong> ou arraste o PDF da dieta aqui';
+  renderShopping();
+  shoppingBody.scrollIntoView({behavior:'smooth', block:'nearest'});
+});
+
+document.getElementById('addShoppingBtn').addEventListener('click', ()=>{
+  state.shoppingList.unshift({ id: uid(), name: '', qty: '', checked: false });
+  save();
+  renderShopping();
+});
+
+function renderShopping(){
+  shoppingBody.innerHTML = '';
+  if(state.shoppingList.length===0){
+    shoppingBody.innerHTML = `<tr><td colspan="4"><span class="hint">Nenhum item ainda. Importe o PDF da dieta ou adicione manualmente.</span></td></tr>`;
+    return;
+  }
+  state.shoppingList.forEach(item=>{
+    const tr = document.createElement('tr');
+    const roAttr = READONLY ? 'disabled' : '';
+    tr.innerHTML = `
+      <td><input type="checkbox" ${item.checked?'checked':''} data-check="${item.id}" ${roAttr}></td>
+      <td><input type="text" value="${escapeAttr(item.name)}" data-f="name" ${roAttr} style="${item.checked?'text-decoration:line-through;color:var(--text-faint);':''}"></td>
+      <td><input type="text" value="${escapeAttr(item.qty)}" data-f="qty" ${roAttr}></td>
+      <td>${READONLY ? '' : `<button class="ghost small" data-delshop="${item.id}" title="Remover">✕</button>`}</td>`;
+    shoppingBody.appendChild(tr);
+    if(!READONLY){
+      tr.querySelector('[data-check]').addEventListener('change', e=>{
+        item.checked = e.target.checked; save(); renderShopping();
+      });
+      tr.querySelectorAll('[data-f]').forEach(inp=>{
+        inp.addEventListener('input', ()=>{
+          item[inp.dataset.f] = inp.value; save();
+        });
+      });
+      tr.querySelector('[data-delshop]').addEventListener('click', async ()=>{
+        if(!(await confirmDialog(`Remover "${item.name}" da lista?`))) return;
+        state.shoppingList = state.shoppingList.filter(s=> s.id!==item.id);
+        save(); renderShopping();
+      });
+    }
+  });
+}
+
+function renderAll(){
+  renderDiet();
+  renderShopping();
+}
+
+if(READONLY){
+  document.getElementById('addDietBtn').style.display = 'none';
+  document.getElementById('dietDrop').style.display = 'none';
+  document.getElementById('addShoppingBtn').style.display = 'none';
+  const banner = document.getElementById('readonlyBanner');
+  banner.style.display = 'block';
+  banner.innerHTML = '<div class="card" style="border-color:var(--accent);padding:12px 16px;margin-bottom:22px;">👁 <strong style="color:var(--text);">Área do professor</strong> — modo somente leitura, nada pode ser editado ou excluído aqui.</div>';
+}
+
+renderAll();
+loadRemote();
+</script>
