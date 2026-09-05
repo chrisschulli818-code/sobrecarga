@@ -207,7 +207,7 @@ footer{text-align:center;color:var(--text-faint);font-size:11.5px;margin-top:32p
   <div class="card">
     <div class="card-head">
       <h2><span class="chip">🍽</span>Refeições</h2>
-      <span class="hint">Separado por refeição do dia — calorias e macros calculados a partir dos alimentos, ou reconhecidos por foto</span>
+      <span class="hint">Separado por refeição do dia — calorias e macros calculados a partir dos alimentos</span>
     </div>
     <button class="small" id="addMealBtn">+ nova refeição</button>
     <div id="mealsList" style="margin-top:16px;"></div>
@@ -566,50 +566,6 @@ function foodTotals(foods){
   }), {kcal:0, protein:0, carbs:0, fat:0});
 }
 
-async function recognizeFoodPhoto(mealEntry, file, btn){
-  const origLabel = btn.textContent;
-  btn.textContent = 'Analisando…'; btn.disabled = true;
-  try{
-    const base64 = await resizeImageFile(file);
-    let photoId = null;
-    try{
-      const upRes = await fetch('/api/photos', {
-        method:'POST', headers:{'Content-Type':'application/json'},
-        body: JSON.stringify({ data: base64, mime: 'image/jpeg' })
-      });
-      if(upRes.ok) photoId = (await upRes.json()).id;
-    }catch(e){}
-
-    const res = await fetch('/api/recognize-food', {
-      method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({ data: base64, mime: 'image/jpeg' })
-    });
-    const data = await res.json();
-    if(!res.ok){
-      alert((data.message || 'Reconhecimento por foto não está disponível.') + (data.detail ? '\n\nDetalhe: ' + data.detail : ''));
-      return;
-    }
-    if(!data.items || data.items.length===0){
-      alert('Não consegui identificar alimentos nessa foto. Adicione manualmente.');
-      return;
-    }
-    data.items.forEach((it,i)=>{
-      mealEntry.foods.push({
-        id: uid(), name: it.name, qty: it.grams||0, unit:'g',
-        kcal: Math.round(it.kcal||0), protein: +(it.protein||0).toFixed(1),
-        carbs: +(it.carbs||0).toFixed(1), fat: +(it.fat||0).toFixed(1),
-        photoId: i===0 ? photoId : null, aiEstimated: true
-      });
-    });
-    save();
-    renderMeals();
-  }catch(e){
-    alert('Não consegui analisar a foto. Tente de novo.');
-  }finally{
-    btn.textContent = origLabel; btn.disabled = false;
-  }
-}
-
 function renderMeals(){
   const mealsList = document.getElementById('mealsList');
   const sorted = [...state.meals].sort((a,b)=> b.date.localeCompare(a.date));
@@ -667,10 +623,6 @@ function renderMeals(){
         ${READONLY ? '' : `
         <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;">
           <button class="ghost small" data-addfood="1">+ alimento</button>
-          <label class="ghost small" style="cursor:pointer;">
-            📷 Reconhecer por foto
-            <input type="file" accept="image/*" data-recognize="1" style="display:none;">
-          </label>
         </div>`}
       `;
       dayBody.appendChild(card);
@@ -684,26 +636,16 @@ function renderMeals(){
           save(); renderMeals();
         });
         card.querySelector('[data-addfood]').addEventListener('click', ()=>{
-          mealEntry.foods.push({ id: uid(), name:'', qty:100, unit:'g', kcal:0, protein:0, carbs:0, fat:0, photoId:null });
+          mealEntry.foods.push({ id: uid(), name:'', qty:100, unit:'g', kcal:0, protein:0, carbs:0, fat:0 });
           save(); renderMeals();
         });
-        const recInput = card.querySelector('[data-recognize]');
-        if(recInput){
-          recInput.addEventListener('change', e=>{
-            const file = e.target.files[0];
-            if(file) recognizeFoodPhoto(mealEntry, file, recInput.closest('label'));
-            e.target.value = '';
-          });
-        }
       }
 
       const rowsEl = card.querySelector('.food-rows');
       mealEntry.foods.forEach(food=>{
         const tr = document.createElement('tr');
-        const photoBadge = food.photoId ? `<a href="/api/photos/${food.photoId}" target="_blank" title="Ver foto">📷</a>` : '';
-        const aiBadge = food.aiEstimated ? `<span class="hint" title="Estimado por IA">✨</span>` : '';
         tr.innerHTML = `
-          <td><input type="text" list="${foodListId}" value="${escapeAttr(food.name)}" data-ff="name" ${roAttr} placeholder="nome do alimento"> ${aiBadge}${photoBadge}</td>
+          <td><input type="text" list="${foodListId}" value="${escapeAttr(food.name)}" data-ff="name" ${roAttr} placeholder="nome do alimento"></td>
           <td><input type="number" min="0" value="${food.qty}" data-ff="qty" ${roAttr}></td>
           <td><select data-ff="unit" ${roAttr}><option value="g" ${food.unit==='g'?'selected':''}>g</option><option value="un" ${food.unit==='un'?'selected':''}>un</option></select></td>
           <td><input type="number" min="0" value="${food.kcal}" data-ff="kcal" ${roAttr}></td>
@@ -722,21 +664,19 @@ function renderMeals(){
               food.unit = dbFood.unit;
               const c = calcFromFood(dbFood, food.qty||(dbFood.unit==='un'?1:100));
               Object.assign(food, c);
-              food.aiEstimated = false;
             }
             save(); renderMeals();
           });
           tr.querySelector('[data-ff="qty"]').addEventListener('input', e=>{
             food.qty = parseFloat(e.target.value)||0;
             const dbFood = findFood(food.name);
-            if(dbFood){ Object.assign(food, calcFromFood(dbFood, food.qty)); food.aiEstimated = false; }
+            if(dbFood){ Object.assign(food, calcFromFood(dbFood, food.qty)); }
             save(); renderMeals();
           });
           tr.querySelector('[data-ff="unit"]').addEventListener('change', e=>{ food.unit = e.target.value; save(); });
           ['kcal','protein','carbs','fat'].forEach(f=>{
             tr.querySelector(`[data-ff="${f}"]`).addEventListener('input', e=>{
               food[f] = parseFloat(e.target.value)||0;
-              food.aiEstimated = false;
               save(); renderMeals();
             });
           });
