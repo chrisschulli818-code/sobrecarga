@@ -326,10 +326,11 @@ function loadLocal(){
       const d = JSON.parse(raw);
       if(!Array.isArray(d.diet)) d.diet = [];
       if(!Array.isArray(d.shoppingList)) d.shoppingList = [];
+      if(!Array.isArray(d.meals)) d.meals = [];
       return d;
     }
   }catch(e){}
-  return { sessions: [], diet: [], shoppingList: [] };
+  return { sessions: [], diet: [], shoppingList: [], meals: [] };
 }
 function saveLocal(){
   try{ localStorage.setItem(STORE_KEY, JSON.stringify(state)); }catch(e){}
@@ -349,6 +350,7 @@ async function loadRemote(){
     if(data && Array.isArray(data.sessions)){
       if(!Array.isArray(data.diet)) data.diet = [];
       if(!Array.isArray(data.shoppingList)) data.shoppingList = [];
+      if(!Array.isArray(data.meals)) data.meals = [];
       state = data;
       saveLocal();
       renderAll();

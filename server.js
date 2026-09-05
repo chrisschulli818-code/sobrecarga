@@ -93,6 +93,81 @@ app.delete('/api/photos/:id', async (req, res) => {
   }
 });
 
+app.post('/api/recognize-food', async (req, res) => {
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) {
+    return res.status(501).json({ error: 'not_configured', message: 'Reconhecimento por foto não está configurado neste servidor (falta ANTHROPIC_API_KEY).' });
+  }
+  const { data, mime } = req.body || {};
+  if (!data || !mime || !mime.startsWith('image/')) {
+    return res.status(400).json({ error: 'invalid_body' });
+  }
+  try {
+    const prompt = `Você está olhando uma foto de comida/refeição. Identifique cada alimento visível e estime, para o que está na foto (não por 100g, e sim a porção real que aparece):
+- name: nome do alimento em português
+- grams: peso estimado em gramas da porção visível
+- kcal: calorias estimadas dessa porção
+- protein: proteína em gramas dessa porção
+- carbs: carboidratos em gramas dessa porção
+- fat: gordura em gramas dessa porção
+
+Responda APENAS com um JSON válido no formato:
+{"items":[{"name":"...", "grams":0, "kcal":0, "protein":0, "carbs":0, "fat":0}]}
+Sem nenhum texto antes ou depois do JSON. Se não conseguir identificar nada, responda {"items":[]}.`;
+
+    const apiRes = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01'
+      },
+      body: JSON.stringify({
+        model: 'claude-haiku-4-5-20251001',
+        max_tokens: 1024,
+        messages: [{
+          role: 'user',
+          content: [
+            { type: 'image', source: { type: 'base64', media_type: mime, data } },
+            { type: 'text', text: prompt }
+          ]
+        }]
+      })
+    });
+
+    if (!apiRes.ok) {
+      const errText = await apiRes.text();
+      console.error('Anthropic API error:', apiRes.status, errText);
+      return res.status(502).json({ error: 'ai_error', message: 'Falha ao consultar a IA de reconhecimento.' });
+    }
+
+    const apiData = await apiRes.json();
+    const text = (apiData.content || []).map(b => b.text || '').join('').trim();
+    const jsonMatch = text.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) {
+      return res.json({ items: [] });
+    }
+    let parsed;
+    try {
+      parsed = JSON.parse(jsonMatch[0]);
+    } catch (e) {
+      return res.json({ items: [] });
+    }
+    const items = Array.isArray(parsed.items) ? parsed.items.slice(0, 15).map(it => ({
+      name: String(it.name || 'Alimento').slice(0, 80),
+      grams: Number(it.grams) || 0,
+      kcal: Number(it.kcal) || 0,
+      protein: Number(it.protein) || 0,
+      carbs: Number(it.carbs) || 0,
+      fat: Number(it.fat) || 0
+    })) : [];
+    res.json({ items });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'server_error' });
+  }
+});
+
 app.use(express.static(__dirname));
 
 const port = process.env.PORT || 3000;

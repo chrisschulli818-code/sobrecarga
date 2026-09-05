@@ -114,9 +114,11 @@ th{
 }
 td{padding:6px 8px;border-bottom:1px solid var(--surface-2);vertical-align:middle;}
 tr:last-child td{border-bottom:none;}
+.num{font-variant-numeric:tabular-nums;font-family:'IBM Plex Mono',monospace;}
+tfoot td{font-weight:700;border-top:1px solid var(--border);border-bottom:none;padding-top:8px;}
 .tbl-scroll{overflow-x:auto;}
 
-input[type=text], input[type=number], input[type=date]{
+input[type=text], input[type=number], input[type=date], select{
   width:100%;background:var(--surface-2);border:1px solid var(--border);color:var(--text);
   border-radius:3px;padding:6px 8px;font-family:inherit;font-size:13px;
 }
@@ -146,6 +148,8 @@ button:disabled{opacity:.4;cursor:not-allowed;}
 .trend.down{color:var(--down);}
 .trend.flat{color:var(--text-faint);}
 
+.row-fields{display:grid;grid-template-columns:1fr 140px 100px;gap:10px;margin-bottom:14px;}
+@media (max-width:560px){.row-fields{grid-template-columns:1fr 1fr;}}
 .stage-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:14px;}
 footer{text-align:center;color:var(--text-faint);font-size:11.5px;margin-top:32px;font-family:'IBM Plex Mono',monospace;text-transform:uppercase;letter-spacing:.04em;}
 
@@ -187,17 +191,26 @@ footer{text-align:center;color:var(--text-faint);font-size:11.5px;margin-top:32p
 
   <div class="card">
     <div class="card-head">
-      <h2><span class="chip">⚖</span>Dieta</h2>
-      <span class="hint">Peso corporal, calorias e proteína — anexe uma foto por registro</span>
+      <h2><span class="chip">⚖</span>Peso Corporal</h2>
+      <span class="hint">Registro diário — anexe uma foto por registro</span>
     </div>
     <div id="dietTrend" class="hint" style="margin-bottom:12px;"></div>
     <div class="tbl-scroll">
       <table>
-        <thead><tr><th>Data</th><th style="width:80px">Peso (kg)</th><th style="width:90px">Calorias</th><th style="width:90px">Proteína (g)</th><th style="width:70px">Foto</th><th></th></tr></thead>
+        <thead><tr><th>Data</th><th style="width:80px">Peso (kg)</th><th style="width:70px">Foto</th><th></th></tr></thead>
         <tbody id="dietBody"></tbody>
       </table>
     </div>
     <button class="small" id="addDietBtn" style="margin-top:12px;">+ novo registro</button>
+  </div>
+
+  <div class="card">
+    <div class="card-head">
+      <h2><span class="chip">🍽</span>Refeições</h2>
+      <span class="hint">Separado por refeição do dia — calorias e macros calculados a partir dos alimentos, ou reconhecidos por foto</span>
+    </div>
+    <button class="small" id="addMealBtn">+ nova refeição</button>
+    <div id="mealsList" style="margin-top:16px;"></div>
   </div>
 
   <div class="card" id="shoppingCard">
@@ -253,10 +266,11 @@ function loadLocal(){
       if(!Array.isArray(d.sessions)) d.sessions = [];
       if(!Array.isArray(d.diet)) d.diet = [];
       if(!Array.isArray(d.shoppingList)) d.shoppingList = [];
+      if(!Array.isArray(d.meals)) d.meals = [];
       return d;
     }
   }catch(e){}
-  return { sessions: [], diet: [], shoppingList: [] };
+  return { sessions: [], diet: [], shoppingList: [], meals: [] };
 }
 function saveLocal(){
   try{ localStorage.setItem(STORE_KEY, JSON.stringify(state)); }catch(e){}
@@ -276,6 +290,7 @@ async function loadRemote(){
     if(data && Array.isArray(data.sessions)){
       if(!Array.isArray(data.diet)) data.diet = [];
       if(!Array.isArray(data.shoppingList)) data.shoppingList = [];
+      if(!Array.isArray(data.meals)) data.meals = [];
       state = data;
       saveLocal();
       renderAll();
@@ -329,6 +344,10 @@ function confirmDialog(message){
 
 function uid(){ return Math.random().toString(36).slice(2,10); }
 function todayISO(){ return new Date().toISOString().slice(0,10); }
+function fmtDate(iso){
+  const d = new Date(iso+'T00:00:00');
+  return d.toLocaleDateString('pt-BR',{day:'2-digit',month:'short',year:'numeric'});
+}
 function escapeHtml(s){ return String(s).replace(/[&<>"']/g, c=> ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 function escapeAttr(s){ return escapeHtml(s); }
 
@@ -352,7 +371,7 @@ const dietBody = document.getElementById('dietBody');
 const dietTrendEl = document.getElementById('dietTrend');
 
 document.getElementById('addDietBtn').addEventListener('click', ()=>{
-  state.diet.unshift({ id: uid(), date: todayISO(), weight: 0, calories: 0, protein: 0, photoId: null });
+  state.diet.unshift({ id: uid(), date: todayISO(), weight: 0, photoId: null });
   save();
   renderDiet();
 });
@@ -419,7 +438,7 @@ function renderDiet(){
   const sorted = [...state.diet].sort((a,b)=> b.date.localeCompare(a.date));
   dietBody.innerHTML = '';
   if(sorted.length===0){
-    dietBody.innerHTML = `<tr><td colspan="6"><span class="hint">Nenhum registro ainda.</span></td></tr>`;
+    dietBody.innerHTML = `<tr><td colspan="4"><span class="hint">Nenhum registro ainda.</span></td></tr>`;
     return;
   }
   sorted.forEach(entry=>{
@@ -431,8 +450,6 @@ function renderDiet(){
     tr.innerHTML = `
       <td><input type="date" value="${entry.date}" data-f="date" ${roAttr} style="min-width:130px;"></td>
       <td><input type="number" min="0" step="0.1" value="${entry.weight||0}" data-f="weight" ${roAttr}></td>
-      <td><input type="number" min="0" value="${entry.calories||0}" data-f="calories" ${roAttr}></td>
-      <td><input type="number" min="0" value="${entry.protein||0}" data-f="protein" ${roAttr}></td>
       <td>${photoCell}</td>
       <td>${READONLY ? '' : `<button class="ghost small" data-deldiet="${entry.id}" title="Excluir registro">✕</button>`}</td>`;
     dietBody.appendChild(tr);
@@ -463,6 +480,274 @@ function renderDiet(){
         if(photoId) fetch('/api/photos/'+photoId, { method:'DELETE' }).catch(()=>{});
       });
     }
+  });
+}
+
+/* ---------- Refeições ---------- */
+// Base de alimentos comuns: kcal/proteína/carboidrato/gordura por 100g
+// (ou por 1 unidade quando unit:'un'). Valores aproximados — o usuário
+// pode editar o resultado calculado a qualquer momento.
+const FOOD_DB = [
+  {name:'Ovo', unit:'un', kcal:78, protein:6.3, carbs:0.6, fat:5.3},
+  {name:'Banana prata', unit:'g', kcal:98, protein:1.3, carbs:26, fat:0.1},
+  {name:'Pão fatiado integral', unit:'g', kcal:253, protein:13, carbs:43, fat:3.5},
+  {name:'Pão francês', unit:'un', kcal:150, protein:4.8, carbs:28, fat:1.5},
+  {name:'Pasta de amendoim', unit:'g', kcal:588, protein:25, carbs:20, fat:50},
+  {name:'Café preto', unit:'g', kcal:2, protein:0.3, carbs:0, fat:0},
+  {name:'Arroz branco cozido', unit:'g', kcal:130, protein:2.7, carbs:28, fat:0.3},
+  {name:'Frango grelhado', unit:'g', kcal:165, protein:31, carbs:0, fat:3.6},
+  {name:'Vegetais e folhas', unit:'g', kcal:25, protein:2, carbs:4, fat:0.3},
+  {name:'Castanha do pará', unit:'g', kcal:656, protein:14, carbs:12, fat:66},
+  {name:'Iogurte integral', unit:'g', kcal:61, protein:3.5, carbs:4.7, fat:3.3},
+  {name:'Whey protein', unit:'g', kcal:400, protein:80, carbs:8, fat:5},
+  {name:'Batata doce', unit:'g', kcal:86, protein:1.6, carbs:20, fat:0.1},
+  {name:'Batata inglesa cozida', unit:'g', kcal:87, protein:1.9, carbs:20, fat:0.1},
+  {name:'Aveia', unit:'g', kcal:389, protein:17, carbs:66, fat:7},
+  {name:'Leite integral', unit:'g', kcal:61, protein:3.2, carbs:4.8, fat:3.3},
+  {name:'Queijo mussarela', unit:'g', kcal:280, protein:22, carbs:3, fat:21},
+  {name:'Azeite de oliva', unit:'g', kcal:884, protein:0, carbs:0, fat:100},
+  {name:'Feijão cozido', unit:'g', kcal:76, protein:4.8, carbs:13.6, fat:0.5},
+  {name:'Carne bovina magra', unit:'g', kcal:190, protein:26, carbs:0, fat:9},
+  {name:'Tilápia grelhada', unit:'g', kcal:128, protein:26, carbs:0, fat:2.7},
+  {name:'Maçã', unit:'g', kcal:52, protein:0.3, carbs:14, fat:0.2},
+  {name:'Laranja', unit:'g', kcal:47, protein:0.9, carbs:12, fat:0.1},
+  {name:'Mel', unit:'g', kcal:304, protein:0.3, carbs:82, fat:0},
+  {name:'Tapioca', unit:'g', kcal:190, protein:0.2, carbs:47, fat:0.02},
+  {name:'Amendoim', unit:'g', kcal:567, protein:26, carbs:16, fat:49},
+  {name:'Granola', unit:'g', kcal:471, protein:10, carbs:64, fat:20},
+  {name:'Abacate', unit:'g', kcal:160, protein:2, carbs:8.5, fat:15},
+  {name:'Quinoa cozida', unit:'g', kcal:120, protein:4.4, carbs:21, fat:1.9},
+  {name:'Macarrão cozido', unit:'g', kcal:158, protein:5.8, carbs:31, fat:0.9},
+  {name:'Melancia', unit:'g', kcal:30, protein:0.6, carbs:8, fat:0.2},
+  {name:'Mamão', unit:'g', kcal:43, protein:0.5, carbs:11, fat:0.3},
+  {name:'Manga', unit:'g', kcal:60, protein:0.8, carbs:15, fat:0.4},
+  {name:'Uva', unit:'g', kcal:69, protein:0.7, carbs:18, fat:0.2},
+  {name:'Pera', unit:'g', kcal:57, protein:0.4, carbs:15, fat:0.1},
+  {name:'Abacaxi', unit:'g', kcal:50, protein:0.5, carbs:13, fat:0.1},
+  {name:'Grão de bico cozido', unit:'g', kcal:164, protein:8.9, carbs:27, fat:2.6},
+  {name:'Lentilha cozida', unit:'g', kcal:116, protein:9, carbs:20, fat:0.4},
+  {name:'Camarão cozido', unit:'g', kcal:99, protein:21, carbs:0.2, fat:1.4},
+  {name:'Salmão grelhado', unit:'g', kcal:208, protein:20, carbs:0, fat:13},
+  {name:'Atum em água', unit:'g', kcal:116, protein:26, carbs:0, fat:1},
+  {name:'Tofu', unit:'g', kcal:76, protein:8, carbs:1.9, fat:4.8},
+  {name:'Chocolate amargo', unit:'g', kcal:546, protein:7.8, carbs:46, fat:31},
+  {name:'Nozes', unit:'g', kcal:654, protein:15, carbs:14, fat:65},
+  {name:'Amêndoas', unit:'g', kcal:579, protein:21, carbs:22, fat:50}
+];
+function findFood(name){
+  const key = (name||'').trim().toLowerCase();
+  return FOOD_DB.find(f=> f.name.toLowerCase()===key) || null;
+}
+function calcFromFood(food, qty){
+  const q = parseFloat(qty)||0;
+  const factor = food.unit==='un' ? q : q/100;
+  return {
+    kcal: Math.round(food.kcal*factor),
+    protein: +(food.protein*factor).toFixed(1),
+    carbs: +(food.carbs*factor).toFixed(1),
+    fat: +(food.fat*factor).toFixed(1)
+  };
+}
+
+const MEAL_TYPES = ['Café da Manhã','Almoço','Café da Tarde','Jantar','Ceia','Outro'];
+const foodListId = 'foodDbList';
+document.body.insertAdjacentHTML('beforeend', `<datalist id="${foodListId}">${FOOD_DB.map(f=> `<option value="${escapeAttr(f.name)}">`).join('')}</datalist>`);
+
+document.getElementById('addMealBtn').addEventListener('click', ()=>{
+  state.meals.unshift({ id: uid(), date: todayISO(), meal: 'Café da Manhã', foods: [] });
+  save();
+  renderMeals();
+});
+
+function foodTotals(foods){
+  return foods.reduce((t,f)=> ({
+    kcal: t.kcal+(f.kcal||0), protein: t.protein+(f.protein||0),
+    carbs: t.carbs+(f.carbs||0), fat: t.fat+(f.fat||0)
+  }), {kcal:0, protein:0, carbs:0, fat:0});
+}
+
+async function recognizeFoodPhoto(mealEntry, file, btn){
+  const origLabel = btn.textContent;
+  btn.textContent = 'Analisando…'; btn.disabled = true;
+  try{
+    const base64 = await resizeImageFile(file);
+    let photoId = null;
+    try{
+      const upRes = await fetch('/api/photos', {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ data: base64, mime: 'image/jpeg' })
+      });
+      if(upRes.ok) photoId = (await upRes.json()).id;
+    }catch(e){}
+
+    const res = await fetch('/api/recognize-food', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ data: base64, mime: 'image/jpeg' })
+    });
+    const data = await res.json();
+    if(!res.ok){
+      alert(data.message || 'Reconhecimento por foto não está disponível.');
+      return;
+    }
+    if(!data.items || data.items.length===0){
+      alert('Não consegui identificar alimentos nessa foto. Adicione manualmente.');
+      return;
+    }
+    data.items.forEach((it,i)=>{
+      mealEntry.foods.push({
+        id: uid(), name: it.name, qty: it.grams||0, unit:'g',
+        kcal: Math.round(it.kcal||0), protein: +(it.protein||0).toFixed(1),
+        carbs: +(it.carbs||0).toFixed(1), fat: +(it.fat||0).toFixed(1),
+        photoId: i===0 ? photoId : null, aiEstimated: true
+      });
+    });
+    save();
+    renderMeals();
+  }catch(e){
+    alert('Não consegui analisar a foto. Tente de novo.');
+  }finally{
+    btn.textContent = origLabel; btn.disabled = false;
+  }
+}
+
+function renderMeals(){
+  const mealsList = document.getElementById('mealsList');
+  const sorted = [...state.meals].sort((a,b)=> b.date.localeCompare(a.date));
+  mealsList.innerHTML = '';
+  if(sorted.length===0){
+    mealsList.innerHTML = `<div class="hint">Nenhuma refeição registrada ainda.</div>`;
+    return;
+  }
+
+  const byDate = new Map();
+  sorted.forEach(m=>{
+    if(!byDate.has(m.date)) byDate.set(m.date, []);
+    byDate.get(m.date).push(m);
+  });
+
+  byDate.forEach((mealsOfDay, date)=>{
+    const dayTotal = foodTotals(mealsOfDay.flatMap(m=> m.foods));
+    const dayWrap = document.createElement('div');
+    dayWrap.style.cssText = 'border:1px solid var(--border);border-radius:3px;margin-bottom:14px;overflow:hidden;';
+    dayWrap.innerHTML = `
+      <div style="background:var(--surface-2);padding:10px 14px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
+        <strong style="font-family:'Big Shoulders Display',sans-serif;letter-spacing:.3px;">${fmtDate(date)}</strong>
+        <span class="hint" style="font-family:'IBM Plex Mono',monospace;">${Math.round(dayTotal.kcal)} kcal · P ${dayTotal.protein.toFixed(0)}g · C ${dayTotal.carbs.toFixed(0)}g · G ${dayTotal.fat.toFixed(0)}g</span>
+      </div>
+      <div class="meal-day-body" style="padding:12px 14px;"></div>`;
+    mealsList.appendChild(dayWrap);
+    const dayBody = dayWrap.querySelector('.meal-day-body');
+
+    mealsOfDay.forEach(mealEntry=>{
+      const total = foodTotals(mealEntry.foods);
+      const roAttr = READONLY ? 'disabled' : '';
+      const card = document.createElement('div');
+      card.style.cssText = 'border:1px solid var(--border);border-radius:3px;padding:12px;margin-bottom:10px;background:var(--surface);';
+      card.innerHTML = `
+        <div class="row-fields" style="grid-template-columns:1fr 140px 90px;margin-bottom:10px;">
+          <div>
+            <label class="hint">Refeição</label>
+            <select data-mf="meal" ${roAttr}>${MEAL_TYPES.map(mt=> `<option ${mt===mealEntry.meal?'selected':''}>${mt}</option>`).join('')}</select>
+          </div>
+          <div>
+            <label class="hint">Data</label>
+            <input type="date" value="${mealEntry.date}" data-mf="date" ${roAttr}>
+          </div>
+          <div style="display:flex;align-items:flex-end;">
+            ${READONLY ? '' : `<button class="ghost small" data-delmeal="1">✕ excluir</button>`}
+          </div>
+        </div>
+        <div class="tbl-scroll">
+          <table>
+            <thead><tr><th>Alimento</th><th style="width:70px">Qtd.</th><th style="width:55px">Un.</th><th style="width:60px">Kcal</th><th style="width:55px">Prot.</th><th style="width:55px">Carb.</th><th style="width:50px">Gord.</th><th></th></tr></thead>
+            <tbody class="food-rows"></tbody>
+            <tfoot><tr><td colspan="3" class="hint">Total</td><td class="num">${Math.round(total.kcal)}</td><td class="num">${total.protein.toFixed(1)}</td><td class="num">${total.carbs.toFixed(1)}</td><td class="num">${total.fat.toFixed(1)}</td><td></td></tr></tfoot>
+          </table>
+        </div>
+        ${READONLY ? '' : `
+        <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;">
+          <button class="ghost small" data-addfood="1">+ alimento</button>
+          <label class="ghost small" style="cursor:pointer;">
+            📷 Reconhecer por foto
+            <input type="file" accept="image/*" data-recognize="1" style="display:none;">
+          </label>
+        </div>`}
+      `;
+      dayBody.appendChild(card);
+
+      if(!READONLY){
+        card.querySelector('[data-mf="meal"]').addEventListener('change', e=>{ mealEntry.meal = e.target.value; save(); });
+        card.querySelector('[data-mf="date"]').addEventListener('input', e=>{ mealEntry.date = e.target.value; save(); renderMeals(); });
+        card.querySelector('[data-delmeal]').addEventListener('click', async ()=>{
+          if(!(await confirmDialog('Excluir esta refeição e seus alimentos?'))) return;
+          state.meals = state.meals.filter(m=> m.id!==mealEntry.id);
+          save(); renderMeals();
+        });
+        card.querySelector('[data-addfood]').addEventListener('click', ()=>{
+          mealEntry.foods.push({ id: uid(), name:'', qty:100, unit:'g', kcal:0, protein:0, carbs:0, fat:0, photoId:null });
+          save(); renderMeals();
+        });
+        const recInput = card.querySelector('[data-recognize]');
+        if(recInput){
+          recInput.addEventListener('change', e=>{
+            const file = e.target.files[0];
+            if(file) recognizeFoodPhoto(mealEntry, file, recInput.closest('label'));
+            e.target.value = '';
+          });
+        }
+      }
+
+      const rowsEl = card.querySelector('.food-rows');
+      mealEntry.foods.forEach(food=>{
+        const tr = document.createElement('tr');
+        const photoBadge = food.photoId ? `<a href="/api/photos/${food.photoId}" target="_blank" title="Ver foto">📷</a>` : '';
+        const aiBadge = food.aiEstimated ? `<span class="hint" title="Estimado por IA">✨</span>` : '';
+        tr.innerHTML = `
+          <td><input type="text" list="${foodListId}" value="${escapeAttr(food.name)}" data-ff="name" ${roAttr} placeholder="nome do alimento"> ${aiBadge}${photoBadge}</td>
+          <td><input type="number" min="0" value="${food.qty}" data-ff="qty" ${roAttr}></td>
+          <td><select data-ff="unit" ${roAttr}><option value="g" ${food.unit==='g'?'selected':''}>g</option><option value="un" ${food.unit==='un'?'selected':''}>un</option></select></td>
+          <td><input type="number" min="0" value="${food.kcal}" data-ff="kcal" ${roAttr}></td>
+          <td><input type="number" min="0" step="0.1" value="${food.protein}" data-ff="protein" ${roAttr}></td>
+          <td><input type="number" min="0" step="0.1" value="${food.carbs}" data-ff="carbs" ${roAttr}></td>
+          <td><input type="number" min="0" step="0.1" value="${food.fat}" data-ff="fat" ${roAttr}></td>
+          <td>${READONLY ? '' : `<button class="ghost small" data-delfood="1">✕</button>`}</td>`;
+        rowsEl.appendChild(tr);
+
+        if(!READONLY){
+          const nameInput = tr.querySelector('[data-ff="name"]');
+          nameInput.addEventListener('change', ()=>{
+            food.name = nameInput.value;
+            const dbFood = findFood(food.name);
+            if(dbFood){
+              food.unit = dbFood.unit;
+              const c = calcFromFood(dbFood, food.qty||(dbFood.unit==='un'?1:100));
+              Object.assign(food, c);
+              food.aiEstimated = false;
+            }
+            save(); renderMeals();
+          });
+          tr.querySelector('[data-ff="qty"]').addEventListener('input', e=>{
+            food.qty = parseFloat(e.target.value)||0;
+            const dbFood = findFood(food.name);
+            if(dbFood){ Object.assign(food, calcFromFood(dbFood, food.qty)); food.aiEstimated = false; }
+            save(); renderMeals();
+          });
+          tr.querySelector('[data-ff="unit"]').addEventListener('change', e=>{ food.unit = e.target.value; save(); });
+          ['kcal','protein','carbs','fat'].forEach(f=>{
+            tr.querySelector(`[data-ff="${f}"]`).addEventListener('input', e=>{
+              food[f] = parseFloat(e.target.value)||0;
+              food.aiEstimated = false;
+              save(); renderMeals();
+            });
+          });
+          const delBtn = tr.querySelector('[data-delfood]');
+          if(delBtn) delBtn.addEventListener('click', ()=>{
+            mealEntry.foods = mealEntry.foods.filter(f=> f.id!==food.id);
+            save(); renderMeals();
+          });
+        }
+      });
+    });
   });
 }
 
@@ -715,6 +1000,7 @@ function renderShopping(){
 
 function renderAll(){
   renderDiet();
+  renderMeals();
   renderShopping();
 }
 
@@ -722,6 +1008,7 @@ if(READONLY){
   document.getElementById('addDietBtn').style.display = 'none';
   document.getElementById('dietDrop').style.display = 'none';
   document.getElementById('addShoppingBtn').style.display = 'none';
+  document.getElementById('addMealBtn').style.display = 'none';
   const banner = document.getElementById('readonlyBanner');
   banner.style.display = 'block';
   banner.innerHTML = '<div class="card" style="border-color:var(--accent);padding:12px 16px;margin-bottom:22px;">👁 <strong style="color:var(--text);">Área do professor</strong> — modo somente leitura, nada pode ser editado ou excluído aqui.</div>';
