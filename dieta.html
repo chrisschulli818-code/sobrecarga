@@ -586,7 +586,7 @@ async function recognizeFoodPhoto(mealEntry, file, btn){
     });
     const data = await res.json();
     if(!res.ok){
-      alert(data.message || 'Reconhecimento por foto não está disponível.');
+      alert((data.message || 'Reconhecimento por foto não está disponível.') + (data.detail ? '\n\nDetalhe: ' + data.detail : ''));
       return;
     }
     if(!data.items || data.items.length===0){

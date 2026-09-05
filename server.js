@@ -138,7 +138,9 @@ Sem nenhum texto antes ou depois do JSON. Se não conseguir identificar nada, re
     if (!apiRes.ok) {
       const errText = await apiRes.text();
       console.error('Anthropic API error:', apiRes.status, errText);
-      return res.status(502).json({ error: 'ai_error', message: 'Falha ao consultar a IA de reconhecimento.' });
+      let detail = errText;
+      try { detail = JSON.parse(errText).error?.message || errText; } catch (e) {}
+      return res.status(502).json({ error: 'ai_error', message: 'Falha ao consultar a IA de reconhecimento.', detail: String(detail).slice(0, 300), status: apiRes.status });
     }
 
     const apiData = await apiRes.json();
