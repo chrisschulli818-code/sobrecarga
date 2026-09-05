@@ -293,6 +293,21 @@ footer{text-align:center;color:var(--text-faint);font-size:11.5px;margin-top:32p
 
   <div class="card">
     <div class="card-head">
+      <h2><span class="chip">⚖</span>Dieta</h2>
+      <span class="hint">Peso corporal, calorias e proteína — anexe uma foto por registro</span>
+    </div>
+    <div id="dietTrend" class="hint" style="margin-bottom:12px;"></div>
+    <div class="tbl-scroll">
+      <table>
+        <thead><tr><th>Data</th><th style="width:80px">Peso (kg)</th><th style="width:90px">Calorias</th><th style="width:90px">Proteína (g)</th><th style="width:70px">Foto</th><th></th></tr></thead>
+        <tbody id="dietBody"></tbody>
+      </table>
+    </div>
+    <button class="small" id="addDietBtn" style="margin-top:12px;">+ novo registro</button>
+  </div>
+
+  <div class="card">
+    <div class="card-head">
       <h2><span class="chip">⬇</span>Exportar</h2>
       <span class="hint">Gera um PDF com todas as sessões registradas e o relatório de rendimento</span>
     </div>
@@ -318,9 +333,9 @@ const syncBadge = () => document.getElementById('syncBadge');
 function loadLocal(){
   try{
     const raw = localStorage.getItem(STORE_KEY);
-    if(raw) return JSON.parse(raw);
+    if(raw){ const d = JSON.parse(raw); if(!Array.isArray(d.diet)) d.diet = []; return d; }
   }catch(e){}
-  return { sessions: [] };
+  return { sessions: [], diet: [] };
 }
 function saveLocal(){
   try{ localStorage.setItem(STORE_KEY, JSON.stringify(state)); }catch(e){}
@@ -338,6 +353,7 @@ async function loadRemote(){
     if(!res.ok) throw new Error('bad status');
     const data = await res.json();
     if(data && Array.isArray(data.sessions)){
+      if(!Array.isArray(data.diet)) data.diet = [];
       state = data;
       saveLocal();
       renderAll();
@@ -1149,15 +1165,136 @@ function renderStats(){
 function escapeHtml(s){ return String(s).replace(/[&<>"']/g, c=> ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 function escapeAttr(s){ return escapeHtml(s); }
 
+/* ---------- Dieta ---------- */
+const dietBody = document.getElementById('dietBody');
+const dietTrendEl = document.getElementById('dietTrend');
+
+document.getElementById('addDietBtn').addEventListener('click', ()=>{
+  state.diet.unshift({ id: uid(), date: todayISO(), weight: 0, calories: 0, protein: 0, photoId: null });
+  save();
+  renderDiet();
+});
+
+function resizeImageFile(file){
+  return new Promise((resolve, reject)=>{
+    const reader = new FileReader();
+    reader.onerror = ()=> reject(new Error('read failed'));
+    reader.onload = ()=>{
+      const img = new Image();
+      img.onerror = ()=> reject(new Error('decode failed'));
+      img.onload = ()=>{
+        const maxDim = 900;
+        const scale = Math.min(1, maxDim / Math.max(img.width, img.height));
+        const canvas = document.createElement('canvas');
+        canvas.width = Math.round(img.width*scale);
+        canvas.height = Math.round(img.height*scale);
+        canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+        const dataUrl = canvas.toDataURL('image/jpeg', 0.72);
+        resolve(dataUrl.split(',')[1]);
+      };
+      img.src = reader.result;
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
+async function uploadDietPhoto(entry, file){
+  try{
+    const base64 = await resizeImageFile(file);
+    const res = await fetch('/api/photos', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ data: base64, mime: 'image/jpeg' })
+    });
+    if(!res.ok) throw new Error('upload failed');
+    const { id } = await res.json();
+    const oldId = entry.photoId;
+    entry.photoId = id;
+    save();
+    renderDiet();
+    if(oldId) fetch('/api/photos/'+oldId, { method:'DELETE' }).catch(()=>{});
+  }catch(e){
+    alert('Não consegui enviar a foto. Tente de novo.');
+  }
+}
+
+function updateDietTrend(){
+  const byDateAsc = [...state.diet].filter(d=> d.weight>0).sort((a,b)=> a.date.localeCompare(b.date));
+  if(byDateAsc.length>1){
+    const cur = byDateAsc[byDateAsc.length-1], prev = byDateAsc[byDateAsc.length-2];
+    const diff = cur.weight - prev.weight;
+    const dir = Math.abs(diff)<0.05 ? 'flat' : (diff>0?'up':'down');
+    const arrow = dir==='up' ? '▲' : dir==='down' ? '▼' : '▬';
+    dietTrendEl.innerHTML = `Peso atual: <strong style="color:var(--text);">${cur.weight}kg</strong> · <span class="trend ${dir}">${arrow} ${Math.abs(diff).toFixed(1)}kg desde o registro anterior</span>`;
+  }else if(byDateAsc.length===1){
+    dietTrendEl.textContent = `Peso atual: ${byDateAsc[0].weight}kg (1º registro)`;
+  }else{
+    dietTrendEl.textContent = 'Sem registros de peso ainda.';
+  }
+}
+
+function renderDiet(){
+  updateDietTrend();
+  const sorted = [...state.diet].sort((a,b)=> b.date.localeCompare(a.date));
+  dietBody.innerHTML = '';
+  if(sorted.length===0){
+    dietBody.innerHTML = `<tr><td colspan="6"><span class="hint">Nenhum registro ainda.</span></td></tr>`;
+    return;
+  }
+  sorted.forEach(entry=>{
+    const tr = document.createElement('tr');
+    const roAttr = READONLY ? 'disabled' : '';
+    const photoCell = entry.photoId
+      ? `<a href="/api/photos/${entry.photoId}" target="_blank"><img src="/api/photos/${entry.photoId}" style="width:36px;height:36px;object-fit:cover;border-radius:4px;border:1px solid var(--border);"></a>`
+      : (READONLY ? '<span class="hint">—</span>' : `<input type="file" accept="image/*" data-photo="${entry.id}" style="max-width:70px;font-size:10px;">`);
+    tr.innerHTML = `
+      <td><input type="date" value="${entry.date}" data-f="date" ${roAttr} style="min-width:130px;"></td>
+      <td><input type="number" min="0" step="0.1" value="${entry.weight||0}" data-f="weight" ${roAttr}></td>
+      <td><input type="number" min="0" value="${entry.calories||0}" data-f="calories" ${roAttr}></td>
+      <td><input type="number" min="0" value="${entry.protein||0}" data-f="protein" ${roAttr}></td>
+      <td>${photoCell}</td>
+      <td>${READONLY ? '' : `<button class="ghost small" data-deldiet="${entry.id}" title="Excluir registro">✕</button>`}</td>`;
+    dietBody.appendChild(tr);
+
+    if(!READONLY){
+      tr.querySelectorAll('[data-f]').forEach(inp=>{
+        inp.addEventListener('input', ()=>{
+          const f = inp.dataset.f;
+          entry[f] = f==='date' ? inp.value : (parseFloat(inp.value)||0);
+          save();
+          if(f==='date'){ renderDiet(); return; }
+          updateDietTrend();
+        });
+      });
+      const photoInput = tr.querySelector('[data-photo]');
+      if(photoInput){
+        photoInput.addEventListener('change', e=>{
+          const file = e.target.files[0];
+          if(file) uploadDietPhoto(entry, file);
+        });
+      }
+      tr.querySelector('[data-deldiet]').addEventListener('click', async ()=>{
+        if(!(await confirmDialog('Excluir este registro de dieta?'))) return;
+        const photoId = entry.photoId;
+        state.diet = state.diet.filter(d=> d.id!==entry.id);
+        save();
+        renderDiet();
+        if(photoId) fetch('/api/photos/'+photoId, { method:'DELETE' }).catch(()=>{});
+      });
+    }
+  });
+}
+
 function renderAll(){
   renderSessions();
   renderProgress();
   renderStats();
+  renderDiet();
 }
 
 if(READONLY){
   document.getElementById('importCard').style.display = 'none';
   document.getElementById('addSessionBtn').style.display = 'none';
+  document.getElementById('addDietBtn').style.display = 'none';
   document.getElementById('professorLink').style.display = 'none';
   const banner = document.getElementById('readonlyBanner');
   banner.style.display = 'block';
