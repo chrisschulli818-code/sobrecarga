@@ -306,6 +306,36 @@ footer{text-align:center;color:var(--text-faint);font-size:11.5px;margin-top:32p
     <button class="small" id="addDietBtn" style="margin-top:12px;">+ novo registro</button>
   </div>
 
+  <div class="card" id="shoppingCard">
+    <div class="card-head">
+      <h2><span class="chip">🛒</span>Lista de Compras</h2>
+      <span class="hint">Importe o PDF da sua dieta — junta os alimentos repetidos e soma as medidas</span>
+    </div>
+    <label class="drop" id="dietDrop" tabindex="0">
+      <input type="file" id="dietFileInput" accept="application/pdf">
+      <div id="dietDropLabel"><strong>Clique para escolher</strong> ou arraste o PDF da dieta aqui</div>
+    </label>
+    <div id="shoppingStageWrap" style="display:none;margin-top:18px;">
+      <div class="tbl-scroll">
+        <table>
+          <thead><tr><th>Alimento</th><th style="width:120px">Medida</th><th></th></tr></thead>
+          <tbody id="shoppingStageBody"></tbody>
+        </table>
+      </div>
+      <div class="stage-actions">
+        <button class="ghost small" id="shoppingStageCancel">Cancelar</button>
+        <button class="primary small" id="shoppingStageConfirm">Adicionar à lista</button>
+      </div>
+    </div>
+    <div class="tbl-scroll" style="margin-top:16px;">
+      <table>
+        <thead><tr><th></th><th>Alimento</th><th style="width:120px">Medida</th><th></th></tr></thead>
+        <tbody id="shoppingBody"></tbody>
+      </table>
+    </div>
+    <button class="small" id="addShoppingBtn" style="margin-top:12px;">+ item manual</button>
+  </div>
+
   <div class="card">
     <div class="card-head">
       <h2><span class="chip">⬇</span>Exportar</h2>
@@ -333,9 +363,14 @@ const syncBadge = () => document.getElementById('syncBadge');
 function loadLocal(){
   try{
     const raw = localStorage.getItem(STORE_KEY);
-    if(raw){ const d = JSON.parse(raw); if(!Array.isArray(d.diet)) d.diet = []; return d; }
+    if(raw){
+      const d = JSON.parse(raw);
+      if(!Array.isArray(d.diet)) d.diet = [];
+      if(!Array.isArray(d.shoppingList)) d.shoppingList = [];
+      return d;
+    }
   }catch(e){}
-  return { sessions: [], diet: [] };
+  return { sessions: [], diet: [], shoppingList: [] };
 }
 function saveLocal(){
   try{ localStorage.setItem(STORE_KEY, JSON.stringify(state)); }catch(e){}
@@ -354,6 +389,7 @@ async function loadRemote(){
     const data = await res.json();
     if(data && Array.isArray(data.sessions)){
       if(!Array.isArray(data.diet)) data.diet = [];
+      if(!Array.isArray(data.shoppingList)) data.shoppingList = [];
       state = data;
       saveLocal();
       renderAll();
@@ -1284,17 +1320,267 @@ function renderDiet(){
   });
 }
 
+/* ---------- Lista de Compras (importa PDF da dieta) ---------- */
+const dietFileInput = document.getElementById('dietFileInput');
+const dietDrop = document.getElementById('dietDrop');
+const dietDropLabel = document.getElementById('dietDropLabel');
+const shoppingStageWrap = document.getElementById('shoppingStageWrap');
+const shoppingStageBody = document.getElementById('shoppingStageBody');
+const shoppingBody = document.getElementById('shoppingBody');
+let shoppingStageRows = [];
+
+dietDrop.addEventListener('dragover', e=>{ e.preventDefault(); dietDrop.classList.add('drag'); });
+dietDrop.addEventListener('dragleave', ()=> dietDrop.classList.remove('drag'));
+dietDrop.addEventListener('drop', e=>{
+  e.preventDefault(); dietDrop.classList.remove('drag');
+  const f = e.dataTransfer.files && e.dataTransfer.files[0];
+  if(f) handleDietFile(f);
+});
+dietFileInput.addEventListener('change', e=>{
+  const f = e.target.files[0];
+  if(f) handleDietFile(f);
+});
+
+async function handleDietFile(file){
+  if(file.type !== 'application/pdf'){ alert('Envie um arquivo PDF.'); return; }
+  dietDropLabel.innerHTML = `<strong>Lendo…</strong> ${file.name}`;
+  try{
+    const buf = await file.arrayBuffer();
+    const pdf = await pdfjsLib.getDocument({data:buf}).promise;
+    const rawRows = await extractDietShoppingItems(pdf);
+    const aggregated = aggregateShoppingRows(rawRows);
+    dietDropLabel.innerHTML = `<strong>${file.name}</strong> — clique para trocar o arquivo`;
+    if(aggregated.length===0){
+      alert('Não encontrei uma tabela de MEDIDA/ALIMENTO nesse PDF. Você pode adicionar os itens manualmente na lista abaixo.');
+      return;
+    }
+    openShoppingStage(aggregated);
+  }catch(err){
+    console.error(err);
+    dietDropLabel.innerHTML = '<strong>Não consegui ler esse PDF.</strong> Clique para tentar outro';
+  }
+}
+
+/* Extrai pares MEDIDA/ALIMENTO de um plano alimentar em PDF, ignorando as
+   colunas de substituição e observações. As colunas variam de posição por
+   documento, então os limites de cada uma são recalculados a cada cabeçalho
+   "MEDIDA/ALIMENTO" encontrado (um por refeição). */
+async function extractDietShoppingItems(pdf){
+  const rows = [];
+
+  function flushSection(medidaLines, alimentoEntries){
+    const blocks = [];
+    medidaLines.forEach(m=>{
+      const last = blocks[blocks.length-1];
+      if(last && Math.abs(last.yLast - m.y) < 14){
+        last.text += ' ' + m.text;
+        last.yLast = m.y;
+      }else{
+        blocks.push({ yLast: m.y, text: m.text });
+      }
+    });
+    alimentoEntries.forEach((text,i)=>{
+      rows.push({ medida: blocks[i] ? blocks[i].text.trim() : '', alimento: text });
+    });
+  }
+
+  // Estado do "cabeçalho" (MEDIDA/ALIMENTO) atual — persiste entre páginas,
+  // já que uma refeição pode continuar numa página seguinte sem repetir o
+  // cabeçalho nem a marcação "REFEIÇÃO: N".
+  let sectionOpen = false;
+  let bands = null;
+  let medidaLines = [];
+  let alimentoEntries = [];
+
+  for(let p=1;p<=pdf.numPages;p++){
+    const page = await pdf.getPage(p);
+    const content = await page.getTextContent();
+    const items = content.items
+      .map(it=> ({ x: it.transform[4], y: it.transform[5], str: it.str }))
+      .filter(it=> it.str && it.str.trim());
+    if(!items.length) continue;
+
+    const lines = clusterByY(items, 4, true);
+
+    lines.forEach(line=>{
+      const sortedLine = line.slice().sort((a,b)=> a.x-b.x);
+      const fullText = sortedLine.map(t=> t.str).join(' ');
+      if(/REFEI[ÇC][ÃA]O\s*:/i.test(fullText)){
+        flushSection(medidaLines, alimentoEntries);
+        medidaLines = []; alimentoEntries = [];
+        sectionOpen = false;
+        return;
+      }
+
+      const medidaIdx = sortedLine.findIndex(t=> t.str.trim().toUpperCase()==='MEDIDA');
+      if(medidaIdx!==-1){
+        const alimentoToks = sortedLine.filter(t=> t.str.trim().toUpperCase()==='ALIMENTO');
+        if(alimentoToks.length){
+          flushSection(medidaLines, alimentoEntries);
+          medidaLines = []; alimentoEntries = [];
+          const medidaX = sortedLine[medidaIdx].x;
+          const alimentoX = alimentoToks[0].x;
+          const mid = (medidaX+alimentoX)/2;
+          bands = {
+            mmin: medidaX-35, mmax: mid,
+            amin: mid, amax: alimentoX + 0.75*(alimentoX-medidaX)
+          };
+          sectionOpen = true;
+        }
+        return;
+      }
+      if(!sectionOpen || !bands) return;
+
+      const medidaText = sortedLine.filter(t=> t.x>=bands.mmin && t.x<bands.mmax).map(t=> t.str).join(' ').trim();
+      const alimentoText = sortedLine.filter(t=> t.x>=bands.amin && t.x<bands.amax).map(t=> t.str).join(' ').trim();
+      const y = sortedLine[0].y;
+      if(medidaText) medidaLines.push({ y, text: medidaText });
+      if(alimentoText) alimentoEntries.push(alimentoText);
+    });
+  }
+  flushSection(medidaLines, alimentoEntries);
+  return rows;
+}
+
+function parseQtyText(text){
+  const m = String(text||'').trim().match(/^(\d+(?:[.,]\d+)?)\s*([a-zà-öø-ÿ%]*)/i);
+  if(!m) return null;
+  return { qty: parseFloat(m[1].replace(',','.')), unit: (m[2]||'').toLowerCase() };
+}
+function mergeQtyText(a, b){
+  a = (a||'').trim(); b = (b||'').trim();
+  if(!a) return b;
+  if(!b) return a;
+  const pa = parseQtyText(a), pb = parseQtyText(b);
+  if(pa && pb && pa.unit===pb.unit){
+    const total = pa.qty + pb.qty;
+    return (Number.isInteger(total) ? total : total.toFixed(1)) + pb.unit;
+  }
+  const parts = a.split(' + ').map(s=> s.trim()).filter(Boolean);
+  if(!parts.includes(b)) parts.push(b);
+  return parts.join(' + ');
+}
+function aggregateShoppingRows(rows){
+  const map = new Map();
+  const order = [];
+  rows.forEach(r=>{
+    if(!r.alimento || !r.alimento.trim()) return;
+    const key = r.alimento.trim().toLowerCase();
+    if(!map.has(key)){ map.set(key, { name: r.alimento.trim(), qty: r.medida||'' }); order.push(key); }
+    else{
+      const item = map.get(key);
+      item.qty = mergeQtyText(item.qty, r.medida||'');
+    }
+  });
+  return order.map(k=> map.get(k));
+}
+
+function openShoppingStage(items){
+  shoppingStageRows = items.map(it=> ({ name: it.name, qty: it.qty }));
+  shoppingStageWrap.style.display = 'block';
+  renderShoppingStage();
+  shoppingStageWrap.scrollIntoView({behavior:'smooth', block:'nearest'});
+}
+function renderShoppingStage(){
+  shoppingStageBody.innerHTML = '';
+  shoppingStageRows.forEach((r,i)=>{
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td><input type="text" data-i="${i}" data-f="name" value="${escapeAttr(r.name)}"></td>
+      <td><input type="text" data-i="${i}" data-f="qty" value="${escapeAttr(r.qty)}"></td>
+      <td><button class="ghost small" data-delstage="${i}" title="Remover">✕</button></td>`;
+    shoppingStageBody.appendChild(tr);
+  });
+}
+shoppingStageBody.addEventListener('input', e=>{
+  const t = e.target;
+  if(t.dataset.i===undefined) return;
+  shoppingStageRows[+t.dataset.i][t.dataset.f] = t.value;
+});
+shoppingStageBody.addEventListener('click', e=>{
+  if(e.target.dataset.delstage!==undefined){
+    shoppingStageRows.splice(+e.target.dataset.delstage, 1);
+    renderShoppingStage();
+  }
+});
+document.getElementById('shoppingStageCancel').addEventListener('click', ()=>{
+  shoppingStageWrap.style.display = 'none';
+  dietFileInput.value = '';
+  dietDropLabel.innerHTML = '<strong>Clique para escolher</strong> ou arraste o PDF da dieta aqui';
+});
+document.getElementById('shoppingStageConfirm').addEventListener('click', ()=>{
+  const valid = shoppingStageRows.filter(r=> r.name && r.name.trim());
+  valid.forEach(r=>{
+    const key = r.name.trim().toLowerCase();
+    const existing = state.shoppingList.find(s=> s.name.trim().toLowerCase()===key);
+    if(existing){
+      existing.qty = mergeQtyText(existing.qty, r.qty);
+      existing.checked = false;
+    }else{
+      state.shoppingList.push({ id: uid(), name: r.name.trim(), qty: r.qty||'', checked: false });
+    }
+  });
+  save();
+  shoppingStageWrap.style.display = 'none';
+  dietFileInput.value = '';
+  dietDropLabel.innerHTML = '<strong>Clique para escolher</strong> ou arraste o PDF da dieta aqui';
+  renderShopping();
+  shoppingBody.scrollIntoView({behavior:'smooth', block:'nearest'});
+});
+
+document.getElementById('addShoppingBtn').addEventListener('click', ()=>{
+  state.shoppingList.unshift({ id: uid(), name: '', qty: '', checked: false });
+  save();
+  renderShopping();
+});
+
+function renderShopping(){
+  shoppingBody.innerHTML = '';
+  if(state.shoppingList.length===0){
+    shoppingBody.innerHTML = `<tr><td colspan="4"><span class="hint">Nenhum item ainda. Importe o PDF da dieta ou adicione manualmente.</span></td></tr>`;
+    return;
+  }
+  state.shoppingList.forEach(item=>{
+    const tr = document.createElement('tr');
+    const roAttr = READONLY ? 'disabled' : '';
+    tr.innerHTML = `
+      <td><input type="checkbox" ${item.checked?'checked':''} data-check="${item.id}" ${roAttr}></td>
+      <td><input type="text" value="${escapeAttr(item.name)}" data-f="name" ${roAttr} style="${item.checked?'text-decoration:line-through;color:var(--text-faint);':''}"></td>
+      <td><input type="text" value="${escapeAttr(item.qty)}" data-f="qty" ${roAttr}></td>
+      <td>${READONLY ? '' : `<button class="ghost small" data-delshop="${item.id}" title="Remover">✕</button>`}</td>`;
+    shoppingBody.appendChild(tr);
+    if(!READONLY){
+      tr.querySelector('[data-check]').addEventListener('change', e=>{
+        item.checked = e.target.checked; save(); renderShopping();
+      });
+      tr.querySelectorAll('[data-f]').forEach(inp=>{
+        inp.addEventListener('input', ()=>{
+          item[inp.dataset.f] = inp.value; save();
+        });
+      });
+      tr.querySelector('[data-delshop]').addEventListener('click', async ()=>{
+        if(!(await confirmDialog(`Remover "${item.name}" da lista?`))) return;
+        state.shoppingList = state.shoppingList.filter(s=> s.id!==item.id);
+        save(); renderShopping();
+      });
+    }
+  });
+}
+
 function renderAll(){
   renderSessions();
   renderProgress();
   renderStats();
   renderDiet();
+  renderShopping();
 }
 
 if(READONLY){
   document.getElementById('importCard').style.display = 'none';
   document.getElementById('addSessionBtn').style.display = 'none';
   document.getElementById('addDietBtn').style.display = 'none';
+  document.getElementById('dietDrop').style.display = 'none';
+  document.getElementById('addShoppingBtn').style.display = 'none';
   document.getElementById('professorLink').style.display = 'none';
   const banner = document.getElementById('readonlyBanner');
   banner.style.display = 'block';
