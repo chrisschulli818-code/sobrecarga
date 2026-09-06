@@ -150,6 +150,19 @@ button:disabled{opacity:.4;cursor:not-allowed;}
 .row-fields{display:grid;grid-template-columns:1fr 140px 100px;gap:10px;margin-bottom:14px;}
 @media (max-width:560px){.row-fields{grid-template-columns:1fr 1fr;}}
 
+.protocol-group{border:1px solid var(--border);border-left:3px solid var(--accent);border-radius:3px;margin-bottom:16px;overflow:hidden;background:var(--surface);}
+.protocol-head{
+  display:flex;align-items:center;gap:10px;padding:13px 15px;cursor:pointer;background:var(--surface-2);
+}
+.protocol-head:hover{background:var(--surface-3);}
+.protocol-group.open .protocol-head .chev{transform:rotate(90deg);}
+.protocol-name{
+  flex:1;font-family:'Big Shoulders Display',sans-serif;font-weight:800;font-size:19px;
+  letter-spacing:.3px;text-transform:uppercase;background:transparent;border:none;color:var(--text);padding:2px 0;
+}
+.protocol-name:focus{background:var(--bg);border-radius:3px;padding:2px 6px;}
+.protocol-body{padding:12px;display:none;}
+.protocol-group.open .protocol-body{display:block;}
 .month-group{border:1px solid var(--border);border-radius:3px;margin-bottom:12px;overflow:hidden;background:var(--surface-2);}
 .month-head{
   display:flex;align-items:center;gap:9px;padding:12px 15px;cursor:pointer;
@@ -185,10 +198,12 @@ button:disabled{opacity:.4;cursor:not-allowed;}
 .chev{transition:transform .15s;color:var(--text-faint);}
 
 .ex-block{margin-bottom:14px;}
-.ex-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;}
+.ex-head{display:flex;align-items:center;gap:10px;margin-bottom:6px;}
 .ex-name-input{font-weight:600;font-size:14px;max-width:260px;background:transparent;border:none;padding:2px 0;}
 .ex-name-input:focus{background:var(--surface-2);border-radius:6px;padding:2px 6px;}
-.set-row{display:grid;grid-template-columns:26px 1fr 1fr 30px;gap:8px;align-items:center;margin-bottom:5px;}
+.ex-target{flex:1;font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--accent);white-space:nowrap;}
+.set-row{display:grid;grid-template-columns:26px 84px 1fr 1fr 30px;gap:8px;align-items:center;margin-bottom:5px;}
+.set-target{font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--accent);text-align:center;}
 .set-idx{font-family:'IBM Plex Mono',monospace;font-size:11.5px;color:var(--text-faint);text-align:center;}
 .set-add{margin-top:2px;}
 
@@ -276,6 +291,22 @@ footer{text-align:center;color:var(--text-faint);font-size:11.5px;margin-top:32p
 .mpad-value{font-family:'IBM Plex Mono',monospace;font-size:26px;color:var(--text);font-weight:600;margin-top:2px;}
 .mpad-box.active .mpad-value{color:var(--accent);}
 .mbig-num{font-family:'IBM Plex Mono',monospace;font-size:32px;color:var(--text);font-weight:600;}
+.mtarget-bar{
+  display:flex;align-items:center;justify-content:space-between;gap:10px;
+  background:var(--surface-2);border:1px solid var(--border);border-left:3px solid var(--accent);
+  border-radius:6px;padding:8px 12px;margin-bottom:12px;
+  font-size:11.5px;color:var(--text-faint);text-transform:uppercase;letter-spacing:.05em;font-weight:700;
+}
+.mtarget-bar strong{font-family:'IBM Plex Mono',monospace;color:var(--accent);font-size:12.5px;letter-spacing:0;text-transform:none;}
+.mset-row.sel{border-color:var(--accent);background:var(--surface-2);}
+.mprotocol-head{
+  display:flex;align-items:center;justify-content:space-between;gap:10px;
+  margin:16px 16px 8px;padding:8px 12px;border-left:3px solid var(--accent);background:var(--surface-2);
+  border-radius:0 6px 6px 0;
+  font-family:'Big Shoulders Display',sans-serif;font-weight:800;font-size:16px;
+  letter-spacing:.3px;text-transform:uppercase;color:var(--text);
+}
+.mprotocol-head .mmono{font-size:10.5px;color:var(--text-faint);font-weight:600;text-transform:none;letter-spacing:0;}
 </style>
 
 <div class="hazard"></div>
@@ -320,6 +351,16 @@ footer{text-align:center;color:var(--text-faint);font-size:11.5px;margin-top:32p
       <div id="dropLabel"><strong>Clique para escolher</strong> ou arraste um PDF de treino aqui</div>
     </label>
     <div id="stageWrap" style="display:none;margin-top:18px;">
+      <div class="stage-group" style="display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap;">
+        <div style="flex:1;min-width:180px;">
+          <label class="hint">Protocolo</label>
+          <select id="stageProtocolSelect"></select>
+        </div>
+        <div style="flex:1;min-width:180px;" id="stageProtocolNameWrap">
+          <label class="hint">Nome do novo protocolo</label>
+          <input type="text" id="stageProtocolName">
+        </div>
+      </div>
       <div id="stageGroupsWrap"></div>
       <div class="stage-actions">
         <button class="ghost small" id="stageCancel">Cancelar</button>
@@ -331,7 +372,10 @@ footer{text-align:center;color:var(--text-faint);font-size:11.5px;margin-top:32p
   <div class="card">
     <div class="card-head">
       <h2><span class="chip">✎</span>Sessões</h2>
-      <button class="small" id="addSessionBtn">+ nova sessão manual</button>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;">
+        <button class="small" id="addProtocolBtn">+ novo protocolo</button>
+        <button class="small" id="addSessionBtn">+ nova sessão manual</button>
+      </div>
     </div>
     <div id="sessionsList"></div>
   </div>
@@ -394,10 +438,11 @@ function loadLocal(){
       if(!Array.isArray(d.diet)) d.diet = [];
       if(!Array.isArray(d.shoppingList)) d.shoppingList = [];
       if(!Array.isArray(d.meals)) d.meals = [];
+      if(!Array.isArray(d.protocols)) d.protocols = [];
       return d;
     }
   }catch(e){}
-  return { sessions: [], diet: [], shoppingList: [], meals: [] };
+  return { sessions: [], diet: [], shoppingList: [], meals: [], protocols: [] };
 }
 function saveLocal(){
   try{ localStorage.setItem(STORE_KEY, JSON.stringify(state)); }catch(e){}
@@ -418,7 +463,9 @@ async function loadRemote(){
       if(!Array.isArray(data.diet)) data.diet = [];
       if(!Array.isArray(data.shoppingList)) data.shoppingList = [];
       if(!Array.isArray(data.meals)) data.meals = [];
+      if(!Array.isArray(data.protocols)) data.protocols = [];
       state = data;
+      if(ensureProtocols()) saveLocal();
       saveLocal();
       renderAll();
     }
@@ -603,12 +650,14 @@ async function extractGridWorkouts(pdf){
 
       const populated = COLS.filter(c=> colToks[c].length);
       if(populated.length===0){
-        group.rows.push({ name, sets: parseInt(setsCount,10)||1, reps: 10, weight: 0 });
+        group.rows.push({ name, sets: parseInt(setsCount,10)||1, reps: 10, weight: 0, target: '' });
         continue;
       }
       populated.forEach(c=>{
         const text = colToks[c].slice().sort((a,b)=> (b.y-a.y) || (a.x-b.x)).map(w=> w.str).join(' ').replace(/\s+/g,' ').trim();
-        group.rows.push({ name, sets: 1, reps: parseRepsTarget(text), weight: 0 });
+        // Guarda a faixa prescrita como veio da ficha ("6 a 10", "max", "12/10/8")
+        // além do número usado como valor inicial da série.
+        group.rows.push({ name, sets: 1, reps: parseRepsTarget(text), weight: 0, target: cleanTarget(text) });
       });
     }
   }
@@ -631,9 +680,24 @@ function clusterByY(items, gap, topFirst){
 }
 
 function parseRepsTarget(text){
-  const nums = (text.match(/\d+/g)||[]).map(n=> parseInt(n,10));
+  const nums = (String(text).match(/\d+/g)||[]).map(n=> parseInt(n,10));
   if(!nums.length) return 10; // ex.: "max"
   return nums[nums.length-1];
+}
+
+// Faixa de repetições prescrita ("alvo"), como está no protocolo.
+function cleanTarget(text){
+  return String(text||'').replace(/\s+/g,' ').trim().slice(0,24);
+}
+// Resumo do alvo de um exercício: junta os alvos distintos das séries na ordem
+// (ex.: aquecimento "15", preparatória "10" e as válidas "6 a 10").
+function exerciseTarget(ex){
+  const seen = [];
+  ex.sets.forEach(s=>{
+    const t = (s.target||'').trim();
+    if(t && !seen.includes(t)) seen.push(t);
+  });
+  return seen.join(' · ');
 }
 
 function groupIntoLines(items, gap){
@@ -725,7 +789,7 @@ function buildExercisesFromRows(rows){
     }
     const ex = byKey.get(key);
     const n = Math.max(1, r.sets||1);
-    for(let i=0;i<n;i++) ex.sets.push({ reps: r.reps||0, weight: r.weight||0 });
+    for(let i=0;i<n;i++) ex.sets.push({ reps: r.reps||0, weight: r.weight||0, target: r.target||'' });
   });
   return order.map(k=> byKey.get(k));
 }
@@ -749,9 +813,42 @@ function openStage(groups, fileName){
     date: addDaysISO(today, i),
     rows: g.rows.length? g.rows : [{name:'', sets:1, reps:10, weight:0}]
   }));
+  stageProtocol = { mode: 'new', id: null, name: suggestProtocolName(stageGroups[0].date) };
   stageWrap.style.display = 'block';
+  renderStageProtocol();
   renderStageGroups();
   stageWrap.scrollIntoView({behavior:'smooth', block:'nearest'});
+}
+
+/* Uma importação = uma ficha = um protocolo (ou anexada a um já existente). */
+let stageProtocol = { mode:'new', id:null, name:'' };
+const stageProtocolSelect = document.getElementById('stageProtocolSelect');
+const stageProtocolName = document.getElementById('stageProtocolName');
+const stageProtocolNameWrap = document.getElementById('stageProtocolNameWrap');
+
+function renderStageProtocol(){
+  stageProtocolSelect.innerHTML =
+    `<option value="__new">➕ Novo protocolo</option>` +
+    state.protocols.map(p=> `<option value="${escapeAttr(p.id)}" ${stageProtocol.id===p.id?'selected':''}>${escapeHtml(p.name)}</option>`).join('');
+  stageProtocolSelect.value = stageProtocol.mode==='new' ? '__new' : stageProtocol.id;
+  stageProtocolName.value = stageProtocol.name;
+  stageProtocolNameWrap.style.display = stageProtocol.mode==='new' ? '' : 'none';
+}
+stageProtocolSelect.addEventListener('change', e=>{
+  if(e.target.value==='__new'){ stageProtocol.mode='new'; stageProtocol.id=null; }
+  else{ stageProtocol.mode='existing'; stageProtocol.id=e.target.value; }
+  renderStageProtocol();
+});
+stageProtocolName.addEventListener('input', e=>{ stageProtocol.name = e.target.value; });
+
+// Resolve o protocolo escolhido na importação, criando-o se for novo.
+function resolveStageProtocolId(){
+  if(stageProtocol.mode==='existing' && state.protocols.some(p=> p.id===stageProtocol.id)){
+    return stageProtocol.id;
+  }
+  const prot = { id: uid(), name: (stageProtocol.name||'').trim() || suggestProtocolName(todayISO()), createdAt: todayISO() };
+  state.protocols.push(prot);
+  return prot.id;
 }
 
 function renderStageGroups(){
@@ -770,7 +867,7 @@ function renderStageGroups(){
       </div>
       <div class="tbl-scroll">
         <table>
-          <thead><tr><th>Exercício</th><th style="width:70px">Séries</th><th style="width:80px">Reps</th><th style="width:90px">Carga (kg)</th><th></th></tr></thead>
+          <thead><tr><th>Exercício</th><th style="width:70px">Séries</th><th style="width:100px">Alvo (reps)</th><th style="width:80px">Reps</th><th style="width:90px">Carga (kg)</th><th></th></tr></thead>
           <tbody></tbody>
         </table>
       </div>
@@ -793,6 +890,7 @@ function renderStageGroups(){
         tr.innerHTML = `
           <td><input type="text" data-i="${i}" data-f="name" value="${escapeAttr(r.name)}"></td>
           <td><input type="number" min="1" data-i="${i}" data-f="sets" value="${r.sets}"></td>
+          <td><input type="text" data-i="${i}" data-f="target" value="${escapeAttr(r.target||'')}" placeholder="6 a 10"></td>
           <td><input type="number" min="0" data-i="${i}" data-f="reps" value="${r.reps}"></td>
           <td><input type="number" min="0" step="0.5" data-i="${i}" data-f="weight" value="${r.weight}"></td>
           <td><button class="ghost small" data-del="${i}" title="Remover linha">✕</button></td>`;
@@ -804,7 +902,16 @@ function renderStageGroups(){
       const t = e.target;
       if(t.dataset.i===undefined) return;
       const i = +t.dataset.i, f = t.dataset.f;
-      group.rows[i][f] = (f==='name') ? t.value : parseFloat(t.value)||0;
+      if(f==='name'){ group.rows[i].name = t.value; return; }
+      if(f==='target'){
+        // O alvo é o que vale do protocolo; as reps iniciais saem dele.
+        group.rows[i].target = cleanTarget(t.value);
+        group.rows[i].reps = parseRepsTarget(t.value);
+        const repsInput = tbody.querySelector(`[data-i="${i}"][data-f="reps"]`);
+        if(repsInput) repsInput.value = group.rows[i].reps;
+        return;
+      }
+      group.rows[i][f] = parseFloat(t.value)||0;
     });
     tbody.addEventListener('click', e=>{
       if(e.target.dataset.del!==undefined){
@@ -813,7 +920,7 @@ function renderStageGroups(){
       }
     });
     card.querySelector('[data-addrow]').addEventListener('click', ()=>{
-      group.rows.push({name:'', sets:1, reps:10, weight:0});
+      group.rows.push({name:'', sets:1, reps:10, weight:0, target:''});
       renderRows();
     });
     renderRows();
@@ -828,11 +935,15 @@ function closeStage(){
 document.getElementById('stageCancel').addEventListener('click', closeStage);
 function commitStagedSessions(){
   let added = 0;
+  const hasValid = stageGroups.some(g=> buildExercisesFromRows(g.rows).length>0);
+  if(!hasValid){ alert('Adicione ao menos um exercício com nome.'); return 0; }
+  const protocolId = resolveStageProtocolId();
   stageGroups.forEach(group=>{
     const exercises = buildExercisesFromRows(group.rows);
     if(exercises.length===0) return;
     const session = {
       id: uid(),
+      protocolId,
       date: group.date || todayISO(),
       name: group.name.trim() || 'Sessão',
       exercises
@@ -842,7 +953,8 @@ function commitStagedSessions(){
     openWeeks.add(getWeekKey(session.date));
     added++;
   });
-  if(added===0){ alert('Adicione ao menos um exercício com nome.'); return 0; }
+  openProtocols.clear();
+  openProtocols.add(protocolId);
   save();
   closeStage();
   stageGroups = [];
@@ -855,18 +967,42 @@ document.getElementById('stageConfirm').addEventListener('click', commitStagedSe
 /* ---------- Sessions render (agrupado por mês > semana > dia) ---------- */
 const sessionsList = document.getElementById('sessionsList');
 let openSessionId = null;
+const openProtocols = new Set();
 const openMonths = new Set();
 const openWeeks = new Set();
 
-document.getElementById('addSessionBtn').addEventListener('click', ()=>{
-  const session = { id: uid(), date: todayISO(), name: 'Nova sessão', exercises: [
-    { id: uid(), name: 'Exercício', sets:[{reps:10, weight:0}] }
+// Sessão manual entra no protocolo mais recente (criando um, se não houver).
+function newManualSession(){
+  let protocolId = newestProtocolId();
+  if(!protocolId){
+    const prot = { id: uid(), name: suggestProtocolName(todayISO()), createdAt: todayISO() };
+    state.protocols.push(prot);
+    protocolId = prot.id;
+  }
+  const session = { id: uid(), protocolId, date: todayISO(), name: 'Nova sessão', exercises: [
+    { id: uid(), name: 'Exercício', sets:[{reps:10, weight:0, target:''}] }
   ]};
   state.sessions.push(session);
   openSessionId = session.id;
+  openProtocols.add(protocolId);
   openMonths.add(getMonthKey(session.date));
   openWeeks.add(getWeekKey(session.date));
+  return session;
+}
+
+document.getElementById('addSessionBtn').addEventListener('click', ()=>{
+  newManualSession();
   save(); renderAll();
+});
+
+document.getElementById('addProtocolBtn').addEventListener('click', ()=>{
+  const prot = { id: uid(), name: suggestProtocolName(todayISO()), createdAt: todayISO() };
+  state.protocols.push(prot);
+  openProtocols.clear();
+  openProtocols.add(prot.id);
+  save(); renderAll();
+  const inp = sessionsList.querySelector(`[data-protname="${prot.id}"]`);
+  if(inp){ inp.focus(); inp.select(); }
 });
 
 function getMonthKey(iso){ return iso.slice(0,7); }
@@ -897,12 +1033,13 @@ function getWeekLabel(mondayIso){
 function cloneSessionTo(session, newDate){
   return {
     id: uid(),
+    protocolId: session.protocolId,
     date: newDate,
     name: session.name,
     exercises: session.exercises.map(ex=> ({
       id: uid(),
       name: ex.name,
-      sets: ex.sets.map(s=> ({ reps: s.reps, weight: 0 }))
+      sets: ex.sets.map(s=> ({ reps: s.reps, weight: 0, target: s.target||'' }))
     }))
   };
 }
@@ -954,6 +1091,70 @@ async function doRepeatWeek(weekKey){
   return true;
 }
 
+/* ---------- Protocolos ----------
+   Cada ficha nova do professor é um protocolo: um bloco que guarda dentro os
+   meses/semanas e as sessões daquele período. */
+function ensureProtocols(){
+  if(!Array.isArray(state.protocols)) state.protocols = [];
+  const orphans = state.sessions.filter(s=> !s.protocolId);
+  if(!orphans.length) return false;
+  // Sessões antigas (anteriores aos protocolos) entram num bloco inicial.
+  let p = state.protocols[0];
+  if(!p){
+    p = { id: uid(), name: suggestProtocolName(orphans.map(s=> s.date).sort()[0]), createdAt: todayISO() };
+    state.protocols.push(p);
+  }
+  orphans.forEach(s=> s.protocolId = p.id);
+  return true;
+}
+function suggestProtocolName(iso){
+  const d = new Date((iso||todayISO())+'T00:00:00');
+  const mes = d.toLocaleDateString('pt-BR',{month:'short'}).replace('.','').trim();
+  return `Protocolo ${mes}/${d.getFullYear()}`;
+}
+function newestProtocolId(){
+  if(!state.protocols.length) return null;
+  return [...state.protocols].sort((a,b)=> String(b.createdAt||'').localeCompare(String(a.createdAt||'')))[0].id;
+}
+function fmtDayMonth(iso){
+  const d = new Date(iso+'T00:00:00');
+  return d.toLocaleDateString('pt-BR',{day:'2-digit',month:'short'});
+}
+
+function groupByProtocol(sessions){
+  const byProt = new Map();
+  sessions.forEach(s=>{
+    const k = s.protocolId || '__none';
+    if(!byProt.has(k)) byProt.set(k, []);
+    byProt.get(k).push(s);
+  });
+  const blocks = [];
+  byProt.forEach((list, k)=>{
+    const prot = state.protocols.find(p=> p.id===k) || null;
+    const dates = list.map(s=> s.date).sort();
+    blocks.push({
+      key: k,
+      protocol: prot,
+      name: prot ? prot.name : 'Sem protocolo',
+      sessions: list,
+      start: dates[0],
+      end: dates[dates.length-1],
+      months: groupSessions(list)
+    });
+  });
+  // Protocolo recém-criado ainda sem sessões também aparece, para receber treinos.
+  state.protocols.forEach(p=>{
+    if(byProt.has(p.id)) return;
+    blocks.push({
+      key: p.id, protocol: p, name: p.name, sessions: [],
+      start: p.createdAt || todayISO(), end: p.createdAt || todayISO(), months: []
+    });
+  });
+  // Protocolo mais recente primeiro.
+  blocks.sort((a,b)=> b.end.localeCompare(a.end));
+  return blocks;
+}
+
 function groupSessions(sessions){
   const sorted = [...sessions].sort((a,b)=> b.date.localeCompare(a.date));
   const months = [];
@@ -974,15 +1175,50 @@ function renderSessions(){
     sessionsList.innerHTML = `<div class="empty"><strong>Nenhuma sessão ainda</strong>Importe um PDF acima ou crie uma sessão manual.</div>`;
     return;
   }
-  const months = groupSessions(state.sessions);
-  if(openMonths.size===0) openMonths.add(months[0].key);
+  const blocks = groupByProtocol(state.sessions);
+  if(!blocks.some(b=> openProtocols.has(b.key))) openProtocols.add(blocks[0].key);
+
+  sessionsList.innerHTML = '';
+  blocks.forEach(block=>{
+    const isOpen = openProtocols.has(block.key);
+    const protEl = document.createElement('div');
+    protEl.className = 'protocol-group' + (isOpen ? ' open':'');
+    const range = block.start===block.end ? fmtDayMonth(block.start) : `${fmtDayMonth(block.start)} – ${fmtDayMonth(block.end)}`;
+    protEl.innerHTML = `
+      <div class="protocol-head" data-protocol="${block.key}">
+        <span class="chev">›</span>
+        ${READONLY
+          ? `<span class="protocol-name">${escapeHtml(block.name)}</span>`
+          : `<input class="protocol-name" data-protname="${block.key}" value="${escapeAttr(block.name)}">`}
+        <span class="group-meta">${range} · ${block.sessions.length} ${block.sessions.length===1?'sessão':'sessões'}</span>
+      </div>
+      <div class="protocol-body"></div>`;
+    sessionsList.appendChild(protEl);
+    if(!isOpen) return;
+    const body = protEl.querySelector('.protocol-body');
+    if(block.months.length===0){
+      body.innerHTML = `<div class="empty" style="padding:18px;">Nenhuma sessão neste protocolo ainda. Importe o PDF da ficha ou crie uma sessão manual.</div>`;
+      return;
+    }
+    renderMonthGroups(body, block.months);
+  });
+}
+
+/* Dentro de um protocolo: se ele cabe num mês só, pula o nível de mês e mostra
+   as semanas direto — menos cliques para chegar na sessão. */
+function renderMonthGroups(container, months){
+  if(openMonths.size===0 && months.length) openMonths.add(months[0].key);
   months.forEach(month=>{
-    if(openMonths.has(month.key) && !month.weeks.some(w=> openWeeks.has(w.key))){
+    if((months.length===1 || openMonths.has(month.key)) && !month.weeks.some(w=> openWeeks.has(w.key))){
       openWeeks.add(month.weeks[0].key);
     }
   });
 
-  sessionsList.innerHTML = '';
+  if(months.length===1){
+    renderWeekGroups(container, months[0].weeks);
+    return;
+  }
+
   months.forEach(month=>{
     const sessionCount = month.weeks.reduce((n,w)=> n+w.sessions.length, 0);
     const monthOpen = openMonths.has(month.key);
@@ -994,42 +1230,43 @@ function renderSessions(){
         <span class="group-meta">${sessionCount} ${sessionCount===1?'sessão':'sessões'}</span>
       </div>
       <div class="month-body"></div>`;
-    sessionsList.appendChild(monthEl);
+    container.appendChild(monthEl);
     if(!monthOpen) return;
-    const monthBody = monthEl.querySelector('.month-body');
+    renderWeekGroups(monthEl.querySelector('.month-body'), month.weeks);
+  });
+}
 
-    month.weeks.forEach(week=>{
-      const weekOpen = openWeeks.has(week.key);
-      const weekEl = document.createElement('div');
-      weekEl.className = 'week-group' + (weekOpen ? ' open':'');
-      weekEl.innerHTML = `
-        <div class="week-head" data-week="${week.key}">
-          <span class="chev">›</span><span class="group-label">${week.label}</span>
-          <span class="group-meta">${week.sessions.length} ${week.sessions.length===1?'sessão':'sessões'}</span>
-          ${READONLY ? '' : `<button class="ghost small repeat" data-repeatweek="${week.key}" title="Repetir estas sessões na semana seguinte">⟳ repetir semana</button>`}
-        </div>
-        <div class="week-body"></div>`;
-      monthBody.appendChild(weekEl);
-      if(!weekOpen) return;
-      const weekBody = weekEl.querySelector('.week-body');
+function renderWeekGroups(container, weeks){
+  weeks.forEach(week=>{
+    const weekOpen = openWeeks.has(week.key);
+    const weekEl = document.createElement('div');
+    weekEl.className = 'week-group' + (weekOpen ? ' open':'');
+    weekEl.innerHTML = `
+      <div class="week-head" data-week="${week.key}">
+        <span class="chev">›</span><span class="group-label">${week.label}</span>
+        <span class="group-meta">${week.sessions.length} ${week.sessions.length===1?'sessão':'sessões'}</span>
+        ${READONLY ? '' : `<button class="ghost small repeat" data-repeatweek="${week.key}" title="Repetir estas sessões na semana seguinte">⟳ repetir semana</button>`}
+      </div>
+      <div class="week-body"></div>`;
+    container.appendChild(weekEl);
+    if(!weekOpen) return;
+    const weekBody = weekEl.querySelector('.week-body');
 
-      week.sessions.forEach(session=>{
-        const div = document.createElement('div');
-        div.className = 'session' + (openSessionId===session.id ? ' open':'');
-        const setCount = session.exercises.reduce((n,e)=> n+e.sets.length, 0);
-        div.innerHTML = `
-          <div class="session-head" data-open="${session.id}">
-            <span class="session-name">${escapeHtml(session.name)}</span>
-            <div style="display:flex;align-items:center;gap:4px;">
-              ${READONLY ? '' : `<button class="ghost small repeat" data-repeatsession="${session.id}" title="Repetir esta sessão daqui a 7 dias">⟳</button>`}
-              ${READONLY ? '' : `<button class="ghost small" data-quickdel="${session.id}" title="Excluir sessão">✕</button>`}
-              <span class="chev">›</span>
-            </div>
+    week.sessions.forEach(session=>{
+      const div = document.createElement('div');
+      div.className = 'session' + (openSessionId===session.id ? ' open':'');
+      div.innerHTML = `
+        <div class="session-head" data-open="${session.id}">
+          <span class="session-name">${escapeHtml(session.name)}</span>
+          <div style="display:flex;align-items:center;gap:4px;">
+            ${READONLY ? '' : `<button class="ghost small repeat" data-repeatsession="${session.id}" title="Repetir esta sessão daqui a 7 dias">⟳</button>`}
+            ${READONLY ? '' : `<button class="ghost small" data-quickdel="${session.id}" title="Excluir sessão">✕</button>`}
+            <span class="chev">›</span>
           </div>
-          <div class="session-body"></div>`;
-        weekBody.appendChild(div);
-        if(openSessionId===session.id) renderSessionBody(div.querySelector('.session-body'), session);
-      });
+        </div>
+        <div class="session-body"></div>`;
+      weekBody.appendChild(div);
+      if(openSessionId===session.id) renderSessionBody(div.querySelector('.session-body'), session);
     });
   });
 }
@@ -1080,9 +1317,11 @@ function renderSessionBody(container, session){
     session.exercises.forEach(ex=>{
       const block = document.createElement('div');
       block.className = 'ex-block';
+      const targetLabel = exerciseTarget(ex);
       block.innerHTML = `
         <div class="ex-head">
           <input type="text" class="ex-name-input" value="${escapeAttr(ex.name)}" ${roAttr}>
+          <span class="ex-target hint">${targetLabel ? 'alvo '+escapeHtml(targetLabel)+' reps' : ''}</span>
           ${ro?'':`<button class="ghost small" data-delex="${ex.id}">✕</button>`}
         </div>
         <div class="set-rows"></div>
@@ -1099,7 +1338,7 @@ function renderSessionBody(container, session){
         });
         block.querySelector('[data-addset]').addEventListener('click', ()=>{
           const last = ex.sets[ex.sets.length-1];
-          ex.sets.push({reps:last?last.reps:10, weight:last?last.weight:0});
+          ex.sets.push({reps:last?last.reps:10, weight:last?last.weight:0, target:last?(last.target||''):''});
           save(); renderSetRows();
         });
       }
@@ -1112,11 +1351,17 @@ function renderSessionBody(container, session){
           row.className = 'set-row';
           row.innerHTML = `
             <span class="set-idx">${i+1}</span>
+            <input type="text" class="set-target" placeholder="alvo" value="${escapeAttr(s.target||'')}" data-k="target" ${roAttr}>
             <input type="number" min="0" placeholder="reps" value="${s.reps}" data-k="reps" ${roAttr}>
             <input type="number" min="0" step="0.5" placeholder="kg" value="${s.weight}" data-k="weight" ${roAttr}>
             ${ro?'':`<button class="ghost small" data-delset="${i}">✕</button>`}`;
           setRowsEl.appendChild(row);
           if(!ro){
+            row.querySelector('[data-k="target"]').addEventListener('input', e=>{
+              s.target = cleanTarget(e.target.value);
+              save();
+              block.querySelector('.ex-target').textContent = exerciseTarget(ex) ? 'alvo '+exerciseTarget(ex)+' reps' : '';
+            });
             row.querySelector('[data-k="reps"]').addEventListener('input', e=>{ s.reps=parseFloat(e.target.value)||0; save(); refreshComputed(); });
             row.querySelector('[data-k="weight"]').addEventListener('input', e=>{ s.weight=parseFloat(e.target.value)||0; save(); refreshComputed(); });
             row.querySelector('[data-delset]').addEventListener('click', ()=>{
@@ -1156,6 +1401,13 @@ sessionsList.addEventListener('click', async e=>{
     }
     return;
   }
+  const protHead = e.target.closest('[data-protocol]');
+  if(protHead && !e.target.closest('input, button')){
+    const k = protHead.dataset.protocol;
+    if(openProtocols.has(k)) openProtocols.delete(k); else openProtocols.add(k);
+    renderSessions();
+    return;
+  }
   const monthHead = e.target.closest('[data-month]');
   if(monthHead){
     const k = monthHead.dataset.month;
@@ -1175,6 +1427,14 @@ sessionsList.addEventListener('click', async e=>{
   const id = head.dataset.open;
   openSessionId = (openSessionId===id) ? null : id;
   renderSessions();
+});
+
+// Renomear protocolo direto no cabeçalho do bloco.
+sessionsList.addEventListener('input', e=>{
+  const inp = e.target.closest('[data-protname]');
+  if(!inp) return;
+  const prot = state.protocols.find(p=> p.id===inp.dataset.protname);
+  if(prot){ prot.name = inp.value; save(); }
 });
 
 /* ---------- Progress table (com ramificação por série) ---------- */
@@ -1319,6 +1579,7 @@ const mobile = {
   screen: 'list',   // treinos: list|session|entry|import ; progresso: list|detail
   sessionId: null,
   exId: null,
+  setIdx: null,      // série sendo preenchida (null = adicionando uma nova)
   progKey: null,
   padWeight: '',
   padReps: '',
@@ -1387,16 +1648,23 @@ function mRenderSessionsList(){
   if(state.sessions.length===0){
     html += `<div class="mempty"><strong>Nenhuma sessão ainda</strong>Importe um PDF ou crie manualmente.</div>`;
   }else{
-    const months = groupSessions(state.sessions);
-    months.forEach(month=>{
-      html += `<div class="mgrouplabel">${month.label}</div>`;
-      month.weeks.forEach(week=>{
-        week.sessions.forEach(sess=>{
-          const setCount = sess.exercises.reduce((n,e)=> n+e.sets.length,0);
-          html += `<div class="mrow" data-mopen-session="${sess.id}">
-            <div class="mrow-main"><div class="mrow-title">${escapeHtml(sess.name)}</div><div class="mrow-sub">${fmtDate(sess.date)} · ${sess.exercises.length} exerc. · ${setCount} séries</div></div>
-            <span class="mchev">›</span>
-          </div>`;
+    // Um bloco por protocolo; dentro dele, os meses/semanas em ordem.
+    groupByProtocol(state.sessions).forEach(block=>{
+      if(block.sessions.length===0) return;
+      html += `<div class="mprotocol-head">
+        <span>${escapeHtml(block.name)}</span>
+        <span class="mmono">${block.sessions.length} ${block.sessions.length===1?'sessão':'sessões'}</span>
+      </div>`;
+      block.months.forEach(month=>{
+        if(block.months.length>1) html += `<div class="mgrouplabel">${month.label}</div>`;
+        month.weeks.forEach(week=>{
+          week.sessions.forEach(sess=>{
+            const setCount = sess.exercises.reduce((n,e)=> n+e.sets.length,0);
+            html += `<div class="mrow" data-mopen-session="${sess.id}">
+              <div class="mrow-main"><div class="mrow-title">${escapeHtml(sess.name)}</div><div class="mrow-sub">${fmtDate(sess.date)} · ${sess.exercises.length} exerc. · ${setCount} séries</div></div>
+              <span class="mchev">›</span>
+            </div>`;
+          });
         });
       });
     });
@@ -1421,8 +1689,12 @@ function mRenderSessionScreen(){
   <div class="msection-title">Exercícios</div>`;
   session.exercises.forEach(ex=>{
     const setCount = ex.sets.length;
-    const lastSet = ex.sets[ex.sets.length-1];
-    const meta = lastSet ? `${setCount} séries · última ${lastSet.weight}kg × ${lastSet.reps}` : `${setCount} séries`;
+    const done = ex.sets.filter(s=> s.weight>0).length;
+    const targetLabel = exerciseTarget(ex);
+    const parts = [`${setCount} séries`];
+    if(targetLabel) parts.push(`alvo ${targetLabel}`);
+    if(done) parts.push(`${done}/${setCount} feitas`);
+    const meta = parts.join(' · ');
     html += `<div class="mrow">
       <div class="mrow-main" data-mopen-ex="${ex.id}">
         <div class="mrow-title">${escapeHtml(ex.name)}</div>
@@ -1442,12 +1714,21 @@ function mRenderEntryScreen(){
   mTitle.textContent = ex.name;
   mBack.hidden = false;
   const ro = READONLY;
+  const editing = mobile.setIdx!==null && ex.sets[mobile.setIdx];
+  // O alvo mostrado é o da série que está sendo preenchida (a ficha prescreve
+  // faixas diferentes para aquecimento, preparatória e séries válidas).
+  const curTarget = editing ? (ex.sets[mobile.setIdx].target||'')
+                            : ((ex.sets[ex.sets.length-1]||{}).target||'');
   const keys = ['1','2','3','4','5','6','7','8','9','.','0','⌫'];
   const keysHtml = keys.map(k=>{
     const val = k==='⌫' ? 'back' : k;
     return `<button class="mkey" data-mpad="${val}" ${ro?'disabled':''}>${k}</button>`;
   }).join('');
   let html = `<div style="padding:14px 16px 20px;">
+    <div class="mtarget-bar">
+      <span>${editing ? `Série ${mobile.setIdx+1}` : 'Nova série'}</span>
+      <strong>${curTarget ? 'alvo '+escapeHtml(curTarget)+' reps' : 'sem alvo definido'}</strong>
+    </div>
     <div style="display:flex;gap:10px;margin-bottom:14px;">
       <div class="mpad-box ${mobile.padActive==='weight'?'active':''}" data-mselw>
         <div class="mpad-label">Peso (kg)</div>
@@ -1459,20 +1740,39 @@ function mRenderEntryScreen(){
       </div>
     </div>
     <div class="mkeypad">${keysHtml}</div>
-    ${ro?'':`<button class="mprimarybtn" data-msaveset style="width:100%;">Salvar série</button>`}
-    <div class="msection-title" style="margin:16px 0 10px;">Séries registradas</div>`;
+    ${ro?'':`<button class="mprimarybtn" data-msaveset style="width:100%;">${editing ? `Salvar série ${mobile.setIdx+1}` : 'Adicionar série'}</button>`}
+    <div class="msection-title" style="margin:16px 0 10px;">Séries do exercício</div>`;
   if(ex.sets.length===0){
     html += `<div class="mempty">Nenhuma série ainda</div>`;
   }else{
     ex.sets.forEach((s,i)=>{
-      html += `<div class="mrow" style="padding:8px 12px;cursor:default;">
-        <span class="mmono">${i+1}. ${s.weight}kg × ${s.reps}</span>
+      const sel = mobile.setIdx===i;
+      const feito = s.weight>0;
+      html += `<div class="mrow mset-row ${sel?'sel':''}" data-mselset="${i}" style="padding:8px 12px;">
+        <span class="mmono">${i+1}. ${feito ? `${s.weight}kg × ${s.reps}` : `<span style="color:var(--text-faint);">a fazer${s.target?' · alvo '+escapeHtml(s.target):''}</span>`}</span>
         ${ro?'':`<button class="micon-btn" data-mdelset="${i}">✕</button>`}
       </div>`;
     });
   }
-  html += `<div style="margin-top:14px;"><button class="mghostbtn" data-maction="backtosession" style="width:100%;">Concluir exercício</button></div></div>`;
+  if(!ro) html += `<div style="margin-top:10px;"><button class="mghostbtn" data-maction="newset" style="width:100%;">+ série extra</button></div>`;
+  html += `<div style="margin-top:10px;"><button class="mghostbtn" data-maction="backtosession" style="width:100%;">Concluir exercício</button></div></div>`;
   mContent.innerHTML = html;
+}
+
+// Seleciona uma série para preencher, carregando os valores dela no teclado.
+function mSelectSet(idx){
+  const session = state.sessions.find(s=> s.id===mobile.sessionId);
+  const ex = session && session.exercises.find(x=> x.id===mobile.exId);
+  const s = ex && ex.sets[idx];
+  mobile.setIdx = idx;
+  mobile.padWeight = s && s.weight ? String(s.weight) : '';
+  mobile.padReps = s && s.reps ? String(s.reps) : '';
+  mobile.padActive = 'weight';
+}
+// Primeira série ainda sem carga — é por onde se começa numa ficha prescrita.
+function mFirstPendingSet(ex, from){
+  for(let i=(from||0);i<ex.sets.length;i++){ if(!(ex.sets[i].weight>0)) return i; }
+  return null;
 }
 
 function mPadDigit(d){
@@ -1501,6 +1801,12 @@ function mRenderImportScreen(){
     return;
   }
   let html = `<div style="padding:16px 16px 20px;">
+    <div class="mrow-sub" style="margin-bottom:6px;">Protocolo</div>
+    <select class="minput" data-mstageprot style="margin-bottom:8px;">
+      <option value="__new" ${stageProtocol.mode==='new'?'selected':''}>➕ Novo protocolo</option>
+      ${state.protocols.map(p=> `<option value="${escapeAttr(p.id)}" ${stageProtocol.id===p.id?'selected':''}>${escapeHtml(p.name)}</option>`).join('')}
+    </select>
+    ${stageProtocol.mode==='new' ? `<input type="text" class="minput" data-mstageprotname value="${escapeAttr(stageProtocol.name)}" placeholder="nome do protocolo" style="margin-bottom:12px;">` : ''}
     <div class="mrow-sub" style="margin-bottom:12px;">Revise antes de adicionar:</div>`;
   stageGroups.forEach((group,gi)=>{
     html += `<div class="mcard">
@@ -1622,6 +1928,11 @@ mContent.addEventListener('click', async e=>{
       }
       return;
     }
+    if(act==='newset'){
+      mobile.setIdx = null; mobile.padWeight=''; mobile.padReps=''; mobile.padActive='weight';
+      mRenderEntryScreen();
+      return;
+    }
     if(act==='backtosession'){ mobile.screen='session'; mRender(); return; }
     if(act==='cancelimport'){ closeStage(); stageGroups = []; mobile.screen='list'; mRender(); return; }
     if(act==='confirmimport'){
@@ -1650,12 +1961,24 @@ mContent.addEventListener('click', async e=>{
     mobile.exId = openEx.dataset.mopenEx;
     const session = state.sessions.find(s=> s.id===mobile.sessionId);
     const ex = session && session.exercises.find(x=> x.id===mobile.exId);
-    const last = ex && ex.sets[ex.sets.length-1];
-    mobile.padWeight = last ? String(last.weight) : '';
-    mobile.padReps = last ? String(last.reps) : '';
-    mobile.padActive = 'weight';
+    const pending = ex ? mFirstPendingSet(ex, 0) : null;
+    if(pending!==null){
+      mSelectSet(pending);
+    }else{
+      mobile.setIdx = null;
+      const last = ex && ex.sets[ex.sets.length-1];
+      mobile.padWeight = last ? String(last.weight) : '';
+      mobile.padReps = last ? String(last.reps) : '';
+      mobile.padActive = 'weight';
+    }
     mobile.screen = 'entry';
     mRender();
+    return;
+  }
+  const selSet = e.target.closest('[data-mselset]');
+  if(selSet && !e.target.closest('[data-mdelset]')){
+    mSelectSet(+selSet.dataset.mselset);
+    mRenderEntryScreen();
     return;
   }
   const delEx = e.target.closest('[data-mdel-ex]');
@@ -1680,8 +2003,20 @@ mContent.addEventListener('click', async e=>{
     const session = state.sessions.find(s=> s.id===mobile.sessionId);
     const ex = session && session.exercises.find(x=> x.id===mobile.exId);
     if(ex){
-      ex.sets.push({ weight: parseFloat(mobile.padWeight)||0, reps: parseFloat(mobile.padReps)||0 });
-      mobile.padWeight=''; mobile.padReps=''; mobile.padActive='weight';
+      const weight = parseFloat(mobile.padWeight)||0;
+      const reps = parseFloat(mobile.padReps)||0;
+      if(mobile.setIdx!==null && ex.sets[mobile.setIdx]){
+        // Preenche a série prescrita, mantendo o alvo do protocolo.
+        ex.sets[mobile.setIdx].weight = weight;
+        ex.sets[mobile.setIdx].reps = reps;
+      }else{
+        const last = ex.sets[ex.sets.length-1];
+        ex.sets.push({ weight, reps, target: last ? (last.target||'') : '' });
+      }
+      // Vai para a próxima série ainda não feita; se acabou, fica no modo "nova".
+      const next = mFirstPendingSet(ex, (mobile.setIdx===null?ex.sets.length:mobile.setIdx+1));
+      if(next!==null){ mSelectSet(next); }
+      else{ mobile.setIdx = null; mobile.padWeight=''; mobile.padReps=''; mobile.padActive='weight'; }
       save(); renderAll();
     }
     return;
@@ -1692,7 +2027,8 @@ mContent.addEventListener('click', async e=>{
     const ex = session && session.exercises.find(x=> x.id===mobile.exId);
     if(ex){
       ex.sets.splice(+delSet.dataset.mdelset,1);
-      if(ex.sets.length===0) ex.sets.push({reps:10,weight:0});
+      if(ex.sets.length===0) ex.sets.push({reps:10,weight:0,target:''});
+      mobile.setIdx = null; mobile.padWeight=''; mobile.padReps='';
       save(); renderAll();
     }
     return;
@@ -1714,7 +2050,21 @@ mContent.addEventListener('click', async e=>{
   if(openProg){ mobile.progKey = openProg.dataset.mopenProg; mobile.screen='detail'; mRenderProgresso(); return; }
 });
 
+mContent.addEventListener('change', e=>{
+  if(e.target.matches('[data-mstageprot]')){
+    if(e.target.value==='__new'){ stageProtocol.mode='new'; stageProtocol.id=null; }
+    else{ stageProtocol.mode='existing'; stageProtocol.id=e.target.value; }
+    renderStageProtocol();
+    mRenderImportScreen();
+  }
+});
+
 mContent.addEventListener('input', e=>{
+  if(e.target.matches('[data-mstageprotname]')){
+    stageProtocol.name = e.target.value;
+    stageProtocolName.value = e.target.value;
+    return;
+  }
   if(e.target.matches('[data-msessname]')){
     const session = state.sessions.find(s=> s.id===mobile.sessionId);
     if(session){ session.name = e.target.value; save(); }
@@ -1748,12 +2098,14 @@ function renderAll(){
 if(READONLY){
   document.getElementById('importCard').style.display = 'none';
   document.getElementById('addSessionBtn').style.display = 'none';
+  document.getElementById('addProtocolBtn').style.display = 'none';
   document.getElementById('professorLink').style.display = 'none';
   const banner = document.getElementById('readonlyBanner');
   banner.style.display = 'block';
   banner.innerHTML = '<div class="card" style="border-color:var(--accent);padding:12px 16px;margin-bottom:22px;">👁 <strong style="color:var(--text);">Área do professor</strong> — modo somente leitura, nada pode ser editado ou excluído aqui.</div>';
 }
 
+if(ensureProtocols()) save();
 renderAll();
 loadRemote();
 
@@ -1839,18 +2191,18 @@ document.getElementById('exportPdfBtn').addEventListener('click', ()=>{
     const rows = [];
     session.exercises.forEach(ex=>{
       ex.sets.forEach((s,i)=>{
-        rows.push([i===0?ex.name:'', String(i+1), String(s.reps||0), fmtW(s.weight)]);
+        rows.push([i===0?ex.name:'', String(i+1), s.target||'—', String(s.reps||0), fmtW(s.weight)]);
       });
     });
-    if(rows.length===0) rows.push(['—','—','—','—']);
+    if(rows.length===0) rows.push(['—','—','—','—','—']);
 
     doc.autoTable({
       startY: y, margin:{left:marginX, right:marginX},
-      head: [['Exercício','Série','Reps','Carga']],
+      head: [['Exercício','Série','Alvo','Reps','Carga']],
       body: rows,
       styles:{fontSize:8.5, cellPadding:2.2},
       headStyles:{fillColor:[244,191,31], textColor:20},
-      columnStyles:{1:{cellWidth:16},2:{cellWidth:20},3:{cellWidth:22}}
+      columnStyles:{1:{cellWidth:16},2:{cellWidth:24},3:{cellWidth:18},4:{cellWidth:22}}
     });
     y = doc.lastAutoTable.finalY + 10;
   });
