@@ -1577,6 +1577,8 @@ function escapeAttr(s){ return escapeHtml(s); }
 const mobile = {
   tab: 'treinos',
   screen: 'list',   // treinos: list|session|entry|import ; progresso: list|detail
+  protKey: null,     // protocolo aberto
+  weekKey: null,     // semana aberta dentro do protocolo
   sessionId: null,
   exId: null,
   setIdx: null,      // série sendo preenchida (null = adicionando uma nova)
@@ -1606,6 +1608,11 @@ document.querySelectorAll('.mtab').forEach(btn=>{
 mBack.addEventListener('click', ()=>{
   if(mobile.tab==='treinos'){
     if(mobile.screen==='entry'){ mobile.screen='session'; }
+    else if(mobile.screen==='session'){
+      mobile.sessionId=null;
+      mobile.screen = mobile.weekKey ? 'week' : 'list';
+    }
+    else if(mobile.screen==='week'){ mobile.screen='list'; mobile.weekKey=null; mobile.protKey=null; }
     else{ mobile.screen='list'; mobile.sessionId=null; }
   }else if(mobile.tab==='progresso'){
     mobile.screen='list'; mobile.progKey=null;
@@ -1628,7 +1635,15 @@ function mRenderTreinos(){
   if(mobile.screen==='session') return mRenderSessionScreen();
   if(mobile.screen==='entry') return mRenderEntryScreen();
   if(mobile.screen==='import') return mRenderImportScreen();
+  if(mobile.screen==='week') return mRenderWeekScreen();
   mRenderSessionsList();
+}
+
+// Sessões de uma semana (dentro do protocolo, quando ele estiver definido).
+function mWeekSessions(){
+  return state.sessions
+    .filter(s=> getWeekKey(s.date)===mobile.weekKey && (!mobile.protKey || s.protocolId===mobile.protKey))
+    .sort((a,b)=> a.date.localeCompare(b.date));
 }
 
 function mRenderSessionsList(){
@@ -1638,36 +1653,64 @@ function mRenderSessionsList(){
   if(!READONLY){
     html += `<div style="padding:14px 16px 4px;"><button class="mimportbtn" data-maction="import">↥ Importar / escanear PDF</button></div>`;
   }
-  html += `<div class="msection-title"><span class="mchip">✎</span>Sessões</div>`;
+  html += `<div class="msection-title"><span class="mchip">✎</span>Treinos</div>`;
   if(!READONLY){
-    html += `<div style="padding:0 16px 8px;display:flex;gap:8px;flex-wrap:wrap;">
-      <button class="mghostbtn" data-maction="addsession">+ nova sessão</button>
-      ${state.sessions.length ? `<button class="mghostbtn" data-maction="repeatlastweek">⟳ repetir última semana</button>` : ''}
-    </div>`;
+    html += `<div style="padding:0 16px 8px;"><button class="mghostbtn" data-maction="addsession">+ nova sessão</button></div>`;
   }
   if(state.sessions.length===0){
     html += `<div class="mempty"><strong>Nenhuma sessão ainda</strong>Importe um PDF ou crie manualmente.</div>`;
   }else{
-    // Um bloco por protocolo; dentro dele, os meses/semanas em ordem.
+    // Bloco por protocolo; dentro dele, uma linha por semana. A divisão de
+    // treino (segunda, terça…) aparece ao abrir a semana.
     groupByProtocol(state.sessions).forEach(block=>{
       if(block.sessions.length===0) return;
       html += `<div class="mprotocol-head">
         <span>${escapeHtml(block.name)}</span>
-        <span class="mmono">${block.sessions.length} ${block.sessions.length===1?'sessão':'sessões'}</span>
+        <span class="mmono">${block.sessions.length} ${block.sessions.length===1?'treino':'treinos'}</span>
       </div>`;
       block.months.forEach(month=>{
         if(block.months.length>1) html += `<div class="mgrouplabel">${month.label}</div>`;
         month.weeks.forEach(week=>{
-          week.sessions.forEach(sess=>{
-            const setCount = sess.exercises.reduce((n,e)=> n+e.sets.length,0);
-            html += `<div class="mrow" data-mopen-session="${sess.id}">
-              <div class="mrow-main"><div class="mrow-title">${escapeHtml(sess.name)}</div><div class="mrow-sub">${fmtDate(sess.date)} · ${sess.exercises.length} exerc. · ${setCount} séries</div></div>
-              <span class="mchev">›</span>
-            </div>`;
-          });
+          const end = addDaysISO(week.key, 6);
+          html += `<div class="mrow" data-mopen-week="${week.key}" data-mprot="${block.key}">
+            <div class="mrow-main">
+              <div class="mrow-title">Semana de ${fmtDayMonth(week.key)} a ${fmtDayMonth(end)}</div>
+              <div class="mrow-sub">${week.sessions.length} ${week.sessions.length===1?'treino':'treinos'}</div>
+            </div>
+            <span class="mchev">›</span>
+          </div>`;
         });
       });
     });
+  }
+  mContent.innerHTML = html;
+}
+
+function mRenderWeekScreen(){
+  const sessions = mWeekSessions();
+  if(sessions.length===0){ mobile.screen='list'; return mRenderSessionsList(); }
+  const end = addDaysISO(mobile.weekKey, 6);
+  mTitle.textContent = `${fmtDayMonth(mobile.weekKey)} – ${fmtDayMonth(end)}`;
+  mBack.hidden = false;
+  const prot = state.protocols.find(p=> p.id===mobile.protKey);
+  let html = '';
+  if(prot) html += `<div class="mgrouplabel" style="margin-top:14px;">${escapeHtml(prot.name)}</div>`;
+  html += `<div class="msection-title" style="margin-top:6px;">Divisão de treino</div>`;
+  sessions.forEach(sess=>{
+    const setCount = sess.exercises.reduce((n,e)=> n+e.sets.length,0);
+    const feitas = sess.exercises.flatMap(e=> e.sets).filter(s=> s.weight>0).length;
+    html += `<div class="mrow" data-mopen-session="${sess.id}">
+      <div class="mrow-main">
+        <div class="mrow-title">${escapeHtml(sess.name)}</div>
+        <div class="mrow-sub">${fmtDate(sess.date)} · ${sess.exercises.length} exerc. · ${feitas}/${setCount} séries feitas</div>
+      </div>
+      <span class="mchev">›</span>
+    </div>`;
+  });
+  if(!READONLY){
+    html += `<div style="padding:8px 16px 20px;">
+      <button class="mghostbtn" data-maction="repeatthisweek" style="width:100%;">⟳ repetir esta semana (+7 dias)</button>
+    </div>`;
   }
   mContent.innerHTML = html;
 }
@@ -1900,14 +1943,11 @@ mContent.addEventListener('click', async e=>{
     if(act==='import'){ mobile.screen='import'; mRenderImportScreen(); return; }
     if(act==='pickfile'){ fileInput.click(); return; }
     if(act==='addsession'){
-      const session = { id: uid(), date: todayISO(), name: 'Nova sessão', exercises: [
-        { id: uid(), name: 'Exercício', sets:[{reps:10, weight:0}] }
-      ]};
-      state.sessions.push(session);
-      openSessionId = session.id;
-      openMonths.add(getMonthKey(session.date));
-      openWeeks.add(getWeekKey(session.date));
-      mobile.sessionId = session.id; mobile.screen = 'session';
+      const session = newManualSession();
+      mobile.sessionId = session.id;
+      mobile.weekKey = getWeekKey(session.date);
+      mobile.protKey = session.protocolId;
+      mobile.screen = 'session';
       save(); renderAll();
       return;
     }
@@ -1916,15 +1956,23 @@ mContent.addEventListener('click', async e=>{
       if(session){ session.exercises.push({id:uid(), name:'Exercício', sets:[{reps:10,weight:0}]}); save(); renderAll(); }
       return;
     }
-    if(act==='repeatlastweek'){
-      const latest = [...state.sessions].sort((a,b)=> b.date.localeCompare(a.date))[0];
-      if(latest) await doRepeatWeek(getWeekKey(latest.date));
+    if(act==='repeatthisweek'){
+      if(mobile.weekKey && (await doRepeatWeek(mobile.weekKey))){
+        // Abre já a semana nova, mantendo a anterior no lugar.
+        mobile.weekKey = addDaysISO(mobile.weekKey, 7);
+        mRender();
+      }
       return;
     }
     if(act==='repeatsession'){
       const session = state.sessions.find(s=> s.id===mobile.sessionId);
       if(session && (await doRepeatSession(session))){
-        mobile.screen='list'; mobile.sessionId=null; mRender();
+        // Volta para a semana de destino; a semana de origem continua intacta.
+        mobile.weekKey = getWeekKey(addDaysISO(session.date, 7));
+        mobile.protKey = session.protocolId;
+        mobile.sessionId = null;
+        mobile.screen = 'week';
+        mRender();
       }
       return;
     }
@@ -1941,6 +1989,14 @@ mContent.addEventListener('click', async e=>{
       mRender();
       return;
     }
+    return;
+  }
+  const openWeek = e.target.closest('[data-mopen-week]');
+  if(openWeek){
+    mobile.weekKey = openWeek.dataset.mopenWeek;
+    mobile.protKey = openWeek.dataset.mprot || null;
+    mobile.screen = 'week';
+    mRender();
     return;
   }
   const openSession = e.target.closest('[data-mopen-session]');
