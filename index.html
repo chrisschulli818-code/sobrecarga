@@ -1,5 +1,6 @@
 <title>Sobrecarga</title>
 <meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Stencil+Display:wght@700;900&family=Big+Shoulders+Display:wght@600;700;800&family=Archivo:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
@@ -24,6 +25,7 @@
   color-scheme: dark;
 }
 *{box-sizing:border-box;}
+[hidden]{display:none!important;}
 body{
   margin:0;
   background:var(--bg);
@@ -226,6 +228,53 @@ footer{text-align:center;color:var(--text-faint);font-size:11.5px;margin-top:32p
 }
 .confirm-box p{margin:0 0 16px;font-size:14px;color:var(--text);}
 .confirm-actions{display:flex;justify-content:flex-end;gap:10px;}
+
+/* ---------- Mobile app shell (telas estilo app, teclado numérico) ---------- */
+.mshell{display:none;}
+@media (max-width:640px){
+  .hazard{display:none;}
+  .wrap{display:none;}
+  .mshell{display:flex;flex-direction:column;height:100vh;height:100dvh;background:var(--bg);}
+}
+.mheader{background:var(--surface);border-bottom:1px solid var(--border);flex-shrink:0;}
+.mheader-top{display:flex;align-items:center;gap:8px;padding:12px 14px;}
+.mback{background:none;border:none;color:var(--text);font-size:24px;padding:0 4px;cursor:pointer;line-height:1;flex:none;}
+.mtitle{font-family:'Big Shoulders Stencil Display',sans-serif;font-weight:900;font-size:22px;letter-spacing:.3px;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.mprofessor-bar{background:var(--surface-2);border-top:1px solid var(--border);padding:7px 14px;font-size:11px;color:var(--accent);font-family:'IBM Plex Mono',monospace;text-transform:uppercase;letter-spacing:.04em;}
+.mcontent{flex:1;overflow:auto;-webkit-overflow-scrolling:touch;}
+.mtabbar{display:flex;border-top:1px solid var(--border);background:var(--surface);flex-shrink:0;padding-bottom:env(safe-area-inset-bottom,4px);}
+.mtab{flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;padding:8px 0 4px;background:none;border:none;color:var(--text-faint);font-family:'Archivo',sans-serif;cursor:pointer;}
+.mtab .micon{font-size:18px;}
+.mtab span:last-child{font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:.03em;}
+.mtab.active{color:var(--accent);}
+.msection-title{display:flex;align-items:center;font-family:'Big Shoulders Display',sans-serif;font-weight:800;font-size:15px;letter-spacing:.3px;text-transform:uppercase;margin:18px 16px 10px;}
+.mchip{display:inline-flex;align-items:center;justify-content:center;background:var(--accent);color:var(--accent-ink);width:20px;height:20px;border-radius:5px;font-family:'IBM Plex Mono',monospace;font-size:10.5px;font-weight:700;margin-right:8px;}
+.mgrouplabel{font-family:'IBM Plex Mono',monospace;font-size:10.5px;text-transform:uppercase;letter-spacing:.07em;color:var(--text-faint);margin:14px 16px 6px;}
+.mrow{display:flex;align-items:center;justify-content:space-between;background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:12px 14px;margin:0 16px 8px;gap:10px;cursor:pointer;}
+.mrow-main{min-width:0;flex:1;}
+.mrow-title{font-size:14px;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.mrow-sub{font-size:11.5px;color:var(--text-faint);margin-top:2px;}
+.mchev{color:var(--text-faint);font-size:18px;flex:none;}
+.mmono{font-family:'IBM Plex Mono',monospace;}
+.mempty{text-align:center;padding:28px 20px;color:var(--text-faint);font-size:12.5px;}
+.mempty strong{display:block;color:var(--text-dim);font-size:13.5px;margin-bottom:4px;}
+.mimportbtn{width:100%;border:2px dashed var(--border);background:none;color:var(--text-dim);border-radius:8px;padding:12px 8px;font-family:'Archivo',sans-serif;font-size:12px;font-weight:700;cursor:pointer;text-transform:none;letter-spacing:0;}
+.mghostbtn{border:1px solid var(--border);background:var(--surface-2);color:var(--text);border-radius:6px;padding:7px 12px;font-family:'Archivo',sans-serif;font-size:11px;font-weight:700;text-transform:uppercase;cursor:pointer;}
+.mghostbtn.small{padding:5px 9px;font-size:10.5px;}
+.mghostbtn.mdanger{color:var(--down);border-color:var(--down);background:transparent;}
+.mprimarybtn{border:none;background:var(--accent);color:var(--accent-ink);border-radius:6px;padding:12px;font-family:'Archivo',sans-serif;font-size:12px;font-weight:800;text-transform:uppercase;cursor:pointer;}
+.micon-btn{background:none;border:none;color:var(--text-faint);font-size:15px;cursor:pointer;padding:4px 6px;flex:none;}
+.minput{width:100%;background:var(--surface-2);border:1px solid var(--border);color:var(--text);border-radius:6px;padding:8px 10px;font-family:'Archivo',sans-serif;font-size:14px;box-sizing:border-box;}
+.mcard{background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:12px;margin:0 16px 10px;}
+.mkeypad{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:12px;}
+.mkey{height:52px;border-radius:8px;border:1px solid var(--border);background:var(--surface-2);color:var(--text);font-family:'IBM Plex Mono',monospace;font-size:18px;font-weight:600;cursor:pointer;}
+.mkey:active{background:var(--surface-3);}
+.mpad-box{flex:1;background:var(--surface-2);border:1px solid var(--border);border-radius:8px;padding:10px 12px;cursor:pointer;}
+.mpad-box.active{border-color:var(--accent);}
+.mpad-label{font-size:10.5px;text-transform:uppercase;letter-spacing:.07em;color:var(--text-faint);font-weight:600;}
+.mpad-value{font-family:'IBM Plex Mono',monospace;font-size:26px;color:var(--text);font-weight:600;margin-top:2px;}
+.mpad-box.active .mpad-value{color:var(--accent);}
+.mbig-num{font-family:'IBM Plex Mono',monospace;font-size:32px;color:var(--text);font-weight:600;}
 </style>
 
 <div class="hazard"></div>
@@ -303,6 +352,23 @@ footer{text-align:center;color:var(--text-faint);font-size:11.5px;margin-top:32p
   </div>
 
   <footer>Os dados sincronizam entre seus aparelhos. Uma cópia fica salva neste navegador para funcionar offline.</footer>
+</div>
+
+<div id="mShell" class="mshell">
+  <div class="mheader">
+    <div class="mheader-top">
+      <button id="mBack" class="mback" hidden>‹</button>
+      <div class="mtitle" id="mTitle">SOBRECARGA</div>
+      <span style="width:22px;flex:none;"></span>
+    </div>
+    <div id="mProfessorBar" class="mprofessor-bar" hidden>👁 Área do professor — somente leitura</div>
+  </div>
+  <div class="mcontent" id="mContent"></div>
+  <div class="mtabbar">
+    <button class="mtab" data-mtab="treinos"><span class="micon">🏋</span><span>Treinos</span></button>
+    <button class="mtab" data-mtab="progresso"><span class="micon">Δ</span><span>Progresso</span></button>
+    <button class="mtab" data-mtab="dieta"><span class="micon">⚖</span><span>Dieta</span></button>
+  </div>
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
@@ -455,6 +521,7 @@ async function handleFile(file){
 
     dropLabel.innerHTML = `<strong>${file.name}</strong> — clique para trocar o arquivo`;
     openStage(groups, file.name);
+    mobile.tab = 'treinos'; mobile.screen = 'import'; mRenderImportScreen();
   }catch(err){
     console.error(err);
     dropLabel.innerHTML = '<strong>Não consegui ler esse PDF.</strong> Clique para tentar outro';
@@ -756,7 +823,7 @@ function closeStage(){
   dropLabel.innerHTML = '<strong>Clique para escolher</strong> ou arraste um PDF de treino aqui';
 }
 document.getElementById('stageCancel').addEventListener('click', closeStage);
-document.getElementById('stageConfirm').addEventListener('click', ()=>{
+function commitStagedSessions(){
   let added = 0;
   stageGroups.forEach(group=>{
     const exercises = buildExercisesFromRows(group.rows);
@@ -772,12 +839,15 @@ document.getElementById('stageConfirm').addEventListener('click', ()=>{
     openWeeks.add(getWeekKey(session.date));
     added++;
   });
-  if(added===0){ alert('Adicione ao menos um exercício com nome.'); return; }
+  if(added===0){ alert('Adicione ao menos um exercício com nome.'); return 0; }
   save();
   closeStage();
+  stageGroups = [];
   renderAll();
   document.getElementById('sessionsList').scrollIntoView({behavior:'smooth', block:'nearest'});
-});
+  return added;
+}
+document.getElementById('stageConfirm').addEventListener('click', commitStagedSessions);
 
 /* ---------- Sessions render (agrupado por mês > semana > dia) ---------- */
 const sessionsList = document.getElementById('sessionsList');
@@ -1162,11 +1232,418 @@ function renderStats(){
 function escapeHtml(s){ return String(s).replace(/[&<>"']/g, c=> ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 function escapeAttr(s){ return escapeHtml(s); }
 
+/* ---------- Mobile app shell (telas estilo app: abas embaixo, teclado numérico) ---------- */
+const mobile = {
+  tab: 'treinos',
+  screen: 'list',   // treinos: list|session|entry|import ; progresso: list|detail
+  sessionId: null,
+  exId: null,
+  progKey: null,
+  padWeight: '',
+  padReps: '',
+  padActive: 'weight'
+};
+
+const mShell = document.getElementById('mShell');
+const mContent = document.getElementById('mContent');
+const mTitle = document.getElementById('mTitle');
+const mBack = document.getElementById('mBack');
+const mProfessorBar = document.getElementById('mProfessorBar');
+if(READONLY && mProfessorBar) mProfessorBar.hidden = false;
+if(new URLSearchParams(location.search).get('tab')==='progresso') mobile.tab = 'progresso';
+
+document.querySelectorAll('.mtab').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    const tab = btn.dataset.mtab;
+    if(tab==='dieta'){ location.href = READONLY ? 'dieta.html?professor=1' : 'dieta.html'; return; }
+    mobile.tab = tab;
+    mobile.screen = 'list';
+    mRender();
+  });
+});
+mBack.addEventListener('click', ()=>{
+  if(mobile.tab==='treinos'){
+    if(mobile.screen==='entry'){ mobile.screen='session'; }
+    else{ mobile.screen='list'; mobile.sessionId=null; }
+  }else if(mobile.tab==='progresso'){
+    mobile.screen='list'; mobile.progKey=null;
+  }
+  mRender();
+});
+
+function mSetActiveTabUI(){
+  document.querySelectorAll('.mtab').forEach(b=> b.classList.toggle('active', b.dataset.mtab===mobile.tab));
+}
+
+function mRender(){
+  mSetActiveTabUI();
+  if(mobile.tab==='progresso') mRenderProgresso();
+  else mRenderTreinos();
+}
+
+/* --- Treinos --- */
+function mRenderTreinos(){
+  if(mobile.screen==='session') return mRenderSessionScreen();
+  if(mobile.screen==='entry') return mRenderEntryScreen();
+  if(mobile.screen==='import') return mRenderImportScreen();
+  mRenderSessionsList();
+}
+
+function mRenderSessionsList(){
+  mTitle.textContent = 'SOBRECARGA';
+  mBack.hidden = true;
+  let html = '';
+  if(!READONLY){
+    html += `<div style="padding:14px 16px 4px;"><button class="mimportbtn" data-maction="import">↥ Importar / escanear PDF</button></div>`;
+  }
+  html += `<div class="msection-title"><span class="mchip">✎</span>Sessões</div>`;
+  if(!READONLY){
+    html += `<div style="padding:0 16px 8px;"><button class="mghostbtn" data-maction="addsession">+ nova sessão</button></div>`;
+  }
+  if(state.sessions.length===0){
+    html += `<div class="mempty"><strong>Nenhuma sessão ainda</strong>Importe um PDF ou crie manualmente.</div>`;
+  }else{
+    const months = groupSessions(state.sessions);
+    months.forEach(month=>{
+      html += `<div class="mgrouplabel">${month.label}</div>`;
+      month.weeks.forEach(week=>{
+        week.sessions.forEach(sess=>{
+          const setCount = sess.exercises.reduce((n,e)=> n+e.sets.length,0);
+          html += `<div class="mrow" data-mopen-session="${sess.id}">
+            <div class="mrow-main"><div class="mrow-title">${escapeHtml(sess.name)}</div><div class="mrow-sub">${fmtDate(sess.date)} · ${sess.exercises.length} exerc. · ${setCount} séries</div></div>
+            <span class="mchev">›</span>
+          </div>`;
+        });
+      });
+    });
+  }
+  mContent.innerHTML = html;
+}
+
+function mRenderSessionScreen(){
+  const session = state.sessions.find(s=> s.id===mobile.sessionId);
+  if(!session){ mobile.screen='list'; return mRenderSessionsList(); }
+  mTitle.textContent = 'Sessão';
+  mBack.hidden = false;
+  const ro = READONLY;
+  let html = `<div style="padding:14px 16px 6px;">
+    <input type="text" class="minput" data-msessname value="${escapeAttr(session.name)}" ${ro?'disabled':''}>
+    <div class="mrow-sub" style="margin-top:6px;">${fmtDate(session.date)}</div>
+    ${ro?'':`<div style="margin-top:10px;"><button class="mghostbtn mdanger" data-mdel-session="${session.id}">✕ excluir sessão</button></div>`}
+  </div>
+  <div class="msection-title">Exercícios</div>`;
+  session.exercises.forEach(ex=>{
+    const setCount = ex.sets.length;
+    const lastSet = ex.sets[ex.sets.length-1];
+    const meta = lastSet ? `${setCount} séries · última ${lastSet.weight}kg × ${lastSet.reps}` : `${setCount} séries`;
+    html += `<div class="mrow">
+      <div class="mrow-main" data-mopen-ex="${ex.id}">
+        <div class="mrow-title">${escapeHtml(ex.name)}</div>
+        <div class="mrow-sub mmono">${meta}</div>
+      </div>
+      ${ro?'':`<button class="micon-btn" data-mdel-ex="${ex.id}">✕</button>`}
+    </div>`;
+  });
+  if(!ro) html += `<div style="padding:4px 16px 20px;"><button class="mghostbtn" data-maction="addexercise">+ exercício</button></div>`;
+  mContent.innerHTML = html;
+}
+
+function mRenderEntryScreen(){
+  const session = state.sessions.find(s=> s.id===mobile.sessionId);
+  const ex = session && session.exercises.find(x=> x.id===mobile.exId);
+  if(!ex){ mobile.screen='session'; return mRenderSessionScreen(); }
+  mTitle.textContent = ex.name;
+  mBack.hidden = false;
+  const ro = READONLY;
+  const keys = ['1','2','3','4','5','6','7','8','9','.','0','⌫'];
+  const keysHtml = keys.map(k=>{
+    const val = k==='⌫' ? 'back' : k;
+    return `<button class="mkey" data-mpad="${val}" ${ro?'disabled':''}>${k}</button>`;
+  }).join('');
+  let html = `<div style="padding:14px 16px 20px;">
+    <div style="display:flex;gap:10px;margin-bottom:14px;">
+      <div class="mpad-box ${mobile.padActive==='weight'?'active':''}" data-mselw>
+        <div class="mpad-label">Peso (kg)</div>
+        <div class="mpad-value">${escapeHtml(mobile.padWeight)||'0'}</div>
+      </div>
+      <div class="mpad-box ${mobile.padActive==='reps'?'active':''}" data-mselr>
+        <div class="mpad-label">Reps</div>
+        <div class="mpad-value">${escapeHtml(mobile.padReps)||'0'}</div>
+      </div>
+    </div>
+    <div class="mkeypad">${keysHtml}</div>
+    ${ro?'':`<button class="mprimarybtn" data-msaveset style="width:100%;">Salvar série</button>`}
+    <div class="msection-title" style="margin:16px 0 10px;">Séries registradas</div>`;
+  if(ex.sets.length===0){
+    html += `<div class="mempty">Nenhuma série ainda</div>`;
+  }else{
+    ex.sets.forEach((s,i)=>{
+      html += `<div class="mrow" style="padding:8px 12px;cursor:default;">
+        <span class="mmono">${i+1}. ${s.weight}kg × ${s.reps}</span>
+        ${ro?'':`<button class="micon-btn" data-mdelset="${i}">✕</button>`}
+      </div>`;
+    });
+  }
+  html += `<div style="margin-top:14px;"><button class="mghostbtn" data-maction="backtosession" style="width:100%;">Concluir exercício</button></div></div>`;
+  mContent.innerHTML = html;
+}
+
+function mPadDigit(d){
+  const key = mobile.padActive==='weight' ? 'padWeight' : 'padReps';
+  let v = mobile[key];
+  if(d==='.' && v.includes('.')) return;
+  if(v.length>=6) return;
+  mobile[key] = v + d;
+}
+function mPadBackspace(){
+  const key = mobile.padActive==='weight' ? 'padWeight' : 'padReps';
+  mobile[key] = mobile[key].slice(0,-1);
+}
+
+function mRenderImportScreen(){
+  mTitle.textContent = 'Importar';
+  mBack.hidden = false;
+  if(!stageGroups.length){
+    mContent.innerHTML = `<div style="padding:24px 16px;text-align:center;">
+      <div style="border:2px dashed var(--border);border-radius:10px;padding:34px 18px;margin-bottom:18px;">
+        <div style="font-size:13px;color:var(--text-dim);margin-bottom:14px;">Escolha um PDF do treino</div>
+        <button class="mghostbtn" data-maction="pickfile">📄 Escolher arquivo</button>
+      </div>
+      <div class="mrow-sub">Detecta cada treino como uma sessão separada.</div>
+    </div>`;
+    return;
+  }
+  let html = `<div style="padding:16px 16px 20px;">
+    <div class="mrow-sub" style="margin-bottom:12px;">Revise antes de adicionar:</div>`;
+  stageGroups.forEach((group,gi)=>{
+    html += `<div class="mcard">
+      <input type="text" class="minput" data-mstagename="${group.id}" value="${escapeAttr(group.name)}" style="margin-bottom:8px;">
+      <input type="date" class="minput" data-mstagedate="${group.id}" value="${group.date}" style="margin-bottom:8px;">`;
+    group.rows.forEach((r,ri)=>{
+      html += `<div style="display:flex;gap:6px;align-items:center;margin-bottom:6px;">
+        <input type="text" class="minput" data-mstagerow="${gi}:${ri}:name" value="${escapeAttr(r.name)}" placeholder="exercício" style="flex:1;">
+        <input type="number" class="minput mmono" data-mstagerow="${gi}:${ri}:sets" value="${r.sets}" style="width:48px;text-align:center;">
+        <input type="number" class="minput mmono" data-mstagerow="${gi}:${ri}:reps" value="${r.reps}" style="width:48px;text-align:center;">
+        <button class="micon-btn" data-mstagedelrow="${gi}:${ri}">✕</button>
+      </div>`;
+    });
+    html += `<button class="mghostbtn small" data-mstageaddrow="${gi}">+ linha</button></div>`;
+  });
+  html += `<div style="display:flex;gap:10px;margin-top:14px;">
+    <button class="mghostbtn" style="flex:1;" data-maction="cancelimport">Cancelar</button>
+    <button class="mprimarybtn" style="flex:1;" data-maction="confirmimport">Adicionar sessões</button>
+  </div></div>`;
+  mContent.innerHTML = html;
+}
+
+/* --- Progresso --- */
+function mRenderProgresso(){
+  if(mobile.screen==='detail') return mRenderProgressDetail();
+  mTitle.textContent = 'Progresso';
+  mBack.hidden = true;
+  const data = computeProgress();
+  let html = '<div style="padding:8px 16px 20px;">';
+  if(data.length===0){
+    html += `<div class="mempty"><strong>Sem dados suficientes</strong>Registre sessões para ver a evolução.</div>`;
+  }else{
+    data.forEach(e=>{
+      const {cur, deltaHtml} = trendDelta(e.points);
+      const spark = e.points.length>1 ? sparkline(e.points.slice(-8)) : '';
+      html += `<div class="mrow" data-mopen-prog="${escapeAttr(e.label.toLowerCase())}">
+        <div class="mrow-main">
+          <div class="mrow-title">${escapeHtml(e.label)}</div>
+          <div class="mrow-sub mmono">${e.points[e.points.length-1].rm.toFixed(1)}kg 1RM</div>
+          <div class="mrow-sub">${deltaHtml}</div>
+        </div>
+        ${spark}
+      </div>`;
+    });
+  }
+  html += '</div>';
+  mContent.innerHTML = html;
+}
+
+function mBigSparkPath(points){
+  const w=280,h=110,pad=8;
+  const vals = points.map(p=>p.rm);
+  const min=Math.min(...vals), max=Math.max(...vals), span=(max-min)||1;
+  const step=(w-pad*2)/Math.max(1,points.length-1);
+  const pts = vals.map((v,i)=>[pad+i*step, h-pad-((v-min)/span)*(h-pad*2)]);
+  return pts.map((p,i)=>(i===0?'M':'L')+p[0].toFixed(1)+','+p[1].toFixed(1)).join(' ');
+}
+
+function mRenderProgressDetail(){
+  const data = computeProgress();
+  const e = data.find(x=> x.label.toLowerCase()===mobile.progKey);
+  if(!e){ mobile.screen='list'; return mRenderProgresso(); }
+  mTitle.textContent = e.label;
+  mBack.hidden = false;
+  const { deltaHtml } = trendDelta(e.points);
+  const cur = e.points[e.points.length-1];
+  const path = mBigSparkPath(e.points);
+  let html = `<div style="padding:16px 16px 24px;">
+    <div class="mbig-num">${cur.rm.toFixed(1)}kg</div>
+    <div style="font-size:13px;font-weight:600;margin:4px 0 16px;">${deltaHtml} desde a sessão anterior</div>
+    <svg width="100%" height="120" viewBox="0 0 280 110" style="background:var(--surface);border-radius:8px;border:1px solid var(--border);">
+      <path d="${path}" fill="none" stroke="var(--accent)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+    <div class="msection-title" style="margin:18px 0 10px;">Histórico</div>`;
+  e.points.slice().reverse().forEach(p=>{
+    html += `<div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--surface-2);">
+      <span class="mrow-sub">${fmtDate(p.date)}</span>
+      <span class="mmono" style="font-size:12.5px;">${p.weight}kg × ${p.reps}</span>
+      <span class="mmono" style="font-size:12.5px;color:var(--accent);">${p.rm.toFixed(1)}kg</span>
+    </div>`;
+  });
+  html += '</div>';
+  mContent.innerHTML = html;
+}
+
+/* --- Event delegation --- */
+mContent.addEventListener('click', async e=>{
+  const action = e.target.closest('[data-maction]');
+  if(action){
+    const act = action.dataset.maction;
+    if(act==='import'){ mobile.screen='import'; mRenderImportScreen(); return; }
+    if(act==='pickfile'){ fileInput.click(); return; }
+    if(act==='addsession'){
+      const session = { id: uid(), date: todayISO(), name: 'Nova sessão', exercises: [
+        { id: uid(), name: 'Exercício', sets:[{reps:10, weight:0}] }
+      ]};
+      state.sessions.push(session);
+      openSessionId = session.id;
+      openMonths.add(getMonthKey(session.date));
+      openWeeks.add(getWeekKey(session.date));
+      mobile.sessionId = session.id; mobile.screen = 'session';
+      save(); renderAll();
+      return;
+    }
+    if(act==='addexercise'){
+      const session = state.sessions.find(s=> s.id===mobile.sessionId);
+      if(session){ session.exercises.push({id:uid(), name:'Exercício', sets:[{reps:10,weight:0}]}); save(); renderAll(); }
+      return;
+    }
+    if(act==='backtosession'){ mobile.screen='session'; mRender(); return; }
+    if(act==='cancelimport'){ closeStage(); stageGroups = []; mobile.screen='list'; mRender(); return; }
+    if(act==='confirmimport'){
+      const added = commitStagedSessions();
+      if(added) mobile.screen='list';
+      mRender();
+      return;
+    }
+    return;
+  }
+  const openSession = e.target.closest('[data-mopen-session]');
+  if(openSession){ mobile.sessionId = openSession.dataset.mopenSession; mobile.screen='session'; mRender(); return; }
+  const delSession = e.target.closest('[data-mdel-session]');
+  if(delSession){
+    const id = delSession.dataset.mdelSession;
+    const session = state.sessions.find(s=> s.id===id);
+    if(session && (await confirmDialog(`Excluir a sessão "${session.name}"?`))){
+      state.sessions = state.sessions.filter(s=> s.id!==id);
+      mobile.screen='list'; mobile.sessionId=null;
+      save(); renderAll();
+    }
+    return;
+  }
+  const openEx = e.target.closest('[data-mopen-ex]');
+  if(openEx){
+    mobile.exId = openEx.dataset.mopenEx;
+    const session = state.sessions.find(s=> s.id===mobile.sessionId);
+    const ex = session && session.exercises.find(x=> x.id===mobile.exId);
+    const last = ex && ex.sets[ex.sets.length-1];
+    mobile.padWeight = last ? String(last.weight) : '';
+    mobile.padReps = last ? String(last.reps) : '';
+    mobile.padActive = 'weight';
+    mobile.screen = 'entry';
+    mRender();
+    return;
+  }
+  const delEx = e.target.closest('[data-mdel-ex]');
+  if(delEx){
+    const session = state.sessions.find(s=> s.id===mobile.sessionId);
+    if(session){ session.exercises = session.exercises.filter(x=> x.id!==delEx.dataset.mdelEx); save(); renderAll(); }
+    return;
+  }
+  const selW = e.target.closest('[data-mselw]');
+  if(selW){ mobile.padActive='weight'; mRenderEntryScreen(); return; }
+  const selR = e.target.closest('[data-mselr]');
+  if(selR){ mobile.padActive='reps'; mRenderEntryScreen(); return; }
+  const padKey = e.target.closest('[data-mpad]');
+  if(padKey){
+    const v = padKey.dataset.mpad;
+    if(v==='back') mPadBackspace(); else mPadDigit(v);
+    mRenderEntryScreen();
+    return;
+  }
+  const saveSet = e.target.closest('[data-msaveset]');
+  if(saveSet){
+    const session = state.sessions.find(s=> s.id===mobile.sessionId);
+    const ex = session && session.exercises.find(x=> x.id===mobile.exId);
+    if(ex){
+      ex.sets.push({ weight: parseFloat(mobile.padWeight)||0, reps: parseFloat(mobile.padReps)||0 });
+      mobile.padWeight=''; mobile.padReps=''; mobile.padActive='weight';
+      save(); renderAll();
+    }
+    return;
+  }
+  const delSet = e.target.closest('[data-mdelset]');
+  if(delSet){
+    const session = state.sessions.find(s=> s.id===mobile.sessionId);
+    const ex = session && session.exercises.find(x=> x.id===mobile.exId);
+    if(ex){
+      ex.sets.splice(+delSet.dataset.mdelset,1);
+      if(ex.sets.length===0) ex.sets.push({reps:10,weight:0});
+      save(); renderAll();
+    }
+    return;
+  }
+  const delRow = e.target.closest('[data-mstagedelrow]');
+  if(delRow){
+    const [gi,ri] = delRow.dataset.mstagedelrow.split(':').map(Number);
+    stageGroups[gi].rows.splice(ri,1);
+    mRenderImportScreen();
+    return;
+  }
+  const addRow = e.target.closest('[data-mstageaddrow]');
+  if(addRow){
+    stageGroups[+addRow.dataset.mstageaddrow].rows.push({name:'', sets:1, reps:10, weight:0});
+    mRenderImportScreen();
+    return;
+  }
+  const openProg = e.target.closest('[data-mopen-prog]');
+  if(openProg){ mobile.progKey = openProg.dataset.mopenProg; mobile.screen='detail'; mRenderProgresso(); return; }
+});
+
+mContent.addEventListener('input', e=>{
+  if(e.target.matches('[data-msessname]')){
+    const session = state.sessions.find(s=> s.id===mobile.sessionId);
+    if(session){ session.name = e.target.value; save(); }
+    return;
+  }
+  if(e.target.matches('[data-mstagename]')){
+    const g = stageGroups.find(g=> g.id===e.target.dataset.mstagename);
+    if(g) g.name = e.target.value;
+    return;
+  }
+  if(e.target.matches('[data-mstagedate]')){
+    const g = stageGroups.find(g=> g.id===e.target.dataset.mstagedate);
+    if(g) g.date = e.target.value;
+    return;
+  }
+  if(e.target.matches('[data-mstagerow]')){
+    const [gi,ri,f] = e.target.dataset.mstagerow.split(':');
+    const row = stageGroups[+gi].rows[+ri];
+    row[f] = f==='name' ? e.target.value : (parseFloat(e.target.value)||0);
+    return;
+  }
+});
 
 function renderAll(){
   renderSessions();
   renderProgress();
   renderStats();
+  mRender();
 }
 
 if(READONLY){

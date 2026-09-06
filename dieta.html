@@ -1,5 +1,6 @@
 <title>Sobrecarga — Dieta</title>
 <meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Stencil+Display:wght@700;900&family=Big+Shoulders+Display:wght@600;700;800&family=Archivo:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
@@ -24,6 +25,7 @@
   color-scheme: dark;
 }
 *{box-sizing:border-box;}
+[hidden]{display:none!important;}
 body{
   margin:0;
   background:var(--bg);
@@ -163,6 +165,44 @@ footer{text-align:center;color:var(--text-faint);font-size:11.5px;margin-top:32p
 }
 .confirm-box p{margin:0 0 16px;font-size:14px;color:var(--text);}
 .confirm-actions{display:flex;justify-content:flex-end;gap:10px;}
+
+/* ---------- Mobile app shell (telas estilo app, teclado numérico) ---------- */
+.mshell{display:none;}
+@media (max-width:640px){
+  .hazard{display:none;}
+  .wrap{display:none;}
+  .mshell{display:flex;flex-direction:column;height:100vh;height:100dvh;background:var(--bg);}
+}
+.mheader{background:var(--surface);border-bottom:1px solid var(--border);flex-shrink:0;}
+.mheader-top{display:flex;align-items:center;gap:8px;padding:12px 14px;}
+.mback{background:none;border:none;color:var(--text);font-size:24px;padding:0 4px;cursor:pointer;line-height:1;flex:none;}
+.mtitle{font-family:'Big Shoulders Stencil Display',sans-serif;font-weight:900;font-size:22px;letter-spacing:.3px;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.mprofessor-bar{background:var(--surface-2);border-top:1px solid var(--border);padding:7px 14px;font-size:11px;color:var(--accent);font-family:'IBM Plex Mono',monospace;text-transform:uppercase;letter-spacing:.04em;}
+.mcontent{flex:1;overflow:auto;-webkit-overflow-scrolling:touch;}
+.mtabbar{display:flex;border-top:1px solid var(--border);background:var(--surface);flex-shrink:0;padding-bottom:env(safe-area-inset-bottom,4px);}
+.mtab{flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;padding:8px 0 4px;background:none;border:none;color:var(--text-faint);font-family:'Archivo',sans-serif;cursor:pointer;}
+.mtab .micon{font-size:18px;}
+.mtab span:last-child{font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:.03em;}
+.mtab.active{color:var(--accent);}
+.msection-title{display:flex;align-items:center;font-family:'Big Shoulders Display',sans-serif;font-weight:800;font-size:15px;letter-spacing:.3px;text-transform:uppercase;margin:18px 16px 10px;}
+.mgrouplabel{font-family:'IBM Plex Mono',monospace;font-size:10.5px;text-transform:uppercase;letter-spacing:.07em;color:var(--text-faint);margin:14px 16px 6px;}
+.mrow{display:flex;align-items:center;justify-content:space-between;background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:12px 14px;margin:0 16px 8px;gap:10px;cursor:pointer;}
+.mrow-main{min-width:0;flex:1;}
+.mrow-title{font-size:14px;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.mrow-sub{font-size:11.5px;color:var(--text-faint);margin-top:2px;}
+.mmono{font-family:'IBM Plex Mono',monospace;}
+.mempty{text-align:center;padding:28px 20px;color:var(--text-faint);font-size:12.5px;}
+.mghostbtn{border:1px solid var(--border);background:var(--surface-2);color:var(--text);border-radius:6px;padding:7px 12px;font-family:'Archivo',sans-serif;font-size:11px;font-weight:700;text-transform:uppercase;cursor:pointer;}
+.mprimarybtn{border:none;background:var(--accent);color:var(--accent-ink);border-radius:6px;padding:12px;font-family:'Archivo',sans-serif;font-size:12px;font-weight:800;text-transform:uppercase;cursor:pointer;}
+.micon-btn{background:none;border:none;color:var(--text-faint);font-size:15px;cursor:pointer;padding:4px 6px;flex:none;}
+.minput{width:100%;background:var(--surface-2);border:1px solid var(--border);color:var(--text);border-radius:6px;padding:8px 10px;font-family:'Archivo',sans-serif;font-size:14px;box-sizing:border-box;}
+.mkeypad{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:12px;}
+.mkey{height:52px;border-radius:8px;border:1px solid var(--border);background:var(--surface-2);color:var(--text);font-family:'IBM Plex Mono',monospace;font-size:18px;font-weight:600;cursor:pointer;}
+.mkey:active{background:var(--surface-3);}
+.mpad-box{background:var(--surface-2);border:1px solid var(--border);border-radius:8px;padding:10px 12px;}
+.mpad-box.active{border-color:var(--accent);}
+.mpad-label{font-size:10.5px;text-transform:uppercase;letter-spacing:.07em;color:var(--text-faint);font-weight:600;}
+.mpad-value{font-family:'IBM Plex Mono',monospace;color:var(--accent);font-weight:600;margin-top:2px;}
 </style>
 
 <div class="hazard"></div>
@@ -244,6 +284,23 @@ footer{text-align:center;color:var(--text-faint);font-size:11.5px;margin-top:32p
   </div>
 
   <footer>Os dados sincronizam entre seus aparelhos. Uma cópia fica salva neste navegador para funcionar offline.</footer>
+</div>
+
+<div id="mShell" class="mshell">
+  <div class="mheader">
+    <div class="mheader-top">
+      <button id="mBack" class="mback" hidden>‹</button>
+      <div class="mtitle" id="mTitle">DIETA</div>
+      <span style="width:22px;flex:none;"></span>
+    </div>
+    <div id="mProfessorBar" class="mprofessor-bar" hidden>👁 Área do professor — somente leitura</div>
+  </div>
+  <div class="mcontent" id="mContent"></div>
+  <div class="mtabbar">
+    <button class="mtab" data-mtab="treinos"><span class="micon">🏋</span><span>Treinos</span></button>
+    <button class="mtab" data-mtab="progresso"><span class="micon">Δ</span><span>Progresso</span></button>
+    <button class="mtab" data-mtab="dieta"><span class="micon">⚖</span><span>Dieta</span></button>
+  </div>
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
@@ -726,6 +783,7 @@ async function handleDietFile(file){
       return;
     }
     openShoppingStage(aggregated);
+    mobile.tab = 'dieta'; mobile.dietSub = 'compras'; mobile.screen = 'shoppingStage'; mRenderDieta();
   }catch(err){
     console.error(err);
     dietDropLabel.innerHTML = '<strong>Não consegui ler esse PDF.</strong> Clique para tentar outro';
@@ -938,10 +996,369 @@ function renderShopping(){
   });
 }
 
+/* ---------- Mobile app shell (telas estilo app: abas embaixo, teclado numérico) ---------- */
+const mobile = {
+  dietSub: 'peso',
+  screen: null,   // null|weightEntry|mealDetail|addFood|shoppingStage
+  mealId: null,
+  padWeight: '',
+  padActive: 'weight'
+};
+
+const mShell = document.getElementById('mShell');
+const mContent = document.getElementById('mContent');
+const mTitle = document.getElementById('mTitle');
+const mBack = document.getElementById('mBack');
+const mProfessorBar = document.getElementById('mProfessorBar');
+if(READONLY && mProfessorBar) mProfessorBar.hidden = false;
+
+document.querySelectorAll('.mtab').forEach(btn=>{
+  btn.classList.toggle('active', btn.dataset.mtab==='dieta');
+  btn.addEventListener('click', ()=>{
+    const tab = btn.dataset.mtab;
+    if(tab==='dieta') return;
+    if(tab==='progresso'){
+      location.href = 'index.html?' + (READONLY?'professor=1&':'') + 'tab=progresso';
+    }else{
+      location.href = READONLY ? 'index.html?professor=1' : 'index.html';
+    }
+  });
+});
+mBack.addEventListener('click', ()=>{
+  if(mobile.screen==='addFood'){ mobile.screen='mealDetail'; }
+  else{ mobile.screen=null; mobile.mealId=null; }
+  mRender();
+});
+
+function mRender(){
+  mRenderDieta();
+}
+
+function mDietSubTabsHtml(){
+  const subs = [['peso','Peso'],['refeicoes','Refeições'],['compras','Compras']];
+  return `<div style="display:flex;gap:6px;padding:10px 16px;">` +
+    subs.map(([k,label])=> `<button class="mghostbtn" data-msubtab="${k}" style="flex:1;${mobile.dietSub===k?'background:var(--accent);color:var(--accent-ink);border-color:transparent;':''}">${label}</button>`).join('') +
+    `</div>`;
+}
+
+function mRenderDieta(){
+  if(mobile.screen==='weightEntry'){ mTitle.textContent='Novo registro'; mBack.hidden=false; return mRenderWeightEntry(); }
+  if(mobile.screen==='mealDetail'){ mBack.hidden=false; return mRenderMealDetail(); }
+  if(mobile.screen==='addFood'){ mTitle.textContent='Adicionar alimento'; mBack.hidden=false; return mRenderAddFood(); }
+  if(mobile.screen==='shoppingStage'){ mTitle.textContent='Revisar lista'; mBack.hidden=false; return mRenderShoppingStage(); }
+  mTitle.textContent = 'DIETA';
+  mBack.hidden = true;
+  if(mobile.dietSub==='refeicoes') return mRenderRefeicoes();
+  if(mobile.dietSub==='compras') return mRenderCompras();
+  return mRenderPeso();
+}
+
+/* --- Peso --- */
+function mDietTrendText(){
+  const byDateAsc = [...state.diet].filter(d=> d.weight>0).sort((a,b)=> a.date.localeCompare(b.date));
+  if(byDateAsc.length>1){
+    const cur=byDateAsc[byDateAsc.length-1], prev=byDateAsc[byDateAsc.length-2];
+    const diff = cur.weight-prev.weight;
+    const dir = Math.abs(diff)<0.05?'flat':(diff>0?'up':'down');
+    const arrow = dir==='up'?'▲':dir==='down'?'▼':'▬';
+    return `Peso atual: ${cur.weight}kg · ${arrow} ${Math.abs(diff).toFixed(1)}kg desde o registro anterior`;
+  }else if(byDateAsc.length===1) return `Peso atual: ${byDateAsc[0].weight}kg (1º registro)`;
+  return 'Sem registros de peso ainda.';
+}
+
+function mRenderPeso(){
+  let html = mDietSubTabsHtml();
+  html += `<div style="padding:0 16px 20px;">`;
+  html += `<div class="mrow-sub" style="margin:4px 0 12px;">${mDietTrendText()}</div>`;
+  const sorted = [...state.diet].sort((a,b)=> b.date.localeCompare(a.date));
+  if(sorted.length===0){
+    html += `<div class="mempty">Nenhum registro ainda</div>`;
+  }else{
+    sorted.forEach(entry=>{
+      html += `<div class="mrow" style="cursor:default;">
+        <div class="mrow-main">
+          <div class="mrow-title mmono">${entry.weight||0}kg</div>
+          <div class="mrow-sub">${fmtDate(entry.date)}</div>
+        </div>
+        ${READONLY?'':`<button class="micon-btn" data-mdel-diet="${entry.id}">✕</button>`}
+      </div>`;
+    });
+  }
+  if(!READONLY) html += `<div style="margin-top:4px;"><button class="mghostbtn" data-maction="addweight">+ novo registro</button></div>`;
+  html += `</div>`;
+  mContent.innerHTML = html;
+}
+
+function mRenderWeightEntry(){
+  const ro = READONLY;
+  const keys = ['1','2','3','4','5','6','7','8','9','.','0','⌫'];
+  const keysHtml = keys.map(k=>{ const val = k==='⌫'?'back':k; return `<button class="mkey" data-mpad="${val}" ${ro?'disabled':''}>${k}</button>`; }).join('');
+  const html = `<div style="padding:16px 16px 20px;">
+    <div class="mpad-box active" style="text-align:center;margin-bottom:16px;padding:14px;">
+      <div class="mpad-label">Peso (kg)</div>
+      <div class="mpad-value" style="font-size:34px;">${escapeHtml(mobile.padWeight)||'0'}</div>
+    </div>
+    <div class="mkeypad">${keysHtml}</div>
+    ${ro?'':`<button class="mprimarybtn" data-msaveweight style="width:100%;">Salvar registro</button>`}
+  </div>`;
+  mContent.innerHTML = html;
+}
+
+function mPadDigit(d){
+  let v = mobile.padWeight;
+  if(d==='.' && v.includes('.')) return;
+  if(v.length>=6) return;
+  mobile.padWeight = v + d;
+}
+function mPadBackspace(){ mobile.padWeight = mobile.padWeight.slice(0,-1); }
+
+/* --- Refeições --- */
+function mRenderRefeicoes(){
+  let html = mDietSubTabsHtml();
+  html += `<div style="padding:0 16px 20px;">`;
+  if(!READONLY) html += `<div style="margin:4px 0 14px;"><button class="mghostbtn" data-maction="addmeal">+ nova refeição</button></div>`;
+  const sorted = [...state.meals].sort((a,b)=> b.date.localeCompare(a.date));
+  if(sorted.length===0){
+    html += `<div class="mempty">Nenhuma refeição ainda</div>`;
+  }else{
+    const byDate = new Map();
+    sorted.forEach(m=>{ if(!byDate.has(m.date)) byDate.set(m.date,[]); byDate.get(m.date).push(m); });
+    byDate.forEach((mealsOfDay, date)=>{
+      const dayTotal = foodTotals(mealsOfDay.flatMap(m=> m.foods));
+      html += `<div class="mgrouplabel" style="display:flex;justify-content:space-between;">
+        <strong style="color:var(--text-dim);">${fmtDate(date)}</strong><span>${Math.round(dayTotal.kcal)} kcal</span>
+      </div>`;
+      mealsOfDay.forEach(m=>{
+        const total = foodTotals(m.foods);
+        html += `<div class="mrow" data-mopen-meal="${m.id}">
+          <div class="mrow-main">
+            <div class="mrow-title">${escapeHtml(m.meal)}</div>
+            <div class="mrow-sub">${m.foods.length} alimento(s)</div>
+          </div>
+          <span class="mmono" style="color:var(--accent);">${Math.round(total.kcal)} kcal</span>
+        </div>`;
+      });
+    });
+  }
+  html += `</div>`;
+  mContent.innerHTML = html;
+}
+
+function mRenderMealDetail(){
+  const m = state.meals.find(x=> x.id===mobile.mealId);
+  if(!m){ mobile.screen=null; mTitle.textContent='DIETA'; mBack.hidden=true; return mRenderRefeicoes(); }
+  mTitle.textContent = m.meal;
+  const ro = READONLY;
+  const total = foodTotals(m.foods);
+  let html = `<div style="padding:14px 16px 20px;">`;
+  html += `<select class="minput" data-mmealtype ${ro?'disabled':''} style="margin-bottom:14px;">${MEAL_TYPES.map(mt=> `<option ${mt===m.meal?'selected':''}>${mt}</option>`).join('')}</select>`;
+  if(m.foods.length===0){
+    html += `<div class="mempty">Nenhum alimento ainda</div>`;
+  }else{
+    m.foods.forEach(f=>{
+      html += `<div class="mrow" style="cursor:default;">
+        <div class="mrow-main">
+          <div class="mrow-title">${escapeHtml(f.name||'Alimento')}</div>
+          <div class="mrow-sub">${f.qty}${f.unit} · P${f.protein}g C${f.carbs}g G${f.fat}g</div>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;">
+          <span class="mmono" style="color:var(--accent);">${Math.round(f.kcal)} kcal</span>
+          ${ro?'':`<button class="micon-btn" data-mdel-food="${f.id}">✕</button>`}
+        </div>
+      </div>`;
+    });
+  }
+  html += `<div style="display:flex;justify-content:space-between;font-family:'IBM Plex Mono',monospace;font-size:13px;color:var(--text-dim);font-weight:700;padding:10px 2px 6px;margin:14px 0;border-top:1px solid var(--border);">
+    <span>Total</span><span>${Math.round(total.kcal)} kcal</span>
+  </div>`;
+  if(!ro) html += `<button class="mghostbtn" data-maction="openaddfood" style="width:100%;">+ alimento</button>`;
+  html += `</div>`;
+  mContent.innerHTML = html;
+}
+
+function mRenderAddFood(){
+  let html = `<div style="padding:8px 16px 20px;">`;
+  FOOD_DB.forEach((f,i)=>{
+    const sub = f.unit==='un' ? `${f.kcal} kcal/un` : `${f.kcal} kcal/100g`;
+    html += `<div class="mrow" data-madd-food="${i}">
+      <span class="mrow-title">${escapeHtml(f.name)}</span>
+      <span class="mmono mrow-sub">${sub}</span>
+    </div>`;
+  });
+  html += `</div>`;
+  mContent.innerHTML = html;
+}
+
+/* --- Compras --- */
+function mRenderCompras(){
+  let html = mDietSubTabsHtml();
+  html += `<div style="padding:0 16px 20px;">`;
+  if(!READONLY){
+    html += `<div style="display:flex;gap:8px;margin:4px 0 10px;">
+      <input type="text" class="minput" id="mNewShopName" placeholder="novo item">
+      <button class="mghostbtn" data-maction="addshopitem" style="flex:none;">+</button>
+    </div>
+    <div style="margin-bottom:14px;"><button class="mghostbtn" data-maction="pickdietfile">📄 Importar PDF da dieta</button></div>`;
+  }
+  if(state.shoppingList.length===0){
+    html += `<div class="mempty">Lista vazia</div>`;
+  }else{
+    state.shoppingList.forEach(item=>{
+      html += `<div class="mrow" style="cursor:default;">
+        <div data-mtoggle-shop="${item.id}" style="width:20px;height:20px;border-radius:4px;border:1.5px solid ${item.checked?'var(--accent)':'var(--border)'};background:${item.checked?'var(--accent)':'transparent'};flex:none;display:flex;align-items:center;justify-content:center;color:var(--accent-ink);font-size:12px;font-weight:700;cursor:pointer;">${item.checked?'✓':''}</div>
+        <div class="mrow-main" style="flex:1;margin-left:10px;">
+          <div class="mrow-title" style="${item.checked?'text-decoration:line-through;color:var(--text-faint);':''}">${escapeHtml(item.name)}</div>
+        </div>
+        <span class="mmono mrow-sub">${escapeHtml(item.qty)}</span>
+        ${READONLY?'':`<button class="micon-btn" data-mdel-shop="${item.id}">✕</button>`}
+      </div>`;
+    });
+  }
+  html += `</div>`;
+  mContent.innerHTML = html;
+}
+
+function mRenderShoppingStage(){
+  let html = `<div style="padding:16px 16px 20px;">
+    <div class="mrow-sub" style="margin-bottom:12px;">Revise antes de adicionar:</div>`;
+  shoppingStageRows.forEach((r,i)=>{
+    html += `<div style="display:flex;gap:6px;align-items:center;margin-bottom:6px;">
+      <input type="text" class="minput" data-mstagesrow="${i}:name" value="${escapeAttr(r.name)}" placeholder="alimento" style="flex:1;">
+      <input type="text" class="minput mmono" data-mstagesrow="${i}:qty" value="${escapeAttr(r.qty)}" style="width:80px;">
+      <button class="micon-btn" data-mstagesdelrow="${i}">✕</button>
+    </div>`;
+  });
+  html += `<div style="display:flex;gap:10px;margin-top:14px;">
+    <button class="mghostbtn" style="flex:1;" data-maction="cancelshopstage">Cancelar</button>
+    <button class="mprimarybtn" style="flex:1;" data-maction="confirmshopstage">Adicionar à lista</button>
+  </div></div>`;
+  mContent.innerHTML = html;
+}
+
+/* --- Event delegation --- */
+mContent.addEventListener('click', async e=>{
+  const subTab = e.target.closest('[data-msubtab]');
+  if(subTab){ mobile.dietSub = subTab.dataset.msubtab; mobile.screen=null; mRender(); return; }
+
+  const action = e.target.closest('[data-maction]');
+  if(action){
+    const act = action.dataset.maction;
+    if(act==='addweight'){ mobile.padWeight=''; mobile.screen='weightEntry'; mRender(); return; }
+    if(act==='addmeal'){
+      const m = { id:uid(), date:todayISO(), meal:'Café da Manhã', foods:[] };
+      state.meals.unshift(m);
+      mobile.mealId = m.id; mobile.screen='mealDetail';
+      save(); renderAll();
+      return;
+    }
+    if(act==='openaddfood'){ mobile.screen='addFood'; mRender(); return; }
+    if(act==='addshopitem'){
+      const inp = document.getElementById('mNewShopName');
+      const name = inp && inp.value.trim();
+      if(name){ state.shoppingList.unshift({id:uid(), name, qty:'', checked:false}); save(); renderAll(); }
+      return;
+    }
+    if(act==='pickdietfile'){ dietFileInput.click(); return; }
+    if(act==='cancelshopstage'){ document.getElementById('shoppingStageCancel').click(); mobile.screen=null; mRender(); return; }
+    if(act==='confirmshopstage'){ document.getElementById('shoppingStageConfirm').click(); mobile.screen=null; mRender(); return; }
+    return;
+  }
+
+  const delDiet = e.target.closest('[data-mdel-diet]');
+  if(delDiet){
+    const id = delDiet.dataset.mdelDiet;
+    const entry = state.diet.find(d=> d.id===id);
+    if(entry && (await confirmDialog('Excluir este registro de dieta?'))){
+      const photoId = entry.photoId;
+      state.diet = state.diet.filter(d=> d.id!==id);
+      save(); renderAll();
+      if(photoId) fetch('/api/photos/'+photoId, { method:'DELETE' }).catch(()=>{});
+    }
+    return;
+  }
+
+  const padKey = e.target.closest('[data-mpad]');
+  if(padKey){
+    const v = padKey.dataset.mpad;
+    if(v==='back') mPadBackspace(); else mPadDigit(v);
+    mRenderWeightEntry();
+    return;
+  }
+  const saveWeight = e.target.closest('[data-msaveweight]');
+  if(saveWeight){
+    const w = parseFloat(mobile.padWeight)||0;
+    state.diet.unshift({ id: uid(), date: todayISO(), weight: w, photoId: null });
+    mobile.screen = null; mobile.padWeight = '';
+    save(); renderAll();
+    return;
+  }
+
+  const openMeal = e.target.closest('[data-mopen-meal]');
+  if(openMeal){ mobile.mealId = openMeal.dataset.mopenMeal; mobile.screen='mealDetail'; mRender(); return; }
+  const delFood = e.target.closest('[data-mdel-food]');
+  if(delFood){
+    const m = state.meals.find(x=> x.id===mobile.mealId);
+    if(m){ m.foods = m.foods.filter(f=> f.id!==delFood.dataset.mdelFood); save(); renderAll(); }
+    return;
+  }
+  const addFood = e.target.closest('[data-madd-food]');
+  if(addFood){
+    const f = FOOD_DB[+addFood.dataset.maddFood];
+    const m = state.meals.find(x=> x.id===mobile.mealId);
+    if(m && f){
+      const qty = f.unit==='un' ? 1 : 100;
+      m.foods.push({ id:uid(), name:f.name, qty, unit:f.unit, ...calcFromFood(f, qty) });
+      mobile.screen='mealDetail';
+      save(); renderAll();
+    }
+    return;
+  }
+
+  const toggleShop = e.target.closest('[data-mtoggle-shop]');
+  if(toggleShop){
+    const item = state.shoppingList.find(s=> s.id===toggleShop.dataset.mtoggleShop);
+    if(item){ item.checked = !item.checked; save(); renderAll(); }
+    return;
+  }
+  const delShop = e.target.closest('[data-mdel-shop]');
+  if(delShop){
+    const item = state.shoppingList.find(s=> s.id===delShop.dataset.mdelShop);
+    if(item && (await confirmDialog(`Remover "${item.name}" da lista?`))){
+      state.shoppingList = state.shoppingList.filter(s=> s.id!==item.id);
+      save(); renderAll();
+    }
+    return;
+  }
+
+  const delRow = e.target.closest('[data-mstagesdelrow]');
+  if(delRow){
+    shoppingStageRows.splice(+delRow.dataset.mstagesdelrow, 1);
+    mRenderShoppingStage();
+    return;
+  }
+});
+
+mContent.addEventListener('input', e=>{
+  if(e.target.matches('[data-mstagesrow]')){
+    const [i,f] = e.target.dataset.mstagesrow.split(':');
+    shoppingStageRows[+i][f] = e.target.value;
+    return;
+  }
+});
+
+mContent.addEventListener('change', e=>{
+  if(e.target.matches('[data-mmealtype]')){
+    const m = state.meals.find(x=> x.id===mobile.mealId);
+    if(m){ m.meal = e.target.value; save(); }
+    return;
+  }
+});
+
 function renderAll(){
   renderDiet();
   renderMeals();
   renderShopping();
+  mRender();
 }
 
 if(READONLY){
