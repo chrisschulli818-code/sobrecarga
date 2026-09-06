@@ -143,6 +143,7 @@ button.primary{background:var(--accent);color:var(--accent-ink);border-color:tra
 button.primary:hover{filter:brightness(1.08);}
 button.ghost{background:transparent;border-color:transparent;color:var(--text-faint);padding:5px 7px;text-transform:none;letter-spacing:0;font-weight:600;}
 button.ghost:hover{color:var(--down);background:var(--surface-2);}
+button.ghost.repeat:hover{color:var(--accent);}
 button.small{padding:4px 9px;font-size:11px;}
 button:disabled{opacity:.4;cursor:not-allowed;}
 
@@ -445,7 +446,9 @@ async function syncRemote(){
     setSyncStatus('offline');
   }
 }
-function confirmDialog(message){
+function confirmDialog(message, opts={}){
+  const okLabel = opts.okLabel || 'Excluir';
+  const danger = opts.danger !== false;
   return new Promise(resolve=>{
     const overlay = document.createElement('div');
     overlay.className = 'confirm-overlay';
@@ -454,7 +457,7 @@ function confirmDialog(message){
         <p>${escapeHtml(message)}</p>
         <div class="confirm-actions">
           <button class="ghost small" data-act="cancel">Cancelar</button>
-          <button class="primary small" data-act="ok" style="background:var(--down);color:#fff;">Excluir</button>
+          <button class="primary small" data-act="ok" ${danger?'style="background:var(--down);color:#fff;"':''}>${escapeHtml(okLabel)}</button>
         </div>
       </div>`;
     document.body.appendChild(overlay);
@@ -886,6 +889,71 @@ function getWeekLabel(mondayIso){
   return `Semana de ${f(start)} a ${f(end)}`;
 }
 
+/* ---------- Repetir semana / sessão ----------
+   O treino é mensal e se repete toda semana, então copiar a estrutura evita
+   reimportar o PDF. A carga vai zerada de propósito: assim a cópia ainda não
+   treinada não entra no relatório de rendimento (1RM só conta com peso > 0)
+   e não finge um resultado que não aconteceu. */
+function cloneSessionTo(session, newDate){
+  return {
+    id: uid(),
+    date: newDate,
+    name: session.name,
+    exercises: session.exercises.map(ex=> ({
+      id: uid(),
+      name: ex.name,
+      sets: ex.sets.map(s=> ({ reps: s.reps, weight: 0 }))
+    }))
+  };
+}
+function sessionExists(name, date){
+  const key = (name||'').trim().toLowerCase();
+  return state.sessions.some(s=> s.date===date && s.name.trim().toLowerCase()===key);
+}
+function pushCopy(copy){
+  state.sessions.push(copy);
+  openMonths.add(getMonthKey(copy.date));
+  openWeeks.add(getWeekKey(copy.date));
+}
+
+async function doRepeatSession(session){
+  const newDate = addDaysISO(session.date, 7);
+  if(sessionExists(session.name, newDate)){
+    alert(`"${session.name}" já existe em ${fmtDate(newDate)}.`);
+    return false;
+  }
+  const ok = await confirmDialog(`Repetir "${session.name}" em ${fmtDate(newDate)}?`, {okLabel:'Repetir', danger:false});
+  if(!ok) return false;
+  const copy = cloneSessionTo(session, newDate);
+  pushCopy(copy);
+  openSessionId = copy.id;
+  save(); renderAll();
+  return true;
+}
+
+async function doRepeatWeek(weekKey){
+  const sessions = state.sessions
+    .filter(s=> getWeekKey(s.date)===weekKey)
+    .sort((a,b)=> a.date.localeCompare(b.date));
+  if(sessions.length===0) return false;
+  const nextLabel = getWeekLabel(addDaysISO(weekKey, 7)).toLowerCase();
+  const ok = await confirmDialog(
+    `Repetir ${sessions.length} ${sessions.length===1?'sessão':'sessões'} na ${nextLabel}?`,
+    {okLabel:'Repetir', danger:false}
+  );
+  if(!ok) return false;
+  let added = 0;
+  sessions.forEach(s=>{
+    const newDate = addDaysISO(s.date, 7);
+    if(sessionExists(s.name, newDate)) return;
+    pushCopy(cloneSessionTo(s, newDate));
+    added++;
+  });
+  if(added===0){ alert('Essas sessões já existem na semana seguinte.'); return false; }
+  save(); renderAll();
+  return true;
+}
+
 function groupSessions(sessions){
   const sorted = [...sessions].sort((a,b)=> b.date.localeCompare(a.date));
   const months = [];
@@ -938,6 +1006,7 @@ function renderSessions(){
         <div class="week-head" data-week="${week.key}">
           <span class="chev">›</span><span class="group-label">${week.label}</span>
           <span class="group-meta">${week.sessions.length} ${week.sessions.length===1?'sessão':'sessões'}</span>
+          ${READONLY ? '' : `<button class="ghost small repeat" data-repeatweek="${week.key}" title="Repetir estas sessões na semana seguinte">⟳ repetir semana</button>`}
         </div>
         <div class="week-body"></div>`;
       monthBody.appendChild(weekEl);
@@ -952,6 +1021,7 @@ function renderSessions(){
           <div class="session-head" data-open="${session.id}">
             <span class="session-name">${escapeHtml(session.name)}</span>
             <div style="display:flex;align-items:center;gap:4px;">
+              ${READONLY ? '' : `<button class="ghost small repeat" data-repeatsession="${session.id}" title="Repetir esta sessão daqui a 7 dias">⟳</button>`}
               ${READONLY ? '' : `<button class="ghost small" data-quickdel="${session.id}" title="Excluir sessão">✕</button>`}
               <span class="chev">›</span>
             </div>
@@ -1064,6 +1134,17 @@ function renderSessionBody(container, session){
 }
 
 sessionsList.addEventListener('click', async e=>{
+  const repeatWeekBtn = e.target.closest('[data-repeatweek]');
+  if(repeatWeekBtn){
+    await doRepeatWeek(repeatWeekBtn.dataset.repeatweek);
+    return;
+  }
+  const repeatSessionBtn = e.target.closest('[data-repeatsession]');
+  if(repeatSessionBtn){
+    const session = state.sessions.find(s=> s.id===repeatSessionBtn.dataset.repeatsession);
+    if(session) await doRepeatSession(session);
+    return;
+  }
   const quickDel = e.target.closest('[data-quickdel]');
   if(quickDel){
     const id = quickDel.dataset.quickdel;
@@ -1298,7 +1379,10 @@ function mRenderSessionsList(){
   }
   html += `<div class="msection-title"><span class="mchip">✎</span>Sessões</div>`;
   if(!READONLY){
-    html += `<div style="padding:0 16px 8px;"><button class="mghostbtn" data-maction="addsession">+ nova sessão</button></div>`;
+    html += `<div style="padding:0 16px 8px;display:flex;gap:8px;flex-wrap:wrap;">
+      <button class="mghostbtn" data-maction="addsession">+ nova sessão</button>
+      ${state.sessions.length ? `<button class="mghostbtn" data-maction="repeatlastweek">⟳ repetir última semana</button>` : ''}
+    </div>`;
   }
   if(state.sessions.length===0){
     html += `<div class="mempty"><strong>Nenhuma sessão ainda</strong>Importe um PDF ou crie manualmente.</div>`;
@@ -1329,7 +1413,10 @@ function mRenderSessionScreen(){
   let html = `<div style="padding:14px 16px 6px;">
     <input type="text" class="minput" data-msessname value="${escapeAttr(session.name)}" ${ro?'disabled':''}>
     <div class="mrow-sub" style="margin-top:6px;">${fmtDate(session.date)}</div>
-    ${ro?'':`<div style="margin-top:10px;"><button class="mghostbtn mdanger" data-mdel-session="${session.id}">✕ excluir sessão</button></div>`}
+    ${ro?'':`<div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;">
+      <button class="mghostbtn" data-maction="repeatsession">⟳ repetir (+7 dias)</button>
+      <button class="mghostbtn mdanger" data-mdel-session="${session.id}">✕ excluir sessão</button>
+    </div>`}
   </div>
   <div class="msection-title">Exercícios</div>`;
   session.exercises.forEach(ex=>{
@@ -1521,6 +1608,18 @@ mContent.addEventListener('click', async e=>{
     if(act==='addexercise'){
       const session = state.sessions.find(s=> s.id===mobile.sessionId);
       if(session){ session.exercises.push({id:uid(), name:'Exercício', sets:[{reps:10,weight:0}]}); save(); renderAll(); }
+      return;
+    }
+    if(act==='repeatlastweek'){
+      const latest = [...state.sessions].sort((a,b)=> b.date.localeCompare(a.date))[0];
+      if(latest) await doRepeatWeek(getWeekKey(latest.date));
+      return;
+    }
+    if(act==='repeatsession'){
+      const session = state.sessions.find(s=> s.id===mobile.sessionId);
+      if(session && (await doRepeatSession(session))){
+        mobile.screen='list'; mobile.sessionId=null; mRender();
+      }
       return;
     }
     if(act==='backtosession'){ mobile.screen='session'; mRender(); return; }
