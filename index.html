@@ -333,7 +333,6 @@ footer{text-align:center;color:var(--text-faint);font-size:11.5px;margin-top:32p
         <div class="stat"><div class="n" id="statUp">0</div><div class="l">Em alta</div></div>
       </div>
       <div style="display:flex;gap:10px;align-items:center;">
-        <a href="dieta.html" id="dietLink" class="hint" style="text-decoration:underline;">⚖ Dieta</a>
         <a href="?professor=1" target="_blank" class="hint" id="professorLink" style="text-decoration:underline;">Área do professor (somente leitura) ↗</a>
       </div>
     </div>
@@ -359,6 +358,10 @@ footer{text-align:center;color:var(--text-faint);font-size:11.5px;margin-top:32p
         <div style="flex:1;min-width:180px;" id="stageProtocolNameWrap">
           <label class="hint">Nome do novo protocolo</label>
           <input type="text" id="stageProtocolName">
+        </div>
+        <div style="width:150px;">
+          <label class="hint">Duração (semanas)</label>
+          <input type="number" min="1" max="52" id="stageProtocolWeeks" value="4">
         </div>
       </div>
       <div id="stageGroupsWrap"></div>
@@ -412,7 +415,6 @@ footer{text-align:center;color:var(--text-faint);font-size:11.5px;margin-top:32p
   <div class="mtabbar">
     <button class="mtab" data-mtab="treinos"><span class="micon">🏋</span><span>Treinos</span></button>
     <button class="mtab" data-mtab="progresso"><span class="micon">Δ</span><span>Progresso</span></button>
-    <button class="mtab" data-mtab="dieta"><span class="micon">⚖</span><span>Dieta</span></button>
   </div>
 </div>
 
@@ -423,7 +425,6 @@ footer{text-align:center;color:var(--text-faint);font-size:11.5px;margin-top:32p
 pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
 
 const READONLY = new URLSearchParams(location.search).get('professor') === '1';
-document.getElementById('dietLink').href = READONLY ? 'dieta.html?professor=1' : 'dieta.html';
 const STORE_KEY = 'sobrecarga_v1';
 let state = loadLocal();
 let stageRows = [];
@@ -435,14 +436,11 @@ function loadLocal(){
     const raw = localStorage.getItem(STORE_KEY);
     if(raw){
       const d = JSON.parse(raw);
-      if(!Array.isArray(d.diet)) d.diet = [];
-      if(!Array.isArray(d.shoppingList)) d.shoppingList = [];
-      if(!Array.isArray(d.meals)) d.meals = [];
       if(!Array.isArray(d.protocols)) d.protocols = [];
       return d;
     }
   }catch(e){}
-  return { sessions: [], diet: [], shoppingList: [], meals: [], protocols: [] };
+  return { sessions: [], protocols: [] };
 }
 function saveLocal(){
   try{ localStorage.setItem(STORE_KEY, JSON.stringify(state)); }catch(e){}
@@ -460,9 +458,6 @@ async function loadRemote(){
     if(!res.ok) throw new Error('bad status');
     const data = await res.json();
     if(data && Array.isArray(data.sessions)){
-      if(!Array.isArray(data.diet)) data.diet = [];
-      if(!Array.isArray(data.shoppingList)) data.shoppingList = [];
-      if(!Array.isArray(data.meals)) data.meals = [];
       if(!Array.isArray(data.protocols)) data.protocols = [];
       state = data;
       if(ensureProtocols()) saveLocal();
@@ -813,7 +808,7 @@ function openStage(groups, fileName){
     date: addDaysISO(today, i),
     rows: g.rows.length? g.rows : [{name:'', sets:1, reps:10, weight:0}]
   }));
-  stageProtocol = { mode: 'new', id: null, name: suggestProtocolName(stageGroups[0].date) };
+  stageProtocol = { mode: 'new', id: null, name: suggestProtocolName(stageGroups[0].date), weeks: 4 };
   stageWrap.style.display = 'block';
   renderStageProtocol();
   renderStageGroups();
@@ -821,10 +816,11 @@ function openStage(groups, fileName){
 }
 
 /* Uma importação = uma ficha = um protocolo (ou anexada a um já existente). */
-let stageProtocol = { mode:'new', id:null, name:'' };
+let stageProtocol = { mode:'new', id:null, name:'', weeks:4 };
 const stageProtocolSelect = document.getElementById('stageProtocolSelect');
 const stageProtocolName = document.getElementById('stageProtocolName');
 const stageProtocolNameWrap = document.getElementById('stageProtocolNameWrap');
+const stageProtocolWeeks = document.getElementById('stageProtocolWeeks');
 
 function renderStageProtocol(){
   stageProtocolSelect.innerHTML =
@@ -832,6 +828,7 @@ function renderStageProtocol(){
     state.protocols.map(p=> `<option value="${escapeAttr(p.id)}" ${stageProtocol.id===p.id?'selected':''}>${escapeHtml(p.name)}</option>`).join('');
   stageProtocolSelect.value = stageProtocol.mode==='new' ? '__new' : stageProtocol.id;
   stageProtocolName.value = stageProtocol.name;
+  stageProtocolWeeks.value = stageProtocol.weeks;
   stageProtocolNameWrap.style.display = stageProtocol.mode==='new' ? '' : 'none';
 }
 stageProtocolSelect.addEventListener('change', e=>{
@@ -840,13 +837,25 @@ stageProtocolSelect.addEventListener('change', e=>{
   renderStageProtocol();
 });
 stageProtocolName.addEventListener('input', e=>{ stageProtocol.name = e.target.value; });
+stageProtocolWeeks.addEventListener('input', e=>{ stageProtocol.weeks = clampWeeks(e.target.value); });
+
+function clampWeeks(v){
+  const n = parseInt(v,10);
+  if(!n || n<1) return 1;
+  return Math.min(52, n);
+}
 
 // Resolve o protocolo escolhido na importação, criando-o se for novo.
 function resolveStageProtocolId(){
   if(stageProtocol.mode==='existing' && state.protocols.some(p=> p.id===stageProtocol.id)){
     return stageProtocol.id;
   }
-  const prot = { id: uid(), name: (stageProtocol.name||'').trim() || suggestProtocolName(todayISO()), createdAt: todayISO() };
+  const prot = {
+    id: uid(),
+    name: (stageProtocol.name||'').trim() || suggestProtocolName(todayISO()),
+    createdAt: todayISO(),
+    weeks: clampWeeks(stageProtocol.weeks)
+  };
   state.protocols.push(prot);
   return prot.id;
 }
@@ -938,21 +947,23 @@ function commitStagedSessions(){
   const hasValid = stageGroups.some(g=> buildExercisesFromRows(g.rows).length>0);
   if(!hasValid){ alert('Adicione ao menos um exercício com nome.'); return 0; }
   const protocolId = resolveStageProtocolId();
-  stageGroups.forEach(group=>{
-    const exercises = buildExercisesFromRows(group.rows);
-    if(exercises.length===0) return;
-    const session = {
-      id: uid(),
-      protocolId,
-      date: group.date || todayISO(),
-      name: group.name.trim() || 'Sessão',
-      exercises
-    };
-    state.sessions.push(session);
-    openMonths.add(getMonthKey(session.date));
-    openWeeks.add(getWeekKey(session.date));
-    added++;
-  });
+  const weeks = clampWeeks(stageProtocol.weeks);
+  // O protocolo já nasce com todas as semanas: a divisão de treino se repete
+  // em cada uma, sem carga, para ser preenchida conforme você treina.
+  for(let w=0; w<weeks; w++){
+    stageGroups.forEach(group=>{
+      const exercises = buildExercisesFromRows(group.rows);
+      if(exercises.length===0) return;
+      const name = group.name.trim() || 'Sessão';
+      const date = addDaysISO(group.date || todayISO(), 7*w);
+      if(sessionExists(name, date)) return;
+      const session = { id: uid(), protocolId, date, name, exercises };
+      state.sessions.push(session);
+      openMonths.add(getMonthKey(session.date));
+      openWeeks.add(getWeekKey(session.date));
+      added++;
+    });
+  }
   openProtocols.clear();
   openProtocols.add(protocolId);
   save();
@@ -1068,25 +1079,50 @@ async function doRepeatSession(session){
   return true;
 }
 
-async function doRepeatWeek(weekKey){
-  const sessions = state.sessions
-    .filter(s=> getWeekKey(s.date)===weekKey)
+/* Semanas de um protocolo, em ordem. */
+function protocolWeekKeys(protocolId){
+  const keys = new Set();
+  state.sessions.forEach(s=>{ if(s.protocolId===protocolId) keys.add(getWeekKey(s.date)); });
+  return [...keys].sort();
+}
+/* A divisão de treino do protocolo é a primeira semana dele — é ela que se
+   repete quando o protocolo é estendido. */
+function protocolDivision(protocolId){
+  const keys = protocolWeekKeys(protocolId);
+  if(!keys.length) return [];
+  return state.sessions
+    .filter(s=> s.protocolId===protocolId && getWeekKey(s.date)===keys[0])
     .sort((a,b)=> a.date.localeCompare(b.date));
-  if(sessions.length===0) return false;
-  const nextLabel = getWeekLabel(addDaysISO(weekKey, 7)).toLowerCase();
+}
+function diffDays(a, b){
+  return Math.round((new Date(a+'T00:00:00') - new Date(b+'T00:00:00')) / 86400000);
+}
+
+/* Acrescenta mais uma semana ao protocolo, repetindo a divisão de treino. */
+async function addProtocolWeek(protocolId){
+  const base = protocolDivision(protocolId);
+  if(base.length===0){
+    alert('Este protocolo ainda não tem treinos para repetir. Importe a ficha ou crie uma sessão primeiro.');
+    return false;
+  }
+  const keys = protocolWeekKeys(protocolId);
+  const newWeekKey = addDaysISO(keys[keys.length-1], 7);
+  const offset = diffDays(newWeekKey, keys[0]);
   const ok = await confirmDialog(
-    `Repetir ${sessions.length} ${sessions.length===1?'sessão':'sessões'} na ${nextLabel}?`,
-    {okLabel:'Repetir', danger:false}
+    `Adicionar a ${getWeekLabel(newWeekKey).toLowerCase()} com os ${base.length} treinos da divisão?`,
+    {okLabel:'Adicionar', danger:false}
   );
   if(!ok) return false;
   let added = 0;
-  sessions.forEach(s=>{
-    const newDate = addDaysISO(s.date, 7);
+  base.forEach(s=>{
+    const newDate = addDaysISO(s.date, offset);
     if(sessionExists(s.name, newDate)) return;
     pushCopy(cloneSessionTo(s, newDate));
     added++;
   });
   if(added===0){ alert('Essas sessões já existem na semana seguinte.'); return false; }
+  const prot = state.protocols.find(p=> p.id===protocolId);
+  if(prot) prot.weeks = protocolWeekKeys(protocolId).length;
   save(); renderAll();
   return true;
 }
@@ -1155,8 +1191,10 @@ function groupByProtocol(sessions){
   return blocks;
 }
 
+/* Dentro de um protocolo a ordem é cronológica: semana 1 → última, e cada
+   semana da segunda para o fim de semana. */
 function groupSessions(sessions){
-  const sorted = [...sessions].sort((a,b)=> b.date.localeCompare(a.date));
+  const sorted = [...sessions].sort((a,b)=> a.date.localeCompare(b.date));
   const months = [];
   const monthIdx = {};
   sorted.forEach(session=>{
@@ -1184,13 +1222,18 @@ function renderSessions(){
     const protEl = document.createElement('div');
     protEl.className = 'protocol-group' + (isOpen ? ' open':'');
     const range = block.start===block.end ? fmtDayMonth(block.start) : `${fmtDayMonth(block.start)} – ${fmtDayMonth(block.end)}`;
+    const nWeeks = block.key==='__none' ? 0 : protocolWeekKeys(block.key).length;
+    const meta = block.sessions.length
+      ? `${range} · ${nWeeks} ${nWeeks===1?'semana':'semanas'} · ${block.sessions.length} ${block.sessions.length===1?'treino':'treinos'}`
+      : 'vazio';
     protEl.innerHTML = `
       <div class="protocol-head" data-protocol="${block.key}">
         <span class="chev">›</span>
         ${READONLY
           ? `<span class="protocol-name">${escapeHtml(block.name)}</span>`
           : `<input class="protocol-name" data-protname="${block.key}" value="${escapeAttr(block.name)}">`}
-        <span class="group-meta">${range} · ${block.sessions.length} ${block.sessions.length===1?'sessão':'sessões'}</span>
+        <span class="group-meta">${meta}</span>
+        ${READONLY ? '' : `<button class="ghost small repeat" data-addweek="${block.key}" title="Repetir a divisão de treino em mais uma semana">+ semana</button>`}
       </div>
       <div class="protocol-body"></div>`;
     sessionsList.appendChild(protEl);
@@ -1200,13 +1243,14 @@ function renderSessions(){
       body.innerHTML = `<div class="empty" style="padding:18px;">Nenhuma sessão neste protocolo ainda. Importe o PDF da ficha ou crie uma sessão manual.</div>`;
       return;
     }
-    renderMonthGroups(body, block.months);
+    const ordem = protocolWeekKeys(block.key);
+    renderMonthGroups(body, block.months, k=> ordem.indexOf(k)+1);
   });
 }
 
 /* Dentro de um protocolo: se ele cabe num mês só, pula o nível de mês e mostra
    as semanas direto — menos cliques para chegar na sessão. */
-function renderMonthGroups(container, months){
+function renderMonthGroups(container, months, weekNumber){
   if(openMonths.size===0 && months.length) openMonths.add(months[0].key);
   months.forEach(month=>{
     if((months.length===1 || openMonths.has(month.key)) && !month.weeks.some(w=> openWeeks.has(w.key))){
@@ -1215,7 +1259,7 @@ function renderMonthGroups(container, months){
   });
 
   if(months.length===1){
-    renderWeekGroups(container, months[0].weeks);
+    renderWeekGroups(container, months[0].weeks, weekNumber);
     return;
   }
 
@@ -1232,20 +1276,21 @@ function renderMonthGroups(container, months){
       <div class="month-body"></div>`;
     container.appendChild(monthEl);
     if(!monthOpen) return;
-    renderWeekGroups(monthEl.querySelector('.month-body'), month.weeks);
+    renderWeekGroups(monthEl.querySelector('.month-body'), month.weeks, weekNumber);
   });
 }
 
-function renderWeekGroups(container, weeks){
+function renderWeekGroups(container, weeks, weekNumber){
   weeks.forEach(week=>{
     const weekOpen = openWeeks.has(week.key);
+    const n = weekNumber ? weekNumber(week.key) : 0;
+    const label = n>0 ? `Semana ${n} · ${week.label.replace('Semana de ','').replace(' a ',' – ')}` : week.label;
     const weekEl = document.createElement('div');
     weekEl.className = 'week-group' + (weekOpen ? ' open':'');
     weekEl.innerHTML = `
       <div class="week-head" data-week="${week.key}">
-        <span class="chev">›</span><span class="group-label">${week.label}</span>
-        <span class="group-meta">${week.sessions.length} ${week.sessions.length===1?'sessão':'sessões'}</span>
-        ${READONLY ? '' : `<button class="ghost small repeat" data-repeatweek="${week.key}" title="Repetir estas sessões na semana seguinte">⟳ repetir semana</button>`}
+        <span class="chev">›</span><span class="group-label">${label}</span>
+        <span class="group-meta">${week.sessions.length} ${week.sessions.length===1?'treino':'treinos'}</span>
       </div>
       <div class="week-body"></div>`;
     container.appendChild(weekEl);
@@ -1379,9 +1424,9 @@ function renderSessionBody(container, session){
 }
 
 sessionsList.addEventListener('click', async e=>{
-  const repeatWeekBtn = e.target.closest('[data-repeatweek]');
-  if(repeatWeekBtn){
-    await doRepeatWeek(repeatWeekBtn.dataset.repeatweek);
+  const addWeekBtn = e.target.closest('[data-addweek]');
+  if(addWeekBtn){
+    await addProtocolWeek(addWeekBtn.dataset.addweek);
     return;
   }
   const repeatSessionBtn = e.target.closest('[data-repeatsession]');
@@ -1599,7 +1644,6 @@ if(new URLSearchParams(location.search).get('tab')==='progresso') mobile.tab = '
 document.querySelectorAll('.mtab').forEach(btn=>{
   btn.addEventListener('click', ()=>{
     const tab = btn.dataset.mtab;
-    if(tab==='dieta'){ location.href = READONLY ? 'dieta.html?professor=1' : 'dieta.html'; return; }
     mobile.tab = tab;
     mobile.screen = 'list';
     mRender();
@@ -1664,23 +1708,32 @@ function mRenderSessionsList(){
     // treino (segunda, terça…) aparece ao abrir a semana.
     groupByProtocol(state.sessions).forEach(block=>{
       if(block.sessions.length===0) return;
+      const nWeeks = protocolWeekKeys(block.key).length;
       html += `<div class="mprotocol-head">
         <span>${escapeHtml(block.name)}</span>
-        <span class="mmono">${block.sessions.length} ${block.sessions.length===1?'treino':'treinos'}</span>
+        <span class="mmono">${nWeeks} ${nWeeks===1?'semana':'semanas'}</span>
       </div>`;
+      const ordem = protocolWeekKeys(block.key);
       block.months.forEach(month=>{
         if(block.months.length>1) html += `<div class="mgrouplabel">${month.label}</div>`;
         month.weeks.forEach(week=>{
           const end = addDaysISO(week.key, 6);
+          const n = ordem.indexOf(week.key)+1;
+          const feitas = week.sessions.filter(s=> s.exercises.some(e=> e.sets.some(x=> x.weight>0))).length;
           html += `<div class="mrow" data-mopen-week="${week.key}" data-mprot="${block.key}">
             <div class="mrow-main">
-              <div class="mrow-title">Semana de ${fmtDayMonth(week.key)} a ${fmtDayMonth(end)}</div>
-              <div class="mrow-sub">${week.sessions.length} ${week.sessions.length===1?'treino':'treinos'}</div>
+              <div class="mrow-title">Semana ${n} · ${fmtDayMonth(week.key)} – ${fmtDayMonth(end)}</div>
+              <div class="mrow-sub">${week.sessions.length} ${week.sessions.length===1?'treino':'treinos'}${feitas?` · ${feitas} iniciados`:''}</div>
             </div>
             <span class="mchev">›</span>
           </div>`;
         });
       });
+      if(!READONLY){
+        html += `<div style="padding:2px 16px 8px;">
+          <button class="mghostbtn" data-maction="addweek" data-prot="${block.key}" style="width:100%;">+ semana</button>
+        </div>`;
+      }
     });
   }
   mContent.innerHTML = html;
@@ -1690,11 +1743,11 @@ function mRenderWeekScreen(){
   const sessions = mWeekSessions();
   if(sessions.length===0){ mobile.screen='list'; return mRenderSessionsList(); }
   const end = addDaysISO(mobile.weekKey, 6);
-  mTitle.textContent = `${fmtDayMonth(mobile.weekKey)} – ${fmtDayMonth(end)}`;
+  const n = mobile.protKey ? protocolWeekKeys(mobile.protKey).indexOf(mobile.weekKey)+1 : 0;
+  mTitle.textContent = n>0 ? `Semana ${n}` : `${fmtDayMonth(mobile.weekKey)} – ${fmtDayMonth(end)}`;
   mBack.hidden = false;
   const prot = state.protocols.find(p=> p.id===mobile.protKey);
-  let html = '';
-  if(prot) html += `<div class="mgrouplabel" style="margin-top:14px;">${escapeHtml(prot.name)}</div>`;
+  let html = `<div class="mgrouplabel" style="margin-top:14px;">${prot?escapeHtml(prot.name)+' · ':''}${fmtDayMonth(mobile.weekKey)} – ${fmtDayMonth(end)}</div>`;
   html += `<div class="msection-title" style="margin-top:6px;">Divisão de treino</div>`;
   sessions.forEach(sess=>{
     const setCount = sess.exercises.reduce((n,e)=> n+e.sets.length,0);
@@ -1707,11 +1760,6 @@ function mRenderWeekScreen(){
       <span class="mchev">›</span>
     </div>`;
   });
-  if(!READONLY){
-    html += `<div style="padding:8px 16px 20px;">
-      <button class="mghostbtn" data-maction="repeatthisweek" style="width:100%;">⟳ repetir esta semana (+7 dias)</button>
-    </div>`;
-  }
   mContent.innerHTML = html;
 }
 
@@ -1849,8 +1897,10 @@ function mRenderImportScreen(){
       <option value="__new" ${stageProtocol.mode==='new'?'selected':''}>➕ Novo protocolo</option>
       ${state.protocols.map(p=> `<option value="${escapeAttr(p.id)}" ${stageProtocol.id===p.id?'selected':''}>${escapeHtml(p.name)}</option>`).join('')}
     </select>
-    ${stageProtocol.mode==='new' ? `<input type="text" class="minput" data-mstageprotname value="${escapeAttr(stageProtocol.name)}" placeholder="nome do protocolo" style="margin-bottom:12px;">` : ''}
-    <div class="mrow-sub" style="margin-bottom:12px;">Revise antes de adicionar:</div>`;
+    ${stageProtocol.mode==='new' ? `<input type="text" class="minput" data-mstageprotname value="${escapeAttr(stageProtocol.name)}" placeholder="nome do protocolo" style="margin-bottom:8px;">` : ''}
+    <div class="mrow-sub" style="margin-bottom:6px;">Duração (semanas)</div>
+    <input type="number" min="1" max="52" class="minput mmono" data-mstageweeks value="${stageProtocol.weeks}" style="margin-bottom:12px;">
+    <div class="mrow-sub" style="margin-bottom:12px;">Revise a divisão de treino — ela vai se repetir em todas as semanas:</div>`;
   stageGroups.forEach((group,gi)=>{
     html += `<div class="mcard">
       <input type="text" class="minput" data-mstagename="${group.id}" value="${escapeAttr(group.name)}" style="margin-bottom:8px;">
@@ -1956,12 +2006,8 @@ mContent.addEventListener('click', async e=>{
       if(session){ session.exercises.push({id:uid(), name:'Exercício', sets:[{reps:10,weight:0}]}); save(); renderAll(); }
       return;
     }
-    if(act==='repeatthisweek'){
-      if(mobile.weekKey && (await doRepeatWeek(mobile.weekKey))){
-        // Abre já a semana nova, mantendo a anterior no lugar.
-        mobile.weekKey = addDaysISO(mobile.weekKey, 7);
-        mRender();
-      }
+    if(act==='addweek'){
+      await addProtocolWeek(action.dataset.prot);
       return;
     }
     if(act==='repeatsession'){
@@ -2119,6 +2165,11 @@ mContent.addEventListener('input', e=>{
   if(e.target.matches('[data-mstageprotname]')){
     stageProtocol.name = e.target.value;
     stageProtocolName.value = e.target.value;
+    return;
+  }
+  if(e.target.matches('[data-mstageweeks]')){
+    stageProtocol.weeks = clampWeeks(e.target.value);
+    stageProtocolWeeks.value = stageProtocol.weeks;
     return;
   }
   if(e.target.matches('[data-msessname]')){
