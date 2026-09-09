@@ -390,9 +390,70 @@ footer{text-align:center;color:var(--text-faint);font-size:11px;margin-top:32px;
 
 .volume-chart{display:flex;align-items:flex-end;gap:5px;height:80px;padding:4px 16px 20px;position:relative;}
 .mempty-vol{padding:0 16px;color:var(--text-faint);font-size:11.5px;}
+.gate{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px;}
+.gate-box{width:100%;max-width:340px;text-align:center;}
+.gate-box .mark{margin:0 auto 16px;}
+.gate-box h1{margin-bottom:6px;}
+.gate-box .tagline{max-width:none;margin-bottom:24px;}
+.gate-code-input{
+  width:100%;background:var(--surface-2);border:1px solid var(--border);color:var(--text);
+  border-radius:var(--radius-sm);padding:14px;font-family:'Space Mono',monospace;font-size:22px;
+  text-align:center;text-transform:uppercase;letter-spacing:.2em;margin-bottom:12px;
+}
+.gate-code-input:focus{outline:2px solid var(--accent);outline-offset:1px;}
+.gate-error{color:var(--down);font-size:12.5px;margin-top:10px;min-height:16px;}
+
+.prof-toplink{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;}
+.student-row{
+  display:flex;align-items:center;justify-content:space-between;gap:12px;
+  background:var(--surface-2);border:1px solid var(--border);border-radius:var(--radius-md);
+  padding:14px 16px;margin-bottom:10px;
+}
+.student-row .sname{font-weight:700;font-size:14.5px;}
+.student-row .scode{font-family:'Space Mono',monospace;color:var(--accent);font-size:15px;letter-spacing:.1em;margin-top:2px;}
+.student-actions{display:flex;gap:6px;align-items:center;}
 </style>
 
-<div class="wrap">
+<div id="gateScreen" class="gate">
+  <div class="gate-box">
+    <span class="mark" style="width:56px;height:56px;">
+      <svg viewBox="0 0 24 24" fill="none" style="width:30px;height:30px;">
+        <path d="M4 12h2M18 12h2M7 9v6M17 9v6M7 12h10" stroke="#fff" stroke-width="2" stroke-linecap="round"/>
+      </svg>
+    </span>
+    <h1>Sobrecarga</h1>
+    <div class="tagline">Entre com o código que o seu professor te passou.</div>
+    <input type="text" id="gateCodeInput" class="gate-code-input" maxlength="10" placeholder="CÓDIGO" autocomplete="off" autocapitalize="characters">
+    <button class="primary" id="gateSubmitBtn" style="width:100%;justify-content:center;">Entrar</button>
+    <div class="gate-error" id="gateError"></div>
+  </div>
+</div>
+
+<div id="professorDashboard" class="wrap" hidden>
+  <div class="hero">
+    <div class="brand">
+      <span class="mark">
+        <svg viewBox="0 0 24 24" fill="none">
+          <path d="M4 12h2M18 12h2M7 9v6M17 9v6M7 12h10" stroke="#fff" stroke-width="2" stroke-linecap="round"/>
+        </svg>
+      </span>
+      <div>
+        <h1>Sobrecarga</h1>
+        <div class="tagline">Área do professor — gerencie os alunos e acompanhe o treino de cada um.</div>
+      </div>
+    </div>
+    <button class="ghost small" id="logoutBtnProf">sair</button>
+  </div>
+  <div class="card">
+    <div class="card-head">
+      <h2><span class="chip">👥</span>Alunos</h2>
+      <button class="small primary" id="addStudentBtn">+ novo aluno</button>
+    </div>
+    <div id="studentsList"></div>
+  </div>
+</div>
+
+<div class="wrap" id="appWrap" hidden>
   <div class="hero">
     <div class="brand">
       <span class="mark">
@@ -407,7 +468,7 @@ footer{text-align:center;color:var(--text-faint);font-size:11px;margin-top:32px;
     </div>
     <div style="display:flex;flex-direction:column;align-items:flex-end;gap:10px;">
       <span class="sync-badge" id="syncBadge" data-status="syncing">Sincronizando…</span>
-      <a href="?professor=1" target="_blank" class="hint" id="professorLink" style="text-decoration:underline;">Área do professor ↗</a>
+      <a href="#" id="professorLink" class="hint" style="text-decoration:underline;">‹ voltar aos alunos</a>
     </div>
   </div>
 
@@ -522,9 +583,124 @@ footer{text-align:center;color:var(--text-faint);font-size:11px;margin-top:32px;
 <script>
 pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
 
-const READONLY = new URLSearchParams(location.search).get('professor') === '1';
-const STORE_KEY = 'sobrecarga_v1';
-let state = loadLocal();
+/* ---------- Autenticação por código ----------
+   Sem e-mail/senha: o professor tem um código fixo e cria um código por aluno.
+   O código fica guardado neste aparelho para não pedir de novo toda hora. */
+const AUTH_KEY = 'sobrecarga_auth';
+let auth = loadAuth();          // {role:'student', studentId, code, name} | {role:'professor', code} | null
+let currentStudentId = null;    // aluno que o professor está vendo agora
+let READONLY = false;           // true quando o professor está vendo a ficha de alguém
+
+function loadAuth(){
+  try{ return JSON.parse(localStorage.getItem(AUTH_KEY)); }catch(e){ return null; }
+}
+function saveAuth(a){
+  auth = a;
+  try{ localStorage.setItem(AUTH_KEY, JSON.stringify(a)); }catch(e){}
+}
+function logout(){
+  auth = null; currentStudentId = null;
+  try{ localStorage.removeItem(AUTH_KEY); }catch(e){}
+  boot();
+}
+function activeStudentId(){ return auth && auth.role==='professor' ? currentStudentId : (auth && auth.studentId); }
+function apiHeaders(extra){
+  const h = Object.assign({}, extra);
+  if(auth && auth.role==='professor') h['x-professor-code'] = auth.code;
+  else if(auth) h['x-student-code'] = auth.code;
+  return h;
+}
+
+const gateScreen = document.getElementById('gateScreen');
+const gateCodeInput = document.getElementById('gateCodeInput');
+const gateError = document.getElementById('gateError');
+const professorDashboard = document.getElementById('professorDashboard');
+const appWrap = document.getElementById('appWrap');
+
+async function submitGateCode(){
+  const code = gateCodeInput.value.trim().toUpperCase();
+  if(!code) return;
+  gateError.textContent = '';
+  try{
+    const res = await fetch('/api/auth', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({code}) });
+    if(!res.ok){ gateError.textContent = 'Código inválido.'; return; }
+    const data = await res.json();
+    saveAuth(data);
+    boot();
+  }catch(e){
+    gateError.textContent = 'Não consegui conectar. Tente de novo.';
+  }
+}
+document.getElementById('gateSubmitBtn').addEventListener('click', submitGateCode);
+gateCodeInput.addEventListener('keydown', e=>{ if(e.key==='Enter') submitGateCode(); });
+
+document.getElementById('logoutBtnProf').addEventListener('click', logout);
+document.getElementById('professorLink').addEventListener('click', e=>{
+  e.preventDefault();
+  if(auth.role==='professor'){ currentStudentId = null; boot(); }
+  else{ logout(); }
+});
+
+/* ---------- Painel do professor: gerenciar alunos ---------- */
+const studentsList = document.getElementById('studentsList');
+async function loadStudents(){
+  try{
+    const res = await fetch('/api/students', { headers: apiHeaders() });
+    if(!res.ok) throw new Error('bad status');
+    return await res.json();
+  }catch(e){ return []; }
+}
+async function renderProfessorDashboard(){
+  studentsList.innerHTML = `<div class="empty">Carregando…</div>`;
+  const students = await loadStudents();
+  if(students.length===0){
+    studentsList.innerHTML = `<div class="empty"><strong>Nenhum aluno ainda</strong>Adicione o primeiro aluno para gerar o código dele.</div>`;
+    return;
+  }
+  studentsList.innerHTML = students.map(s=> `
+    <div class="student-row">
+      <div>
+        <div class="sname">${escapeHtml(s.name)}</div>
+        <div class="scode">${escapeHtml(s.code)}</div>
+      </div>
+      <div class="student-actions">
+        <button class="small" data-viewstudent="${s.id}">Ver treino</button>
+        <button class="ghost small" data-renamestudent="${s.id}" data-name="${escapeAttr(s.name)}" title="Renomear">✎</button>
+        <button class="ghost small" data-delstudent="${s.id}" data-name="${escapeAttr(s.name)}" title="Remover aluno">✕</button>
+      </div>
+    </div>`).join('');
+}
+document.getElementById('addStudentBtn').addEventListener('click', async ()=>{
+  const name = prompt('Nome do novo aluno:');
+  if(!name || !name.trim()) return;
+  const res = await fetch('/api/students', { method:'POST', headers: apiHeaders({'Content-Type':'application/json'}), body: JSON.stringify({name: name.trim()}) });
+  if(!res.ok){ alert('Não consegui criar o aluno.'); return; }
+  const student = await res.json();
+  await renderProfessorDashboard();
+  alert(`Aluno "${student.name}" criado!\n\nCódigo de acesso: ${student.code}\n\nPasse esse código para ele entrar no site.`);
+});
+studentsList.addEventListener('click', async e=>{
+  const view = e.target.closest('[data-viewstudent]');
+  if(view){ currentStudentId = view.dataset.viewstudent; boot(); return; }
+  const rename = e.target.closest('[data-renamestudent]');
+  if(rename){
+    const novo = prompt('Novo nome do aluno:', rename.dataset.name);
+    if(!novo || !novo.trim()) return;
+    await fetch(`/api/students/${rename.dataset.renamestudent}`, { method:'PUT', headers: apiHeaders({'Content-Type':'application/json'}), body: JSON.stringify({name: novo.trim()}) });
+    renderProfessorDashboard();
+    return;
+  }
+  const del = e.target.closest('[data-delstudent]');
+  if(del){
+    if(!(await confirmDialog(`Remover "${del.dataset.name}" e apagar todos os treinos dele? Isso não pode ser desfeito.`))) return;
+    await fetch(`/api/students/${del.dataset.delstudent}`, { method:'DELETE', headers: apiHeaders() });
+    renderProfessorDashboard();
+  }
+});
+
+/* ---------- Estado do treino (por aluno) ---------- */
+let STORE_KEY = 'sobrecarga_v1';
+let state = { sessions: [], protocols: [] };
 let stageRows = [];
 let syncTimer = null;
 const syncBadge = () => document.getElementById('syncBadge');
@@ -550,9 +726,11 @@ function setSyncStatus(status){
   el.textContent = status==='synced' ? 'Sincronizado' : status==='syncing' ? 'Sincronizando…' : status==='offline' ? 'Só neste aparelho' : 'Erro ao sincronizar';
 }
 async function loadRemote(){
+  const sid = activeStudentId();
+  if(!sid) return;
   try{
     setSyncStatus('syncing');
-    const res = await fetch('/api/state');
+    const res = await fetch(`/api/state/${sid}`, { headers: apiHeaders() });
     if(!res.ok) throw new Error('bad status');
     const data = await res.json();
     if(data && Array.isArray(data.sessions)){
@@ -573,11 +751,13 @@ function save(){
   syncTimer = setTimeout(syncRemote, 500);
 }
 async function syncRemote(){
+  const sid = activeStudentId();
+  if(!sid) return;
   try{
     setSyncStatus('syncing');
-    const res = await fetch('/api/state', {
+    const res = await fetch(`/api/state/${sid}`, {
       method: 'PUT',
-      headers: {'Content-Type':'application/json'},
+      headers: apiHeaders({'Content-Type':'application/json'}),
       body: JSON.stringify(state)
     });
     if(!res.ok) throw new Error('bad status');
@@ -1415,9 +1595,9 @@ function renderWeekGroups(container, weeks, weekNumber){
 }
 
 /* ---------- Feedback do professor ----------
-   O link ?professor=1 já deixa o professor ver tudo, somente leitura. O único
-   campo que ele PODE escrever é este: um comentário por sessão, visível para
-   o aluno. Sem contas — o professor escreve pelo mesmo link de sempre. */
+   O login de professor já deixa ver a ficha de qualquer aluno, somente
+   leitura. O único campo que ele PODE escrever é este: um comentário por
+   sessão, visível para o aluno. */
 function feedbackBlockHtml(session){
   const fb = session.feedback || '';
   if(READONLY){
@@ -1938,7 +2118,6 @@ const mContent = document.getElementById('mContent');
 const mTitle = document.getElementById('mTitle');
 const mBack = document.getElementById('mBack');
 const mProfessorBar = document.getElementById('mProfessorBar');
-if(READONLY && mProfessorBar) mProfessorBar.hidden = false;
 if(new URLSearchParams(location.search).get('tab')==='progresso') mobile.tab = 'progresso';
 
 document.querySelectorAll('.mtab').forEach(btn=>{
@@ -2561,19 +2740,52 @@ function renderAll(){
   mRender();
 }
 
-if(READONLY){
-  document.getElementById('importCard').style.display = 'none';
-  document.getElementById('addSessionBtn').style.display = 'none';
-  document.getElementById('addProtocolBtn').style.display = 'none';
-  document.getElementById('professorLink').style.display = 'none';
+function applyReadonlyUI(){
+  document.getElementById('importCard').style.display = READONLY ? 'none' : '';
+  document.getElementById('addSessionBtn').style.display = READONLY ? 'none' : '';
+  document.getElementById('addProtocolBtn').style.display = READONLY ? 'none' : '';
   const banner = document.getElementById('readonlyBanner');
-  banner.style.display = 'block';
-  banner.innerHTML = '<div class="card" style="border-color:var(--accent);padding:12px 16px;margin-bottom:22px;">👁 <strong style="color:var(--text);">Área do professor</strong> — modo somente leitura, nada pode ser editado ou excluído aqui, exceto o campo de feedback em cada sessão.</div>';
+  if(READONLY){
+    banner.style.display = 'block';
+    banner.innerHTML = '<div class="card" style="border-color:var(--accent);padding:12px 16px;margin-bottom:22px;">👁 <strong style="color:var(--text);">Área do professor</strong> — modo somente leitura, nada pode ser editado ou excluído aqui, exceto o campo de feedback em cada sessão.</div>';
+  }else{
+    banner.style.display = 'none';
+  }
+  document.getElementById('professorLink').textContent = READONLY ? '‹ voltar aos alunos' : 'sair';
+  mProfessorBar.hidden = !READONLY;
 }
 
-if(ensureProtocols()) save();
-renderAll();
-loadRemote();
+/* ---------- Decide o que mostrar: login, painel do professor ou o app ---------- */
+function boot(){
+  gateScreen.hidden = !!auth;
+  if(!auth){
+    professorDashboard.hidden = true;
+    appWrap.hidden = true;
+    mShell.hidden = true;
+    gateCodeInput.value = '';
+    gateError.textContent = '';
+    setTimeout(()=> gateCodeInput.focus(), 50);
+    return;
+  }
+  if(auth.role==='professor' && !currentStudentId){
+    professorDashboard.hidden = false;
+    appWrap.hidden = true;
+    mShell.hidden = true;
+    renderProfessorDashboard();
+    return;
+  }
+  professorDashboard.hidden = true;
+  appWrap.hidden = false;
+  mShell.hidden = false;
+  READONLY = (auth.role==='professor');
+  STORE_KEY = 'sobrecarga_v1_' + activeStudentId();
+  state = loadLocal();
+  applyReadonlyUI();
+  if(ensureProtocols()) save();
+  renderAll();
+  loadRemote();
+}
+boot();
 
 /* ---------- Exportar PDF ---------- */
 function fmtW(w){ return w>0 ? (w+'kg') : '—'; }
