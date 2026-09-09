@@ -149,6 +149,20 @@ button:disabled{opacity:.4;cursor:not-allowed;}
 .row-fields{display:grid;grid-template-columns:1fr 140px 100px;gap:10px;margin-bottom:14px;}
 @media (max-width:560px){.row-fields{grid-template-columns:1fr 1fr;}}
 
+.feedback-block{
+  background:var(--surface-2);border:1px solid var(--border);border-left:3px solid var(--up);
+  border-radius:var(--radius-sm);padding:10px 12px;margin-bottom:14px;
+}
+.feedback-block .feedback-text{font-size:13px;color:var(--text);margin-top:4px;white-space:pre-wrap;}
+.feedback-block.feedback-editing{border-left-color:var(--accent);}
+.feedback-block textarea{
+  width:100%;background:var(--surface);border:1px solid var(--border);color:var(--text);
+  border-radius:var(--radius-sm);padding:8px 9px;font-family:inherit;font-size:13px;margin-top:6px;
+  resize:vertical;min-height:44px;
+}
+.feedback-block textarea:focus{outline:2px solid var(--accent);outline-offset:1px;}
+.feedback-flag{color:var(--up);font-size:12px;}
+
 /* ---------- Dashboard ---------- */
 .dash{display:grid;grid-template-columns:1.3fr 1fr;gap:14px;}
 @media (max-width:760px){.dash{grid-template-columns:1fr;}}
@@ -1386,7 +1400,7 @@ function renderWeekGroups(container, weeks, weekNumber){
       div.className = 'session' + (openSessionId===session.id ? ' open':'');
       div.innerHTML = `
         <div class="session-head" data-open="${session.id}">
-          <span class="session-name">${escapeHtml(session.name)}</span>
+          <span class="session-name">${escapeHtml(session.name)} ${session.feedback?'<span class="feedback-flag" title="Tem feedback do professor">💬</span>':''}</span>
           <div style="display:flex;align-items:center;gap:4px;">
             ${READONLY ? '' : `<button class="ghost small repeat" data-repeatsession="${session.id}" title="Repetir esta sessão daqui a 7 dias">⟳</button>`}
             ${READONLY ? '' : `<button class="ghost small" data-quickdel="${session.id}" title="Excluir sessão">✕</button>`}
@@ -1400,6 +1414,31 @@ function renderWeekGroups(container, weeks, weekNumber){
   });
 }
 
+/* ---------- Feedback do professor ----------
+   O link ?professor=1 já deixa o professor ver tudo, somente leitura. O único
+   campo que ele PODE escrever é este: um comentário por sessão, visível para
+   o aluno. Sem contas — o professor escreve pelo mesmo link de sempre. */
+function feedbackBlockHtml(session){
+  const fb = session.feedback || '';
+  if(READONLY){
+    return `<div class="feedback-block feedback-editing">
+      <label class="hint">💬 Feedback para o aluno</label>
+      <textarea data-feedback rows="2" placeholder="Deixe um comentário sobre esta sessão...">${escapeHtml(fb)}</textarea>
+    </div>`;
+  }
+  if(!fb) return '';
+  return `<div class="feedback-block">
+    <div class="hint">💬 Feedback do professor</div>
+    <div class="feedback-text">${escapeHtml(fb)}</div>
+  </div>`;
+}
+function wireFeedbackBlock(container, session){
+  if(!READONLY) return;
+  const ta = container.querySelector('[data-feedback]');
+  if(!ta) return;
+  ta.addEventListener('input', ()=>{ session.feedback = ta.value; save(); });
+}
+
 function renderSessionBody(container, session){
   const ro = READONLY;
   const roAttr = ro ? 'disabled' : '';
@@ -1409,8 +1448,11 @@ function renderSessionBody(container, session){
       <div><label class="hint">Data</label><input type="date" data-sfield="date" value="${session.date}" ${roAttr}></div>
       <div style="display:flex;align-items:flex-end;">${ro?'':'<button class="ghost small" data-delsession="1">✕ excluir sessão</button>'}</div>
     </div>
+    ${feedbackBlockHtml(session)}
     <div id="exList-${session.id}"></div>
     ${ro?'':'<button class="small" data-addex="1">+ exercício</button>'}`;
+
+  wireFeedbackBlock(container, session);
 
   if(!ro){
     container.querySelectorAll('[data-sfield]').forEach(inp=>{
@@ -2024,13 +2066,28 @@ function mRenderWeekScreen(){
     const feitas = sess.exercises.flatMap(e=> e.sets).filter(s=> s.weight>0).length;
     html += `<div class="mrow" data-mopen-session="${sess.id}">
       <div class="mrow-main">
-        <div class="mrow-title">${escapeHtml(sess.name)}</div>
+        <div class="mrow-title">${escapeHtml(sess.name)} ${sess.feedback?'<span class="feedback-flag">💬</span>':''}</div>
         <div class="mrow-sub">${fmtDate(sess.date)} · ${sess.exercises.length} exerc. · ${feitas}/${setCount} séries feitas</div>
       </div>
       <span class="mchev">›</span>
     </div>`;
   });
   mContent.innerHTML = html;
+}
+
+function mFeedbackBlockHtml(session){
+  const fb = session.feedback || '';
+  if(READONLY){
+    return `<div class="feedback-block feedback-editing">
+      <label class="hint">💬 Feedback para o aluno</label>
+      <textarea data-mfeedback rows="2" placeholder="Deixe um comentário sobre esta sessão...">${escapeHtml(fb)}</textarea>
+    </div>`;
+  }
+  if(!fb) return '';
+  return `<div class="feedback-block">
+    <div class="hint">💬 Feedback do professor</div>
+    <div class="feedback-text">${escapeHtml(fb)}</div>
+  </div>`;
 }
 
 function mRenderSessionScreen(){
@@ -2047,6 +2104,7 @@ function mRenderSessionScreen(){
       <button class="mghostbtn mdanger" data-mdel-session="${session.id}">✕ excluir sessão</button>
     </div>`}
   </div>
+  <div style="padding:0 16px;">${mFeedbackBlockHtml(session)}</div>
   <div class="msection-title">Exercícios</div>`;
   session.exercises.forEach(ex=>{
     const setCount = ex.sets.length;
@@ -2466,6 +2524,11 @@ mContent.addEventListener('input', e=>{
     stageProtocolWeeks.value = stageProtocol.weeks;
     return;
   }
+  if(e.target.matches('[data-mfeedback]')){
+    const session = state.sessions.find(s=> s.id===mobile.sessionId);
+    if(session){ session.feedback = e.target.value; save(); }
+    return;
+  }
   if(e.target.matches('[data-msessname]')){
     const session = state.sessions.find(s=> s.id===mobile.sessionId);
     if(session){ session.name = e.target.value; save(); }
@@ -2505,7 +2568,7 @@ if(READONLY){
   document.getElementById('professorLink').style.display = 'none';
   const banner = document.getElementById('readonlyBanner');
   banner.style.display = 'block';
-  banner.innerHTML = '<div class="card" style="border-color:var(--accent);padding:12px 16px;margin-bottom:22px;">👁 <strong style="color:var(--text);">Área do professor</strong> — modo somente leitura, nada pode ser editado ou excluído aqui.</div>';
+  banner.innerHTML = '<div class="card" style="border-color:var(--accent);padding:12px 16px;margin-bottom:22px;">👁 <strong style="color:var(--text);">Área do professor</strong> — modo somente leitura, nada pode ser editado ou excluído aqui, exceto o campo de feedback em cada sessão.</div>';
 }
 
 if(ensureProtocols()) save();
