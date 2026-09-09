@@ -3,25 +3,26 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Stencil+Display:wght@700;900&family=Big+Shoulders+Display:wght@600;700;800&family=Archivo:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Manrope:wght@500;600;700;800;900&family=JetBrains+Mono:wght@500;600;700;800&display=swap">
 <style>
 :root{
-  --bg:#18191a;
-  --surface:#212223;
-  --surface-2:#2a2b2b;
-  --surface-3:#343534;
-  --border:#3f4041;
-  --text:#eae7e0;
-  --text-dim:#a6a29a;
-  --text-faint:#726e65;
-  --accent:#f4bf1f;
-  --accent-strong:#f4bf1f;
-  --accent-ink:#181510;
-  --up:#7cb342;
-  --down:#e0654a;
-  --hazard-a:var(--accent);
-  --hazard-b:#18191a;
-  --shadow: 0 1px 2px rgba(0,0,0,.45), 0 14px 32px -16px rgba(0,0,0,.65);
+  --bg:#0b0c11;
+  --surface:#15161d;
+  --surface-2:#1c1e28;
+  --surface-3:#262835;
+  --border:#2a2c39;
+  --text:#f3f4f8;
+  --text-dim:#9a9db0;
+  --text-faint:#5c5f70;
+  --accent:#7c5cff;
+  --accent-2:#00e0a4;
+  --accent-ink:#ffffff;
+  --up:#00e0a4;
+  --down:#ff5470;
+  --shadow: 0 2px 10px rgba(0,0,0,.35), 0 24px 48px -28px rgba(124,92,255,.35);
+  --radius-lg:22px;
+  --radius-md:16px;
+  --radius-sm:11px;
   color-scheme: dark;
 }
 *{box-sizing:border-box;}
@@ -30,76 +31,71 @@ body{
   margin:0;
   background:var(--bg);
   color:var(--text);
-  font-family:'Archivo',system-ui,-apple-system,sans-serif;
+  font-family:'Manrope',system-ui,-apple-system,sans-serif;
   -webkit-font-smoothing:antialiased;
 }
-.hazard{
-  height:6px;
-  background:repeating-linear-gradient(45deg, var(--hazard-a) 0 10px, var(--hazard-b) 10px 20px);
-}
-.wrap{max-width:1040px;margin:0 auto;padding:0 20px 80px;}
+.hazard{display:none;}
+.wrap{max-width:1080px;margin:0 auto;padding:24px 20px 90px;}
 .hero{
-  display:flex;align-items:flex-end;justify-content:space-between;gap:16px;
-  margin:0 -20px 28px;padding:22px 20px 20px;flex-wrap:wrap;
-  background:var(--surface);border-bottom:1px solid var(--border);
+  display:flex;align-items:center;justify-content:space-between;gap:16px;
+  margin-bottom:22px;padding:4px 2px;flex-wrap:wrap;
 }
 .brand{display:flex;align-items:center;gap:12px;}
-.mark{width:40px;height:40px;flex:none;}
+.mark{width:42px;height:42px;flex:none;border-radius:13px;background:linear-gradient(135deg, var(--accent), #4b3bd6);display:flex;align-items:center;justify-content:center;box-shadow:0 8px 20px -8px rgba(124,92,255,.7);}
+.mark svg{width:24px;height:24px;}
 h1{
-  font-family:'Big Shoulders Stencil Display',system-ui,sans-serif;
+  font-family:'Manrope',sans-serif;
   font-weight:900;
-  font-size:46px;
-  letter-spacing:.5px;
+  font-size:26px;
+  letter-spacing:-.02em;
   margin:0;
-  line-height:.85;
+  line-height:1;
 }
-.tagline{color:var(--text-dim);font-size:13.5px;margin-top:4px;max-width:34ch;}
-.stat-row{display:flex;gap:22px;flex-wrap:wrap;}
+.tagline{color:var(--text-dim);font-size:12.5px;margin-top:3px;max-width:34ch;}
+.stat-row{display:flex;gap:18px;flex-wrap:wrap;}
 .sync-badge{
   font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;
-  padding:4px 10px 4px 8px;border-radius:3px;border:1px solid var(--border);color:var(--text-faint);
-  display:inline-flex;align-items:center;gap:6px;font-family:'IBM Plex Mono',monospace;
+  padding:5px 11px 5px 9px;border-radius:999px;border:1px solid var(--border);color:var(--text-faint);
+  display:inline-flex;align-items:center;gap:6px;font-family:'JetBrains Mono',monospace;background:var(--surface);
 }
 .sync-badge::before{content:'';width:7px;height:7px;border-radius:50%;background:currentColor;flex:none;}
-.sync-badge[data-status="synced"]{color:var(--up);border-color:var(--up);}
-.sync-badge[data-status="offline"]{color:var(--down);border-color:var(--down);}
+.sync-badge[data-status="synced"]{color:var(--up);border-color:transparent;background:rgba(0,224,164,.12);}
+.sync-badge[data-status="offline"]{color:var(--down);border-color:transparent;background:rgba(255,84,112,.12);}
 .sync-badge[data-status="syncing"]{color:var(--text-dim);}
 .stat{text-align:right;}
-.stat .n{font-family:'IBM Plex Mono',monospace;font-size:22px;font-weight:700;font-variant-numeric:tabular-nums;}
-.stat .l{font-size:10px;text-transform:uppercase;letter-spacing:.09em;color:var(--text-faint);font-weight:600;}
+.stat .n{font-family:'JetBrains Mono',monospace;font-size:20px;font-weight:700;font-variant-numeric:tabular-nums;}
+.stat .l{font-size:9.5px;text-transform:uppercase;letter-spacing:.09em;color:var(--text-faint);font-weight:700;}
 
 .card{
   background:var(--surface);
   border:1px solid var(--border);
-  border-radius:3px;
+  border-radius:var(--radius-lg);
   box-shadow:var(--shadow);
   padding:22px;
-  margin-bottom:22px;
+  margin-bottom:18px;
   position:relative;
 }
 .card-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:16px;flex-wrap:wrap;}
 .card-head h2{
-  font-family:'Big Shoulders Display',sans-serif;
+  font-family:'Manrope',sans-serif;
   font-weight:800;
-  font-size:22px;
-  letter-spacing:.3px;
-  text-transform:uppercase;
+  font-size:16px;
+  letter-spacing:-.01em;
   margin:0;
   display:flex;align-items:center;gap:10px;
 }
 .chip{
   display:inline-flex;align-items:center;justify-content:center;
-  background:var(--accent);color:var(--accent-ink);
-  width:24px;height:24px;border-radius:3px;
-  font-family:'IBM Plex Mono',monospace;font-size:11.5px;font-weight:700;
-  box-shadow:1px 1px 0 var(--border);
+  background:linear-gradient(135deg, var(--accent), #4b3bd6);color:var(--accent-ink);
+  width:26px;height:26px;border-radius:9px;
+  font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:700;
 }
 .hint{font-size:12.5px;color:var(--text-faint);}
 
 .drop{
   display:block;
   border:2px dashed var(--border);
-  border-radius:3px;
+  border-radius:var(--radius-md);
   padding:26px 18px;
   text-align:center;
   color:var(--text-dim);
@@ -107,67 +103,84 @@ h1{
   cursor:pointer;
   transition:border-color .15s, background .15s;
 }
-.drop:hover, .drop.drag{border-color:var(--accent-strong);background:var(--surface-2);}
+.drop:hover, .drop.drag{border-color:var(--accent);background:var(--surface-2);}
 .drop strong{color:var(--text);}
 .drop input{display:none;}
 
 table{width:100%;border-collapse:collapse;font-size:13.5px;}
 th{
   text-align:left;font-size:10.5px;text-transform:uppercase;letter-spacing:.07em;
-  color:var(--text-faint);font-weight:600;padding:0 8px 8px;border-bottom:1px solid var(--border);
+  color:var(--text-faint);font-weight:700;padding:0 8px 8px;border-bottom:1px solid var(--border);
 }
-td{padding:6px 8px;border-bottom:1px solid var(--surface-2);vertical-align:middle;}
+td{padding:8px 8px;border-bottom:1px solid var(--surface-2);vertical-align:middle;}
 tr:last-child td{border-bottom:none;}
-.num{font-variant-numeric:tabular-nums;font-family:'IBM Plex Mono',monospace;}
+.num{font-variant-numeric:tabular-nums;font-family:'JetBrains Mono',monospace;}
 .tbl-scroll{overflow-x:auto;}
 
 input[type=text], input[type=number], input[type=date]{
   width:100%;background:var(--surface-2);border:1px solid var(--border);color:var(--text);
-  border-radius:3px;padding:6px 8px;font-family:inherit;font-size:13px;
+  border-radius:var(--radius-sm);padding:7px 9px;font-family:inherit;font-size:13px;
 }
-input[type=number]{font-family:'IBM Plex Mono',monospace;text-align:right;}
+input[type=number]{font-family:'JetBrains Mono',monospace;text-align:right;}
 input:focus, .drop:focus-visible, button:focus-visible{
-  outline:2px solid var(--accent-strong);outline-offset:1px;
+  outline:2px solid var(--accent);outline-offset:1px;
 }
 
 button{
-  font-family:'Archivo',sans-serif;font-weight:700;font-size:12px;border-radius:3px;
-  text-transform:uppercase;letter-spacing:.04em;
+  font-family:'Manrope',sans-serif;font-weight:700;font-size:12.5px;border-radius:var(--radius-sm);
   border:1px solid var(--border);background:var(--surface-2);color:var(--text);
-  padding:7px 12px;cursor:pointer;transition:transform .08s, background .12s;
+  padding:8px 14px;cursor:pointer;transition:transform .08s, background .12s;
   display:inline-flex;align-items:center;gap:6px;
 }
 button:hover{background:var(--surface-3);}
-button:active{transform:scale(.97);}
-button.primary{background:var(--accent);color:var(--accent-ink);border-color:transparent;font-weight:800;}
+button:active{transform:scale(.96);}
+button.primary{background:linear-gradient(135deg, var(--accent), #4b3bd6);color:#fff;border-color:transparent;font-weight:800;box-shadow:0 8px 20px -10px rgba(124,92,255,.8);}
 button.primary:hover{filter:brightness(1.08);}
-button.ghost{background:transparent;border-color:transparent;color:var(--text-faint);padding:5px 7px;text-transform:none;letter-spacing:0;font-weight:600;}
+button.ghost{background:transparent;border-color:transparent;color:var(--text-faint);padding:5px 7px;font-weight:600;}
 button.ghost:hover{color:var(--down);background:var(--surface-2);}
 button.ghost.repeat:hover{color:var(--accent);}
-button.small{padding:4px 9px;font-size:11px;}
+button.small{padding:5px 11px;font-size:11.5px;}
 button:disabled{opacity:.4;cursor:not-allowed;}
 
 .row-fields{display:grid;grid-template-columns:1fr 140px 100px;gap:10px;margin-bottom:14px;}
 @media (max-width:560px){.row-fields{grid-template-columns:1fr 1fr;}}
 
-.protocol-group{border:1px solid var(--border);border-left:3px solid var(--accent);border-radius:3px;margin-bottom:16px;overflow:hidden;background:var(--surface);}
+/* ---------- Dashboard ---------- */
+.dash{display:grid;grid-template-columns:1.3fr 1fr;gap:14px;}
+@media (max-width:760px){.dash{grid-template-columns:1fr;}}
+.dash-cta{
+  background:linear-gradient(135deg, rgba(124,92,255,.18), rgba(0,224,164,.08));
+  border:1px solid var(--border);border-radius:var(--radius-lg);padding:20px;
+  display:flex;flex-direction:column;gap:10px;justify-content:space-between;
+}
+.dash-cta .k{font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--text-faint);font-weight:700;}
+.dash-cta .v{font-size:19px;font-weight:800;letter-spacing:-.01em;}
+.dash-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;}
+.dash-stat{
+  background:var(--surface-2);border:1px solid var(--border);border-radius:var(--radius-md);
+  padding:14px 12px;text-align:center;
+}
+.dash-stat .n{font-family:'JetBrains Mono',monospace;font-size:22px;font-weight:800;}
+.dash-stat .l{font-size:10px;color:var(--text-faint);text-transform:uppercase;letter-spacing:.06em;font-weight:700;margin-top:2px;}
+
+/* ---------- Protocolos / sessões ---------- */
+.protocol-group{border:1px solid var(--border);border-radius:var(--radius-lg);margin-bottom:14px;overflow:hidden;background:var(--surface-2);}
 .protocol-head{
-  display:flex;align-items:center;gap:10px;padding:13px 15px;cursor:pointer;background:var(--surface-2);
+  display:flex;align-items:center;gap:10px;padding:14px 16px;cursor:pointer;background:var(--surface-2);
 }
 .protocol-head:hover{background:var(--surface-3);}
 .protocol-group.open .protocol-head .chev{transform:rotate(90deg);}
 .protocol-name{
-  flex:1;font-family:'Big Shoulders Display',sans-serif;font-weight:800;font-size:19px;
-  letter-spacing:.3px;text-transform:uppercase;background:transparent;border:none;color:var(--text);padding:2px 0;
+  flex:1;font-family:'Manrope',sans-serif;font-weight:800;font-size:15px;
+  letter-spacing:-.01em;background:transparent;border:none;color:var(--text);padding:2px 0;
 }
-.protocol-name:focus{background:var(--bg);border-radius:3px;padding:2px 6px;}
+.protocol-name:focus{background:var(--bg);border-radius:var(--radius-sm);padding:2px 6px;}
 .protocol-body{padding:12px;display:none;}
 .protocol-group.open .protocol-body{display:block;}
-.month-group{border:1px solid var(--border);border-radius:3px;margin-bottom:12px;overflow:hidden;background:var(--surface-2);}
+.month-group{border:1px solid var(--border);border-radius:var(--radius-md);margin-bottom:12px;overflow:hidden;background:var(--surface);}
 .month-head{
   display:flex;align-items:center;gap:9px;padding:12px 15px;cursor:pointer;
-  font-family:'Big Shoulders Display',sans-serif;font-weight:700;font-size:18px;
-  letter-spacing:.3px;text-transform:uppercase;
+  font-family:'Manrope',sans-serif;font-weight:700;font-size:14px;
 }
 .month-head:hover{background:var(--surface-3);}
 .month-group.open .month-head .chev{transform:rotate(90deg);}
@@ -176,50 +189,63 @@ button:disabled{opacity:.4;cursor:not-allowed;}
 .week-group:first-child{border-top:none;margin-top:0;padding-top:0;}
 .week-head{
   display:flex;align-items:center;gap:8px;padding:8px 6px;cursor:pointer;
-  font-size:12.5px;font-weight:600;color:var(--text-dim);text-transform:uppercase;letter-spacing:.05em;
+  font-size:12px;font-weight:700;color:var(--text-dim);text-transform:uppercase;letter-spacing:.04em;
 }
 .week-head:hover{color:var(--text);}
 .week-group.open .week-head .chev{transform:rotate(90deg);}
 .week-body{padding:2px 0 4px;}
 .group-label{flex:1;}
-.group-meta{font-size:11px;color:var(--text-faint);font-weight:500;text-transform:none;letter-spacing:0;font-family:'IBM Plex Mono',monospace;}
+.group-meta{font-size:11px;color:var(--text-faint);font-weight:600;font-family:'JetBrains Mono',monospace;}
 .month-head .chev, .week-head .chev{color:var(--text-faint);transition:transform .15s;font-size:13px;}
 
-.session{border:1px solid var(--border);border-radius:3px;margin-bottom:10px;overflow:hidden;background:var(--surface);}
+.session{border:1px solid var(--border);border-radius:var(--radius-md);margin-bottom:10px;overflow:hidden;background:var(--surface);}
 .session-head{
   display:flex;align-items:center;justify-content:space-between;gap:10px;
   padding:13px 16px;cursor:pointer;background:var(--surface-2);
 }
 .session-head:hover{background:var(--surface-3);}
-.session-name{color:var(--text);font-size:14px;font-weight:600;}
+.session-name{color:var(--text);font-size:14px;font-weight:700;}
 .session-body{padding:14px 16px 16px;display:none;}
 .session.open .session-body{display:block;}
 .session.open .chev{transform:rotate(90deg);}
 .chev{transition:transform .15s;color:var(--text-faint);}
 
-.ex-block{margin-bottom:14px;}
-.ex-head{display:flex;align-items:center;gap:10px;margin-bottom:6px;}
-.ex-name-input{font-weight:600;font-size:14px;max-width:260px;background:transparent;border:none;padding:2px 0;}
-.ex-name-input:focus{background:var(--surface-2);border-radius:6px;padding:2px 6px;}
-.ex-target{flex:1;font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--accent);white-space:nowrap;}
+.ex-block{margin-bottom:14px;background:var(--surface-2);border:1px solid var(--border);border-radius:var(--radius-md);padding:12px;}
+.ex-head{display:flex;align-items:center;gap:10px;margin-bottom:6px;flex-wrap:wrap;}
+.ex-name-input{font-weight:700;font-size:14px;max-width:260px;background:transparent;border:none;padding:2px 0;}
+.ex-name-input:focus{background:var(--surface-3);border-radius:var(--radius-sm);padding:2px 6px;}
+.ex-target{flex:1;font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--accent);white-space:nowrap;}
+.pr-badge{
+  display:inline-flex;align-items:center;gap:4px;background:rgba(0,224,164,.14);color:var(--up);
+  border-radius:999px;padding:3px 9px;font-size:10.5px;font-weight:800;font-family:'JetBrains Mono',monospace;white-space:nowrap;
+}
 .set-row{display:grid;grid-template-columns:26px 84px 1fr 1fr 30px;gap:8px;align-items:center;margin-bottom:5px;}
-.set-target{font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--accent);text-align:center;}
-.set-idx{font-family:'IBM Plex Mono',monospace;font-size:11.5px;color:var(--text-faint);text-align:center;}
+.set-target{font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--accent);text-align:center;}
+.set-idx{font-family:'JetBrains Mono',monospace;font-size:11.5px;color:var(--text-faint);text-align:center;}
 .set-add{margin-top:2px;}
 
-.trend{display:inline-flex;align-items:center;gap:5px;font-weight:600;font-variant-numeric:tabular-nums;}
+.trend{display:inline-flex;align-items:center;gap:5px;font-weight:700;font-variant-numeric:tabular-nums;}
 .trend.up{color:var(--up);}
 .trend.down{color:var(--down);}
 .trend.flat{color:var(--text-faint);}
 .spark{display:block;}
 .ex-toggle{
   background:transparent;border:1px solid var(--border);color:var(--text-faint);
-  padding:2px 8px;font-size:10.5px;border-radius:3px;margin-left:8px;
-  text-transform:none;letter-spacing:0;font-weight:600;
+  padding:3px 9px;font-size:10.5px;border-radius:999px;margin-left:8px;font-weight:700;
 }
 .ex-toggle:hover{color:var(--text);border-color:var(--text-faint);}
 tr.sub-row td{background:var(--surface-2);font-size:12.5px;color:var(--text-dim);}
 tr.sub-row td:first-child{padding-left:22px;color:var(--text-faint);}
+
+/* ---------- Progresso: cards ---------- */
+.prog-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:12px;}
+.prog-card{background:var(--surface-2);border:1px solid var(--border);border-radius:var(--radius-md);padding:14px;}
+.prog-card .pc-name{font-weight:700;font-size:13.5px;margin-bottom:2px;}
+.prog-card .pc-rm{font-family:'JetBrains Mono',monospace;font-size:20px;font-weight:800;}
+.prog-card .pc-sets{margin-top:8px;border-top:1px solid var(--border);padding-top:8px;}
+.volume-chart{display:flex;align-items:flex-end;gap:6px;height:90px;padding:4px 2px;}
+.volume-bar{flex:1;background:linear-gradient(180deg, var(--accent), #4b3bd6);border-radius:6px 6px 2px 2px;min-height:3px;position:relative;}
+.volume-bar .vb-label{position:absolute;bottom:-18px;left:0;right:0;text-align:center;font-size:9px;color:var(--text-faint);font-family:'JetBrains Mono',monospace;}
 
 .empty{
   text-align:center;padding:34px 18px;color:var(--text-faint);font-size:13.5px;
@@ -227,118 +253,164 @@ tr.sub-row td:first-child{padding-left:22px;color:var(--text-faint);}
 .empty strong{color:var(--text-dim);display:block;font-size:14.5px;margin-bottom:4px;}
 
 .stage-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:14px;}
-.stage-group{border:1px solid var(--border);border-radius:3px;padding:16px;margin-bottom:14px;background:var(--surface-2);}
+.stage-group{border:1px solid var(--border);border-radius:var(--radius-md);padding:16px;margin-bottom:14px;background:var(--surface-2);}
 .badge-count{
-  background:var(--surface-3);color:var(--text-dim);font-size:11px;font-family:'IBM Plex Mono',monospace;
-  padding:2px 7px;border-radius:3px;
+  background:var(--surface-3);color:var(--text-dim);font-size:11px;font-family:'JetBrains Mono',monospace;
+  padding:3px 9px;border-radius:999px;
 }
-footer{text-align:center;color:var(--text-faint);font-size:11.5px;margin-top:32px;font-family:'IBM Plex Mono',monospace;text-transform:uppercase;letter-spacing:.04em;}
+footer{text-align:center;color:var(--text-faint);font-size:11px;margin-top:32px;font-family:'JetBrains Mono',monospace;}
 
 .confirm-overlay{
-  position:fixed;inset:0;background:rgba(0,0,0,.6);
+  position:fixed;inset:0;background:rgba(4,4,8,.7);backdrop-filter:blur(2px);
   display:flex;align-items:center;justify-content:center;z-index:1000;padding:20px;
 }
 .confirm-box{
-  background:var(--surface);border:1px solid var(--border);border-radius:3px;
-  padding:20px;max-width:340px;width:100%;box-shadow:var(--shadow);
+  background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);
+  padding:22px;max-width:340px;width:100%;box-shadow:var(--shadow);
 }
 .confirm-box p{margin:0 0 16px;font-size:14px;color:var(--text);}
 .confirm-actions{display:flex;justify-content:flex-end;gap:10px;}
 
+/* ---------- Toast ---------- */
+.toast{
+  position:fixed;left:50%;bottom:28px;transform:translate(-50%,20px);
+  background:var(--surface-3);border:1px solid var(--accent);color:var(--text);
+  padding:12px 20px;border-radius:999px;font-size:13px;font-weight:700;
+  box-shadow:0 12px 30px -10px rgba(124,92,255,.6);
+  opacity:0;transition:opacity .25s, transform .25s;z-index:2000;white-space:nowrap;
+}
+.toast.show{opacity:1;transform:translate(-50%,0);}
+
 /* ---------- Mobile app shell (telas estilo app, teclado numérico) ---------- */
 .mshell{display:none;}
 @media (max-width:640px){
-  .hazard{display:none;}
   .wrap{display:none;}
   .mshell{display:flex;flex-direction:column;height:100vh;height:100dvh;background:var(--bg);}
 }
 .mheader{background:var(--surface);border-bottom:1px solid var(--border);flex-shrink:0;}
-.mheader-top{display:flex;align-items:center;gap:8px;padding:12px 14px;}
-.mback{background:none;border:none;color:var(--text);font-size:24px;padding:0 4px;cursor:pointer;line-height:1;flex:none;}
-.mtitle{font-family:'Big Shoulders Stencil Display',sans-serif;font-weight:900;font-size:22px;letter-spacing:.3px;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-.mprofessor-bar{background:var(--surface-2);border-top:1px solid var(--border);padding:7px 14px;font-size:11px;color:var(--accent);font-family:'IBM Plex Mono',monospace;text-transform:uppercase;letter-spacing:.04em;}
+.mheader-top{display:flex;align-items:center;gap:8px;padding:14px 16px;}
+.mback{background:none;border:none;color:var(--text);font-size:22px;padding:0 4px;cursor:pointer;line-height:1;flex:none;}
+.mtitle{font-family:'Manrope',sans-serif;font-weight:800;font-size:18px;letter-spacing:-.01em;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.mprofessor-bar{background:var(--surface-2);border-top:1px solid var(--border);padding:7px 14px;font-size:11px;color:var(--accent);font-family:'JetBrains Mono',monospace;text-transform:uppercase;letter-spacing:.04em;}
 .mcontent{flex:1;overflow:auto;-webkit-overflow-scrolling:touch;}
 .mtabbar{display:flex;border-top:1px solid var(--border);background:var(--surface);flex-shrink:0;padding-bottom:env(safe-area-inset-bottom,4px);}
-.mtab{flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;padding:8px 0 4px;background:none;border:none;color:var(--text-faint);font-family:'Archivo',sans-serif;cursor:pointer;}
+.mtab{flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;padding:9px 0 4px;background:none;border:none;color:var(--text-faint);font-family:'Manrope',sans-serif;cursor:pointer;}
 .mtab .micon{font-size:18px;}
 .mtab span:last-child{font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:.03em;}
 .mtab.active{color:var(--accent);}
-.msection-title{display:flex;align-items:center;font-family:'Big Shoulders Display',sans-serif;font-weight:800;font-size:15px;letter-spacing:.3px;text-transform:uppercase;margin:18px 16px 10px;}
-.mchip{display:inline-flex;align-items:center;justify-content:center;background:var(--accent);color:var(--accent-ink);width:20px;height:20px;border-radius:5px;font-family:'IBM Plex Mono',monospace;font-size:10.5px;font-weight:700;margin-right:8px;}
-.mgrouplabel{font-family:'IBM Plex Mono',monospace;font-size:10.5px;text-transform:uppercase;letter-spacing:.07em;color:var(--text-faint);margin:14px 16px 6px;}
-.mrow{display:flex;align-items:center;justify-content:space-between;background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:12px 14px;margin:0 16px 8px;gap:10px;cursor:pointer;}
+.msection-title{display:flex;align-items:center;font-family:'Manrope',sans-serif;font-weight:800;font-size:13px;letter-spacing:-.01em;margin:18px 16px 10px;}
+.mchip{display:inline-flex;align-items:center;justify-content:center;background:linear-gradient(135deg,var(--accent),#4b3bd6);color:#fff;width:22px;height:22px;border-radius:7px;font-family:'JetBrains Mono',monospace;font-size:10.5px;font-weight:700;margin-right:8px;}
+.mgrouplabel{font-family:'JetBrains Mono',monospace;font-size:10.5px;text-transform:uppercase;letter-spacing:.07em;color:var(--text-faint);margin:14px 16px 6px;}
+.mrow{display:flex;align-items:center;justify-content:space-between;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-md);padding:13px 15px;margin:0 16px 8px;gap:10px;cursor:pointer;}
 .mrow-main{min-width:0;flex:1;}
-.mrow-title{font-size:14px;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.mrow-title{font-size:14px;font-weight:700;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .mrow-sub{font-size:11.5px;color:var(--text-faint);margin-top:2px;}
 .mchev{color:var(--text-faint);font-size:18px;flex:none;}
-.mmono{font-family:'IBM Plex Mono',monospace;}
+.mmono{font-family:'JetBrains Mono',monospace;}
 .mempty{text-align:center;padding:28px 20px;color:var(--text-faint);font-size:12.5px;}
 .mempty strong{display:block;color:var(--text-dim);font-size:13.5px;margin-bottom:4px;}
-.mimportbtn{width:100%;border:2px dashed var(--border);background:none;color:var(--text-dim);border-radius:8px;padding:12px 8px;font-family:'Archivo',sans-serif;font-size:12px;font-weight:700;cursor:pointer;text-transform:none;letter-spacing:0;}
-.mghostbtn{border:1px solid var(--border);background:var(--surface-2);color:var(--text);border-radius:6px;padding:7px 12px;font-family:'Archivo',sans-serif;font-size:11px;font-weight:700;text-transform:uppercase;cursor:pointer;}
+.mimportbtn{width:100%;border:2px dashed var(--border);background:none;color:var(--text-dim);border-radius:var(--radius-md);padding:14px 8px;font-family:'Manrope',sans-serif;font-size:12.5px;font-weight:700;cursor:pointer;}
+.mghostbtn{border:1px solid var(--border);background:var(--surface-2);color:var(--text);border-radius:var(--radius-sm);padding:8px 14px;font-family:'Manrope',sans-serif;font-size:11.5px;font-weight:700;cursor:pointer;}
 .mghostbtn.small{padding:5px 9px;font-size:10.5px;}
 .mghostbtn.mdanger{color:var(--down);border-color:var(--down);background:transparent;}
-.mprimarybtn{border:none;background:var(--accent);color:var(--accent-ink);border-radius:6px;padding:12px;font-family:'Archivo',sans-serif;font-size:12px;font-weight:800;text-transform:uppercase;cursor:pointer;}
+.mprimarybtn{border:none;background:linear-gradient(135deg,var(--accent),#4b3bd6);color:#fff;border-radius:var(--radius-sm);padding:13px;font-family:'Manrope',sans-serif;font-size:13px;font-weight:800;cursor:pointer;box-shadow:0 8px 20px -10px rgba(124,92,255,.8);}
 .micon-btn{background:none;border:none;color:var(--text-faint);font-size:15px;cursor:pointer;padding:4px 6px;flex:none;}
-.minput{width:100%;background:var(--surface-2);border:1px solid var(--border);color:var(--text);border-radius:6px;padding:8px 10px;font-family:'Archivo',sans-serif;font-size:14px;box-sizing:border-box;}
-.mcard{background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:12px;margin:0 16px 10px;}
+.minput{width:100%;background:var(--surface-2);border:1px solid var(--border);color:var(--text);border-radius:var(--radius-sm);padding:9px 11px;font-family:'Manrope',sans-serif;font-size:14px;box-sizing:border-box;}
+.mcard{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-md);padding:12px;margin:0 16px 10px;}
 .mkeypad{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:12px;}
-.mkey{height:52px;border-radius:8px;border:1px solid var(--border);background:var(--surface-2);color:var(--text);font-family:'IBM Plex Mono',monospace;font-size:18px;font-weight:600;cursor:pointer;}
+.mkey{height:54px;border-radius:var(--radius-sm);border:1px solid var(--border);background:var(--surface-2);color:var(--text);font-family:'JetBrains Mono',monospace;font-size:18px;font-weight:700;cursor:pointer;}
 .mkey:active{background:var(--surface-3);}
-.mpad-box{flex:1;background:var(--surface-2);border:1px solid var(--border);border-radius:8px;padding:10px 12px;cursor:pointer;}
-.mpad-box.active{border-color:var(--accent);}
-.mpad-label{font-size:10.5px;text-transform:uppercase;letter-spacing:.07em;color:var(--text-faint);font-weight:600;}
-.mpad-value{font-family:'IBM Plex Mono',monospace;font-size:26px;color:var(--text);font-weight:600;margin-top:2px;}
+.mpad-box{flex:1;background:var(--surface-2);border:1px solid var(--border);border-radius:var(--radius-md);padding:11px 13px;cursor:pointer;}
+.mpad-box.active{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent) inset;}
+.mpad-label{font-size:10.5px;text-transform:uppercase;letter-spacing:.07em;color:var(--text-faint);font-weight:700;}
+.mpad-value{font-family:'JetBrains Mono',monospace;font-size:26px;color:var(--text);font-weight:700;margin-top:2px;}
 .mpad-box.active .mpad-value{color:var(--accent);}
-.mbig-num{font-family:'IBM Plex Mono',monospace;font-size:32px;color:var(--text);font-weight:600;}
+.mbig-num{font-family:'JetBrains Mono',monospace;font-size:32px;color:var(--text);font-weight:700;}
 .mtarget-bar{
   display:flex;align-items:center;justify-content:space-between;gap:10px;
   background:var(--surface-2);border:1px solid var(--border);border-left:3px solid var(--accent);
-  border-radius:6px;padding:8px 12px;margin-bottom:12px;
+  border-radius:var(--radius-sm);padding:9px 13px;margin-bottom:12px;
   font-size:11.5px;color:var(--text-faint);text-transform:uppercase;letter-spacing:.05em;font-weight:700;
 }
-.mtarget-bar strong{font-family:'IBM Plex Mono',monospace;color:var(--accent);font-size:12.5px;letter-spacing:0;text-transform:none;}
+.mtarget-bar strong{font-family:'JetBrains Mono',monospace;color:var(--accent);font-size:12.5px;letter-spacing:0;text-transform:none;}
 .mset-row.sel{border-color:var(--accent);background:var(--surface-2);}
 .mprotocol-head{
   display:flex;align-items:center;justify-content:space-between;gap:10px;
-  margin:16px 16px 8px;padding:8px 12px;border-left:3px solid var(--accent);background:var(--surface-2);
-  border-radius:0 6px 6px 0;
-  font-family:'Big Shoulders Display',sans-serif;font-weight:800;font-size:16px;
-  letter-spacing:.3px;text-transform:uppercase;color:var(--text);
+  margin:16px 16px 8px;padding:10px 14px;background:var(--surface-2);
+  border-radius:var(--radius-md);
+  font-family:'Manrope',sans-serif;font-weight:800;font-size:14.5px;
+  letter-spacing:-.01em;color:var(--text);
 }
-.mprotocol-head .mmono{font-size:10.5px;color:var(--text-faint);font-weight:600;text-transform:none;letter-spacing:0;}
+.mprotocol-head .mmono{font-size:10.5px;color:var(--text-faint);font-weight:700;letter-spacing:0;}
+
+/* dashboard (dentro da lista de Treinos) */
+.mdash-cta{
+  margin:14px 16px;padding:16px;border-radius:var(--radius-lg);
+  background:linear-gradient(135deg, rgba(124,92,255,.2), rgba(0,224,164,.08));
+  border:1px solid var(--border);
+}
+.mdash-cta .k{font-size:10.5px;text-transform:uppercase;letter-spacing:.08em;color:var(--text-faint);font-weight:700;}
+.mdash-cta .v{font-size:16px;font-weight:800;margin:4px 0 12px;letter-spacing:-.01em;}
+.mdash-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:0 16px 6px;}
+.mdash-stat{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-md);padding:10px 6px;text-align:center;}
+.mdash-stat .n{font-family:'JetBrains Mono',monospace;font-size:18px;font-weight:800;}
+.mdash-stat .l{font-size:9px;color:var(--text-faint);text-transform:uppercase;font-weight:700;margin-top:2px;}
+
+.pr-badge{
+  display:inline-flex;align-items:center;gap:3px;background:rgba(0,224,164,.14);color:var(--up);
+  border-radius:999px;padding:2px 8px;font-size:10px;font-weight:800;font-family:'JetBrains Mono',monospace;
+}
+
+/* timer de descanso */
+.rest-timer{
+  position:sticky;top:0;z-index:5;display:flex;align-items:center;justify-content:space-between;gap:8px;
+  background:var(--surface-3);border-bottom:1px solid var(--accent);padding:10px 14px;margin-bottom:6px;
+}
+.rt-time{font-family:'JetBrains Mono',monospace;font-size:20px;font-weight:800;color:var(--accent);min-width:56px;text-align:center;}
+.rt-btn{border:1px solid var(--border);background:var(--surface-2);color:var(--text);border-radius:999px;padding:6px 12px;font-size:11px;font-weight:700;cursor:pointer;}
+.rt-skip{color:var(--text-faint);}
+
+.volume-chart{display:flex;align-items:flex-end;gap:5px;height:80px;padding:4px 16px 20px;position:relative;}
+.mempty-vol{padding:0 16px;color:var(--text-faint);font-size:11.5px;}
 </style>
 
-<div class="hazard"></div>
 <div class="wrap">
   <div class="hero">
     <div class="brand">
-      <svg class="mark" viewBox="0 0 40 40" fill="none">
-        <rect x="2" y="17" width="6" height="6" rx="1.5" fill="var(--text-faint)"/>
-        <rect x="8" y="13" width="4" height="14" rx="1.5" fill="var(--text-dim)"/>
-        <rect x="12" y="18.5" width="16" height="3" rx="1.5" fill="var(--accent)"/>
-        <rect x="28" y="13" width="4" height="14" rx="1.5" fill="var(--text-dim)"/>
-        <rect x="32" y="17" width="6" height="6" rx="1.5" fill="var(--text-faint)"/>
-      </svg>
+      <span class="mark">
+        <svg viewBox="0 0 24 24" fill="none">
+          <path d="M4 12h2M18 12h2M7 9v6M17 9v6M7 12h10" stroke="#fff" stroke-width="2" stroke-linecap="round"/>
+        </svg>
+      </span>
       <div>
-        <h1>SOBRECARGA</h1>
-        <div class="tagline">Seu diário de treino: importe do PDF, edite séries e peso, acompanhe se o rendimento está subindo ou caindo.</div>
+        <h1>Sobrecarga</h1>
+        <div class="tagline">Seu treino, sua evolução — importe a ficha e acompanhe cada recorde.</div>
       </div>
     </div>
     <div style="display:flex;flex-direction:column;align-items:flex-end;gap:10px;">
       <span class="sync-badge" id="syncBadge" data-status="syncing">Sincronizando…</span>
-      <div class="stat-row">
-        <div class="stat"><div class="n" id="statSessions">0</div><div class="l">Sessões</div></div>
-        <div class="stat"><div class="n" id="statExercises">0</div><div class="l">Exercícios</div></div>
-        <div class="stat"><div class="n" id="statUp">0</div><div class="l">Em alta</div></div>
-      </div>
-      <div style="display:flex;gap:10px;align-items:center;">
-        <a href="?professor=1" target="_blank" class="hint" id="professorLink" style="text-decoration:underline;">Área do professor (somente leitura) ↗</a>
-      </div>
+      <a href="?professor=1" target="_blank" class="hint" id="professorLink" style="text-decoration:underline;">Área do professor ↗</a>
     </div>
   </div>
 
   <div id="readonlyBanner" style="display:none;" class="hint"></div>
+
+  <div class="card" id="dashCard">
+    <div class="dash">
+      <div class="dash-cta">
+        <div>
+          <div class="k">Próximo treino</div>
+          <div class="v" id="dashNextLabel">—</div>
+        </div>
+        <button class="primary small" id="dashNextBtn" style="align-self:flex-start;">Ir para o treino</button>
+      </div>
+      <div class="dash-stats">
+        <div class="dash-stat"><div class="n" id="statStreak">0</div><div class="l">🔥 semanas seguidas</div></div>
+        <div class="dash-stat"><div class="n" id="statSessions">0</div><div class="l">Sessões</div></div>
+        <div class="dash-stat"><div class="n" id="statUp">0</div><div class="l">Em alta</div></div>
+      </div>
+    </div>
+  </div>
 
   <div class="card" id="importCard">
     <div class="card-head">
@@ -385,6 +457,14 @@ footer{text-align:center;color:var(--text-faint);font-size:11.5px;margin-top:32p
 
   <div class="card">
     <div class="card-head">
+      <h2><span class="chip">📈</span>Volume semanal</h2>
+      <span class="hint">Peso × repetições somados por semana</span>
+    </div>
+    <div id="volumeWrap"></div>
+  </div>
+
+  <div class="card">
+    <div class="card-head">
       <h2><span class="chip">Δ</span>Rendimento</h2>
       <span class="hint">1RM estimado (Epley) — compara a última sessão com a anterior</span>
     </div>
@@ -406,7 +486,7 @@ footer{text-align:center;color:var(--text-faint);font-size:11.5px;margin-top:32p
   <div class="mheader">
     <div class="mheader-top">
       <button id="mBack" class="mback" hidden>‹</button>
-      <div class="mtitle" id="mTitle">SOBRECARGA</div>
+      <div class="mtitle" id="mTitle">Sobrecarga</div>
       <span style="width:22px;flex:none;"></span>
     </div>
     <div id="mProfessorBar" class="mprofessor-bar" hidden>👁 Área do professor — somente leitura</div>
@@ -1363,10 +1443,12 @@ function renderSessionBody(container, session){
       const block = document.createElement('div');
       block.className = 'ex-block';
       const targetLabel = exerciseTarget(ex);
+      const record = recordFor(ex.name);
       block.innerHTML = `
         <div class="ex-head">
           <input type="text" class="ex-name-input" value="${escapeAttr(ex.name)}" ${roAttr}>
           <span class="ex-target hint">${targetLabel ? 'alvo '+escapeHtml(targetLabel)+' reps' : ''}</span>
+          ${record ? `<span class="pr-badge">🏆 ${record.weight}kg × ${record.reps}</span>` : ''}
           ${ro?'':`<button class="ghost small" data-delex="${ex.id}">✕</button>`}
         </div>
         <div class="set-rows"></div>
@@ -1407,8 +1489,21 @@ function renderSessionBody(container, session){
               save();
               block.querySelector('.ex-target').textContent = exerciseTarget(ex) ? 'alvo '+exerciseTarget(ex)+' reps' : '';
             });
-            row.querySelector('[data-k="reps"]').addEventListener('input', e=>{ s.reps=parseFloat(e.target.value)||0; save(); refreshComputed(); });
-            row.querySelector('[data-k="weight"]').addEventListener('input', e=>{ s.weight=parseFloat(e.target.value)||0; save(); refreshComputed(); });
+            function updatePrBadge(){
+              const record = recordFor(ex.name);
+              const badge = block.querySelector('.pr-badge');
+              const html = record ? `<span class="pr-badge">🏆 ${record.weight}kg × ${record.reps}</span>` : '';
+              if(badge) badge.outerHTML = html;
+              else if(html) block.querySelector('.ex-target').insertAdjacentHTML('afterend', html);
+            }
+            row.querySelector('[data-k="reps"]').addEventListener('input', e=>{
+              s.reps=parseFloat(e.target.value)||0; save(); refreshComputed();
+              maybeCelebratePR(ex.name, s); updatePrBadge();
+            });
+            row.querySelector('[data-k="weight"]').addEventListener('input', e=>{
+              s.weight=parseFloat(e.target.value)||0; save(); refreshComputed();
+              maybeCelebratePR(ex.name, s); updatePrBadge();
+            });
             row.querySelector('[data-delset]').addEventListener('click', ()=>{
               ex.sets.splice(i,1);
               if(ex.sets.length===0) ex.sets.push({reps:10,weight:0});
@@ -1552,16 +1647,31 @@ function sparkline(points){
 
 const expandedExercises = new Set();
 
-function progressRow(label, pts, opts={}){
-  const {cur, prev, deltaHtml} = trendDelta(pts);
-  return `<tr class="${opts.sub?'sub-row':''}">
-    <td>${opts.control||''}${escapeHtml(label)}</td>
-    <td class="num">${cur.weight}kg × ${cur.reps}</td>
-    <td class="num">${prev? prev.weight+'kg × '+prev.reps : '—'}</td>
-    <td class="num">${cur.rm.toFixed(1)}kg</td>
-    <td>${deltaHtml}</td>
-    <td>${pts.length>1 ? sparkline(pts.slice(-8)) : '<span class="hint">1 registro</span>'}</td>
-  </tr>`;
+function progressSubRow(label, pts){
+  const {cur, deltaHtml} = trendDelta(pts);
+  return `<div style="display:flex;justify-content:space-between;align-items:center;padding:5px 0;font-size:12px;color:var(--text-dim);">
+    <span>${escapeHtml(label)}</span>
+    <span class="num">${cur.weight}kg × ${cur.reps}</span>
+    <span>${deltaHtml}</span>
+  </div>`;
+}
+
+function progressCard(e){
+  const {cur, prev, deltaHtml} = trendDelta(e.points);
+  const key = e.label.toLowerCase();
+  const hasBranches = e.bySet.length>1;
+  const isOpen = hasBranches && expandedExercises.has(key);
+  return `<div class="prog-card">
+    <div class="pc-name">${escapeHtml(e.label)}</div>
+    <div class="pc-rm">${cur.rm.toFixed(1)}kg</div>
+    <div class="hint" style="margin:2px 0 6px;">${cur.weight}kg × ${cur.reps} ${prev?'· antes '+prev.weight+'kg × '+prev.reps:''}</div>
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;">
+      ${deltaHtml}
+      ${e.points.length>1 ? sparkline(e.points.slice(-8)) : '<span class="hint">1 registro</span>'}
+    </div>
+    ${hasBranches ? `<button class="ghost small ex-toggle" data-ex="${escapeAttr(key)}" style="margin-top:8px;">${isOpen?'▾':'▸'} ${e.bySet.length} séries</button>` : ''}
+    ${isOpen ? `<div class="pc-sets">${e.bySet.map((pts,i)=> progressSubRow(`Série ${i+1}`, pts)).join('')}</div>` : ''}
+  </div>`;
 }
 
 function renderProgress(){
@@ -1571,22 +1681,7 @@ function renderProgress(){
     wrap.innerHTML = `<div class="empty"><strong>Sem dados suficientes</strong>Registre pelo menos uma sessão para ver a evolução do rendimento.</div>`;
     return;
   }
-  const rows = data.map(e=>{
-    const key = e.label.toLowerCase();
-    const hasBranches = e.bySet.length>1;
-    const isOpen = hasBranches && expandedExercises.has(key);
-    const control = hasBranches
-      ? `<button class="ghost small ex-toggle" data-ex="${escapeAttr(key)}">${isOpen?'▾':'▸'} ${e.bySet.length} séries</button> `
-      : '';
-    let html = progressRow(e.label, e.points, {control});
-    if(isOpen){
-      html += e.bySet.map((pts,i)=> progressRow(`Série ${i+1}`, pts, {sub:true})).join('');
-    }
-    return html;
-  }).join('');
-  wrap.innerHTML = `<div class="tbl-scroll"><table>
-    <thead><tr><th>Exercício</th><th>Atual</th><th>Anterior</th><th>1RM est.</th><th>Variação</th><th>Tendência</th></tr></thead>
-    <tbody>${rows}</tbody></table></div>`;
+  wrap.innerHTML = `<div class="prog-grid">${data.map(progressCard).join('')}</div>`;
 
   wrap.querySelectorAll('.ex-toggle').forEach(btn=>{
     btn.addEventListener('click', ()=>{
@@ -1601,18 +1696,138 @@ function renderProgress(){
 function refreshComputed(){
   renderProgress();
   renderStats();
+  renderDashboard();
+  renderVolumeChart();
 }
 
 function renderStats(){
-  const exSet = new Set();
   let up=0;
-  state.sessions.forEach(s=> s.exercises.forEach(e=> { if(e.name.trim()) exSet.add(e.name.trim().toLowerCase()); }));
   computeProgress().forEach(e=>{
     if(e.points.length>1 && e.points[e.points.length-1].rm > e.points[e.points.length-2].rm) up++;
   });
   document.getElementById('statSessions').textContent = state.sessions.length;
-  document.getElementById('statExercises').textContent = exSet.size;
   document.getElementById('statUp').textContent = up;
+  document.getElementById('statStreak').textContent = computeStreak();
+}
+
+/* ---------- Dashboard: streak, próximo treino, recordes ---------- */
+
+// Semanas seguidas (a partir de hoje) com pelo menos uma série com carga.
+function computeStreak(){
+  const trainedWeeks = new Set();
+  state.sessions.forEach(s=>{
+    if(s.exercises.some(e=> e.sets.some(x=> x.weight>0))) trainedWeeks.add(getWeekKey(s.date));
+  });
+  if(trainedWeeks.size===0) return 0;
+  let cursor = getWeekKey(todayISO());
+  if(!trainedWeeks.has(cursor)) cursor = addDaysISO(cursor, -7);
+  let streak = 0;
+  while(trainedWeeks.has(cursor)){ streak++; cursor = addDaysISO(cursor, -7); }
+  return streak;
+}
+
+// Sessão a fazer: a mais recente que já passou (ou hoje) e ainda tem série sem
+// carga; se não houver nenhuma atrasada, a próxima futura com série pendente.
+function findNextSession(){
+  const pending = state.sessions.filter(s=> s.exercises.some(e=> e.sets.some(x=> !(x.weight>0))));
+  if(!pending.length) return null;
+  pending.sort((a,b)=> a.date.localeCompare(b.date));
+  const today = todayISO();
+  const overdue = pending.filter(s=> s.date<=today);
+  return overdue.length ? overdue[overdue.length-1] : pending[0];
+}
+
+function renderDashboard(){
+  const next = findNextSession();
+  const label = document.getElementById('dashNextLabel');
+  const btn = document.getElementById('dashNextBtn');
+  if(next){
+    label.textContent = next.name;
+    btn.disabled = false;
+    btn.onclick = ()=> openSessionFromDashboard(next.id);
+  }else{
+    label.textContent = state.sessions.length ? 'Tudo em dia 🎉' : 'Importe sua ficha para começar';
+    btn.disabled = true;
+  }
+}
+function openSessionFromDashboard(id){
+  const session = state.sessions.find(s=> s.id===id);
+  if(!session) return;
+  openProtocols.clear(); openProtocols.add(session.protocolId);
+  openMonths.add(getMonthKey(session.date));
+  openWeeks.add(getWeekKey(session.date));
+  openSessionId = id;
+  renderSessions();
+  document.getElementById('sessionsList').scrollIntoView({behavior:'smooth', block:'start'});
+}
+
+// Melhor 1RM já registrado para um exercício (para badge de recorde pessoal).
+function recordFor(label){
+  const key = (label||'').trim().toLowerCase();
+  if(!key) return null;
+  let best = null;
+  state.sessions.forEach(s=> s.exercises.forEach(e=>{
+    if(e.name.trim().toLowerCase()!==key) return;
+    e.sets.forEach(x=>{
+      if(x.weight>0){ const rm = epley1RM(x.weight,x.reps); if(!best || rm>best.rm) best = {weight:x.weight, reps:x.reps, rm}; }
+    });
+  }));
+  return best;
+}
+// Igual a recordFor, mas ignorando uma série específica — usado para saber se
+// a série que acabou de ser editada É o novo recorde (comparando com o resto).
+function bestExcluding(label, excludeSet){
+  const key = (label||'').trim().toLowerCase();
+  let best = null;
+  state.sessions.forEach(s=> s.exercises.forEach(e=>{
+    if(e.name.trim().toLowerCase()!==key) return;
+    e.sets.forEach(x=>{
+      if(x===excludeSet) return;
+      if(x.weight>0){ const rm = epley1RM(x.weight,x.reps); if(!best || rm>best.rm) best = {weight:x.weight, reps:x.reps, rm}; }
+    });
+  }));
+  return best;
+}
+function maybeCelebratePR(exName, set){
+  if(!(set.weight>0)) return;
+  const rm = epley1RM(set.weight, set.reps);
+  const prev = bestExcluding(exName, set);
+  if(!prev || rm > prev.rm + 0.05) showToast(`🏆 Novo recorde em ${exName}: ${set.weight}kg × ${set.reps}`);
+}
+function showToast(msg){
+  const t = document.createElement('div');
+  t.className = 'toast';
+  t.textContent = msg;
+  document.body.appendChild(t);
+  requestAnimationFrame(()=> t.classList.add('show'));
+  setTimeout(()=>{ t.classList.remove('show'); setTimeout(()=> t.remove(), 300); }, 2800);
+}
+
+// Volume total (peso × reps) por semana, últimas 8 semanas com dados.
+function computeWeeklyVolume(){
+  const byWeek = {};
+  state.sessions.forEach(s=>{
+    const wk = getWeekKey(s.date);
+    s.exercises.forEach(e=> e.sets.forEach(x=>{
+      if(x.weight>0 && x.reps>0) byWeek[wk] = (byWeek[wk]||0) + x.weight*x.reps;
+    }));
+  });
+  return Object.keys(byWeek).sort().map(k=> ({week:k, volume:byWeek[k]})).slice(-8);
+}
+function renderVolumeChart(){
+  const wrap = document.getElementById('volumeWrap');
+  if(!wrap) return;
+  const data = computeWeeklyVolume();
+  if(data.length===0){
+    wrap.innerHTML = `<div class="empty" style="padding:16px;"><strong>Sem volume ainda</strong>Registre cargas para ver o total levantado por semana.</div>`;
+    return;
+  }
+  const max = Math.max(...data.map(d=> d.volume));
+  wrap.innerHTML = `<div class="volume-chart">${data.map(d=>{
+    const h = Math.max(4, Math.round((d.volume/max)*80));
+    const lbl = fmtDayMonth(d.week);
+    return `<div class="volume-bar" style="height:${h}px;" title="${Math.round(d.volume)}kg na semana de ${lbl}"><span class="vb-label">${lbl}</span></div>`;
+  }).join('')}</div>`;
 }
 
 function escapeHtml(s){ return String(s).replace(/[&<>"']/g, c=> ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
@@ -1630,8 +1845,47 @@ const mobile = {
   progKey: null,
   padWeight: '',
   padReps: '',
-  padActive: 'weight'
+  padActive: 'weight',
+  timerActive: false,
+  timerEnd: 0
 };
+
+/* ---------- Timer de descanso (celular) ---------- */
+let restTimerInterval = null;
+function startRestTimer(seconds){
+  mobile.timerEnd = Date.now() + seconds*1000;
+  mobile.timerActive = true;
+  clearInterval(restTimerInterval);
+  restTimerInterval = setInterval(updateRestTimer, 250);
+}
+function stopRestTimer(){
+  mobile.timerActive = false;
+  clearInterval(restTimerInterval);
+  const bar = document.getElementById('mRestTimer');
+  if(bar) bar.remove();
+}
+function fmtSecs(s){ const m=Math.floor(s/60), r=s%60; return m+':'+String(r).padStart(2,'0'); }
+function updateRestTimer(){
+  const bar = document.getElementById('mRestTimer');
+  if(!bar || !mobile.timerActive){ clearInterval(restTimerInterval); return; }
+  const remaining = Math.max(0, Math.ceil((mobile.timerEnd - Date.now())/1000));
+  const timeEl = bar.querySelector('.rt-time');
+  if(timeEl) timeEl.textContent = fmtSecs(remaining);
+  if(remaining<=0){
+    stopRestTimer();
+    if(navigator.vibrate) navigator.vibrate(250);
+  }
+}
+function renderRestTimerBar(){
+  if(!mobile.timerActive) return '';
+  const remaining = Math.max(0, Math.ceil((mobile.timerEnd - Date.now())/1000));
+  return `<div id="mRestTimer" class="rest-timer">
+    <button class="rt-btn" data-rt="-15">-15s</button>
+    <span class="rt-time">${fmtSecs(remaining)}</span>
+    <button class="rt-btn" data-rt="+15">+15s</button>
+    <button class="rt-btn rt-skip" data-rt="skip">Pular</button>
+  </div>`;
+}
 
 const mShell = document.getElementById('mShell');
 const mContent = document.getElementById('mContent');
@@ -1643,6 +1897,7 @@ if(new URLSearchParams(location.search).get('tab')==='progresso') mobile.tab = '
 
 document.querySelectorAll('.mtab').forEach(btn=>{
   btn.addEventListener('click', ()=>{
+    stopRestTimer();
     const tab = btn.dataset.mtab;
     mobile.tab = tab;
     mobile.screen = 'list';
@@ -1651,7 +1906,7 @@ document.querySelectorAll('.mtab').forEach(btn=>{
 });
 mBack.addEventListener('click', ()=>{
   if(mobile.tab==='treinos'){
-    if(mobile.screen==='entry'){ mobile.screen='session'; }
+    if(mobile.screen==='entry'){ mobile.screen='session'; stopRestTimer(); }
     else if(mobile.screen==='session'){
       mobile.sessionId=null;
       mobile.screen = mobile.weekKey ? 'week' : 'list';
@@ -1691,9 +1946,20 @@ function mWeekSessions(){
 }
 
 function mRenderSessionsList(){
-  mTitle.textContent = 'SOBRECARGA';
+  mTitle.textContent = 'Sobrecarga';
   mBack.hidden = true;
   let html = '';
+  const next = findNextSession();
+  html += `<div class="mdash-cta">
+    <div class="k">Próximo treino</div>
+    <div class="v">${next ? escapeHtml(next.name) : (state.sessions.length ? 'Tudo em dia 🎉' : 'Importe sua ficha para começar')}</div>
+    ${next ? `<button class="mprimarybtn" data-maction="gotonext" data-session="${next.id}" style="width:100%;">Ir para o treino</button>` : ''}
+  </div>
+  <div class="mdash-stats">
+    <div class="mdash-stat"><div class="n">${computeStreak()}</div><div class="l">🔥 semanas</div></div>
+    <div class="mdash-stat"><div class="n">${state.sessions.length}</div><div class="l">Sessões</div></div>
+    <div class="mdash-stat"><div class="n">${computeProgress().length}</div><div class="l">Exercícios</div></div>
+  </div>`;
   if(!READONLY){
     html += `<div style="padding:14px 16px 4px;"><button class="mimportbtn" data-maction="import">↥ Importar / escanear PDF</button></div>`;
   }
@@ -1782,13 +2048,14 @@ function mRenderSessionScreen(){
     const setCount = ex.sets.length;
     const done = ex.sets.filter(s=> s.weight>0).length;
     const targetLabel = exerciseTarget(ex);
+    const record = recordFor(ex.name);
     const parts = [`${setCount} séries`];
     if(targetLabel) parts.push(`alvo ${targetLabel}`);
     if(done) parts.push(`${done}/${setCount} feitas`);
     const meta = parts.join(' · ');
     html += `<div class="mrow">
       <div class="mrow-main" data-mopen-ex="${ex.id}">
-        <div class="mrow-title">${escapeHtml(ex.name)}</div>
+        <div class="mrow-title">${escapeHtml(ex.name)} ${record?`<span class="pr-badge">🏆 ${record.weight}kg</span>`:''}</div>
         <div class="mrow-sub mmono">${meta}</div>
       </div>
       ${ro?'':`<button class="micon-btn" data-mdel-ex="${ex.id}">✕</button>`}
@@ -1815,7 +2082,8 @@ function mRenderEntryScreen(){
     const val = k==='⌫' ? 'back' : k;
     return `<button class="mkey" data-mpad="${val}" ${ro?'disabled':''}>${k}</button>`;
   }).join('');
-  let html = `<div style="padding:14px 16px 20px;">
+  let html = renderRestTimerBar();
+  html += `<div style="padding:14px 16px 20px;">
     <div class="mtarget-bar">
       <span>${editing ? `Série ${mobile.setIdx+1}` : 'Nova série'}</span>
       <strong>${curTarget ? 'alvo '+escapeHtml(curTarget)+' reps' : 'sem alvo definido'}</strong>
@@ -1991,6 +2259,17 @@ mContent.addEventListener('click', async e=>{
   if(action){
     const act = action.dataset.maction;
     if(act==='import'){ mobile.screen='import'; mRenderImportScreen(); return; }
+    if(act==='gotonext'){
+      const session = state.sessions.find(s=> s.id===action.dataset.session);
+      if(session){
+        mobile.protKey = session.protocolId;
+        mobile.weekKey = getWeekKey(session.date);
+        mobile.sessionId = session.id;
+        mobile.screen = 'session';
+        mRender();
+      }
+      return;
+    }
     if(act==='pickfile'){ fileInput.click(); return; }
     if(act==='addsession'){
       const session = newManualSession();
@@ -2027,7 +2306,7 @@ mContent.addEventListener('click', async e=>{
       mRenderEntryScreen();
       return;
     }
-    if(act==='backtosession'){ mobile.screen='session'; mRender(); return; }
+    if(act==='backtosession'){ stopRestTimer(); mobile.screen='session'; mRender(); return; }
     if(act==='cancelimport'){ closeStage(); stageGroups = []; mobile.screen='list'; mRender(); return; }
     if(act==='confirmimport'){
       const added = commitStagedSessions();
@@ -2089,6 +2368,13 @@ mContent.addEventListener('click', async e=>{
     if(session){ session.exercises = session.exercises.filter(x=> x.id!==delEx.dataset.mdelEx); save(); renderAll(); }
     return;
   }
+  const rtBtn = e.target.closest('[data-rt]');
+  if(rtBtn){
+    const v = rtBtn.dataset.rt;
+    if(v==='skip'){ stopRestTimer(); }
+    else{ mobile.timerEnd += (v==='+15'?15000:-15000); updateRestTimer(); }
+    return;
+  }
   const selW = e.target.closest('[data-mselw]');
   if(selW){ mobile.padActive='weight'; mRenderEntryScreen(); return; }
   const selR = e.target.closest('[data-mselr]');
@@ -2107,14 +2393,18 @@ mContent.addEventListener('click', async e=>{
     if(ex){
       const weight = parseFloat(mobile.padWeight)||0;
       const reps = parseFloat(mobile.padReps)||0;
+      let targetSet;
       if(mobile.setIdx!==null && ex.sets[mobile.setIdx]){
         // Preenche a série prescrita, mantendo o alvo do protocolo.
-        ex.sets[mobile.setIdx].weight = weight;
-        ex.sets[mobile.setIdx].reps = reps;
+        targetSet = ex.sets[mobile.setIdx];
+        targetSet.weight = weight;
+        targetSet.reps = reps;
       }else{
         const last = ex.sets[ex.sets.length-1];
-        ex.sets.push({ weight, reps, target: last ? (last.target||'') : '' });
+        targetSet = { weight, reps, target: last ? (last.target||'') : '' };
+        ex.sets.push(targetSet);
       }
+      if(weight>0){ maybeCelebratePR(ex.name, targetSet); startRestTimer(90); }
       // Vai para a próxima série ainda não feita; se acabou, fica no modo "nova".
       const next = mFirstPendingSet(ex, (mobile.setIdx===null?ex.sets.length:mobile.setIdx+1));
       if(next!==null){ mSelectSet(next); }
@@ -2199,6 +2489,8 @@ function renderAll(){
   renderSessions();
   renderProgress();
   renderStats();
+  renderDashboard();
+  renderVolumeChart();
   mRender();
 }
 
@@ -2277,8 +2569,8 @@ document.getElementById('exportPdfBtn').addEventListener('click', ()=>{
       head: [['Exercício','Atual','Anterior','1RM est.','Variação']],
       body: rows,
       styles:{fontSize:8.5, cellPadding:2.5},
-      headStyles:{fillColor:[36,35,32], textColor:255},
-      alternateRowStyles:{fillColor:[245,243,238]}
+      headStyles:{fillColor:[124,92,255], textColor:255},
+      alternateRowStyles:{fillColor:[245,243,250]}
     });
     y = doc.lastAutoTable.finalY + 12;
   }
@@ -2308,7 +2600,7 @@ document.getElementById('exportPdfBtn').addEventListener('click', ()=>{
       head: [['Exercício','Série','Alvo','Reps','Carga']],
       body: rows,
       styles:{fontSize:8.5, cellPadding:2.2},
-      headStyles:{fillColor:[244,191,31], textColor:20},
+      headStyles:{fillColor:[124,92,255], textColor:255},
       columnStyles:{1:{cellWidth:16},2:{cellWidth:24},3:{cellWidth:18},4:{cellWidth:22}}
     });
     y = doc.lastAutoTable.finalY + 10;
