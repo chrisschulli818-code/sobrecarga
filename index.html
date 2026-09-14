@@ -170,8 +170,9 @@ button:disabled{opacity:.4;cursor:not-allowed;}
 .dash{display:grid;grid-template-columns:1.3fr 1fr;gap:14px;}
 @media (max-width:760px){.dash{grid-template-columns:1fr;}}
 .dash-cta{
-  background:var(--surface-2);border-left:3px solid var(--accent);
+  background:var(--surface-2);
   border:1px solid var(--border);border-radius:var(--radius-lg);padding:20px;
+  border-left:3px solid var(--accent);
   display:flex;flex-direction:column;gap:10px;justify-content:space-between;
 }
 .dash-cta .k{font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--text-faint);font-weight:700;}
@@ -430,8 +431,8 @@ footer{text-align:center;color:var(--text-faint);font-size:11px;margin-top:32px;
 /* dashboard (dentro da lista de Treinos) */
 .mdash-cta{
   margin:14px 16px;padding:16px;border-radius:var(--radius-lg);
-  background:var(--surface-2);border-left:3px solid var(--accent);
-  border:1px solid var(--border);
+  background:var(--surface-2);border:1px solid var(--border);
+  border-left:3px solid var(--accent);
 }
 .mdash-cta .k{font-size:10.5px;text-transform:uppercase;letter-spacing:.08em;color:var(--text-faint);font-weight:700;}
 .mdash-cta .v{font-family:'Archivo',sans-serif;font-size:17px;font-weight:600;margin:4px 0 12px;text-transform:uppercase;letter-spacing:.01em;}
@@ -473,6 +474,7 @@ footer{text-align:center;color:var(--text-faint);font-size:11px;margin-top:32px;
 .student-row{
   display:flex;align-items:center;justify-content:space-between;gap:12px;
   background:var(--surface-2);border:1px solid var(--border);border-radius:var(--radius-md);
+  border-left:3px solid var(--accent);
   padding:14px 16px;margin-bottom:10px;
 }
 .student-row .sname{font-weight:700;font-size:14.5px;}
