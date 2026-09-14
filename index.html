@@ -2592,9 +2592,9 @@ function renderTourStep(){
   const last = tourIndex === TOUR_STEPS.length - 1;
   const targetEl = step.target ? mContent.querySelector(step.target) : null;
   if(targetEl){
-    targetEl.scrollIntoView({block:'center', behavior:'instant' in document.body.style ? 'instant' : 'auto'});
+    targetEl.scrollIntoView({block:'center', behavior:'auto'});
   }
-  requestAnimationFrame(()=>{
+  setTimeout(()=>{
     if(targetEl){
       const r = targetEl.getBoundingClientRect();
       const pad = 6;
@@ -2631,7 +2631,7 @@ function renderTourStep(){
       tourIndex++;
       renderTourStep();
     });
-  });
+  }, 60);
 }
 mTourBtn.addEventListener('click', startTour);
 
