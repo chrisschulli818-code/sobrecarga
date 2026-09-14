@@ -458,6 +458,10 @@ footer{text-align:center;color:var(--text-faint);font-size:11px;margin-top:32px;
 .volume-chart{display:flex;align-items:flex-end;gap:5px;height:80px;padding:4px 16px 20px;position:relative;}
 .mempty-vol{padding:0 16px;color:var(--text-faint);font-size:11.5px;}
 .gate{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px;}
+.lang-toggle{position:fixed;top:16px;right:16px;display:flex;border:1px solid var(--border);z-index:10;}
+.lang-toggle .lang-pill{background:none;border:none;color:var(--text-faint);font-family:'Archivo',sans-serif;font-weight:800;font-size:11px;padding:6px 11px;cursor:pointer;}
+.lang-toggle .lang-pill.active{background:var(--accent);color:var(--accent-ink);}
+.ghost-link{background:none;border:none;color:var(--text-dim);font-family:'Archivo',sans-serif;font-size:12.5px;font-weight:600;text-decoration:underline;cursor:pointer;margin-top:14px;padding:4px;}
 .gate-box{width:100%;max-width:340px;text-align:center;}
 .gate-box .mark{margin:0 auto 16px;}
 .gate-box h1{margin-bottom:6px;}
@@ -483,17 +487,22 @@ footer{text-align:center;color:var(--text-faint);font-size:11px;margin-top:32px;
 </style>
 
 <div id="gateScreen" class="gate">
+  <div class="lang-toggle" id="langToggle">
+    <button type="button" class="lang-pill" data-lang="pt">PT</button>
+    <button type="button" class="lang-pill" data-lang="en">EN</button>
+  </div>
   <div class="gate-box">
     <span class="mark" style="width:56px;height:56px;">
       <svg viewBox="0 0 24 24" fill="none" style="width:30px;height:30px;">
         <path d="M4 12h2M18 12h2M7 9v6M17 9v6M7 12h10" stroke="#fff" stroke-width="2" stroke-linecap="round"/>
       </svg>
     </span>
-    <h1>Sobrecarga</h1>
-    <div class="tagline">Entre com o código que o seu professor te passou.</div>
-    <input type="text" id="gateCodeInput" class="gate-code-input" maxlength="10" placeholder="CÓDIGO" autocomplete="off" autocapitalize="characters">
-    <button class="primary" id="gateSubmitBtn" style="width:100%;justify-content:center;">Entrar</button>
+    <h1 data-i18n="appName">Sobrecarga</h1>
+    <div class="tagline" data-i18n="gateSubhead">Entre com o código que o seu professor te passou.</div>
+    <input type="text" id="gateCodeInput" class="gate-code-input" maxlength="10" data-i18n-placeholder="codePlaceholder" placeholder="CÓDIGO" autocomplete="off" autocapitalize="characters">
+    <button class="primary" id="gateSubmitBtn" data-i18n="enter" style="width:100%;justify-content:center;">Entrar</button>
     <div class="gate-error" id="gateError"></div>
+    <button type="button" class="ghost-link" id="gateCoachHint" data-i18n="accessAsCoach">Acessar como professor</button>
   </div>
 </div>
 
@@ -510,7 +519,7 @@ footer{text-align:center;color:var(--text-faint);font-size:11px;margin-top:32px;
         <div class="tagline">Área do professor — gerencie os alunos e acompanhe o treino de cada um.</div>
       </div>
     </div>
-    <button class="ghost small" id="logoutBtnProf">sair</button>
+    <button class="ghost small" id="logoutBtnProf" data-i18n="logout">sair</button>
   </div>
   <div class="card">
     <div class="card-head">
@@ -673,14 +682,18 @@ footer{text-align:center;color:var(--text-faint);font-size:11px;margin-top:32px;
     <div class="mheader-top">
       <button id="mBack" class="mback" hidden>‹</button>
       <div class="mtitle" id="mTitle">Sobrecarga</div>
-      <button id="mTourBtn" class="mtourbtn" title="Tour do app">?</button>
+      <div class="lang-toggle" id="mLangToggle" style="position:static;flex:none;">
+        <button type="button" class="lang-pill" data-lang="pt">PT</button>
+        <button type="button" class="lang-pill" data-lang="en">EN</button>
+      </div>
+      <button id="mTourBtn" class="mtourbtn" data-i18n-title="tourBtnTitle" title="Tour do app">?</button>
     </div>
     <div id="mProfessorBar" class="mprofessor-bar" hidden>👁 Área do professor — somente leitura</div>
   </div>
   <div class="mcontent" id="mContent"></div>
   <div class="mtabbar">
-    <button class="mtab" data-mtab="treinos"><span class="micon">🏋</span><span>Treinos</span></button>
-    <button class="mtab" data-mtab="progresso"><span class="micon">Δ</span><span>Progresso</span></button>
+    <button class="mtab" data-mtab="treinos"><span class="micon">🏋</span><span data-i18n="workoutsTab">Treinos</span></button>
+    <button class="mtab" data-mtab="progresso"><span class="micon">Δ</span><span data-i18n="progressTab">Progresso</span></button>
   </div>
 </div>
 
@@ -689,6 +702,65 @@ footer{text-align:center;color:var(--text-faint);font-size:11px;margin-top:32px;
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
 <script>
 pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+
+/* ---------- Idioma da interface (PT/EN) ----------
+   Traduz só o texto fixo do app (botões, títulos, rótulos). Nomes de
+   sessão/exercício vêm da ficha real do aluno e continuam como foram
+   importados — traduzir conteúdo do usuário automaticamente não faz
+   sentido aqui. */
+const I18N = {
+  pt: {
+    appName:'Sobrecarga', gateSubhead:'Entre com o código que o seu professor te passou.',
+    codePlaceholder:'CÓDIGO', enter:'Entrar', accessAsCoach:'Acessar como professor',
+    coachHintToast:'Digite seu código de professor no campo acima.',
+    nextWorkout:'Próximo treino', startWorkout:'Ir para o treino',
+    weeksLabel:'semanas', sessionsLabel:'Sessões', exercisesLabel:'Exercícios',
+    muscleMap:'Mapa Muscular', muscleMapHint:'Toque num músculo pra montar o treino na hora',
+    front:'Frente', back:'Costas', importPdf:'↥ Importar / escanear PDF',
+    workoutsTab:'Treinos', progressTab:'Progresso',
+    newSession:'+ nova sessão', buildWorkout:'🎯 montar treino',
+    noSessionsYet:'Nenhuma sessão ainda', importHint:'Importe um PDF ou crie manualmente.',
+    importPdfCta:'Importe sua ficha para começar',
+    logout:'sair', tourBtnTitle:'Tour do app',
+  },
+  en: {
+    appName:'Sobrecarga', gateSubhead:'Enter the code your coach gave you.',
+    codePlaceholder:'CODE', enter:'Sign in', accessAsCoach:'Continue as coach',
+    coachHintToast:'Enter your coach code in the field above.',
+    nextWorkout:'Next workout', startWorkout:'Start workout',
+    weeksLabel:'weeks', sessionsLabel:'Sessions', exercisesLabel:'Exercises',
+    muscleMap:'Muscle map', muscleMapHint:'Tap a muscle to build a workout right now',
+    front:'Front', back:'Back', importPdf:'↥ Import / scan PDF',
+    workoutsTab:'Workouts', progressTab:'Progress',
+    newSession:'+ new session', buildWorkout:'🎯 build workout',
+    noSessionsYet:'No sessions yet', importHint:'Import a PDF or create one manually.',
+    importPdfCta:'Import your workout sheet to get started',
+    logout:'log out', tourBtnTitle:'App tour',
+  }
+};
+let lang = 'pt';
+try{ lang = localStorage.getItem('sobrecarga_lang') || 'pt'; }catch(e){}
+function t(key){ return (I18N[lang] && I18N[lang][key]) || I18N.pt[key] || key; }
+function applyStaticI18n(root){
+  (root||document).querySelectorAll('[data-i18n]').forEach(el=>{ el.textContent = t(el.dataset.i18n); });
+  (root||document).querySelectorAll('[data-i18n-placeholder]').forEach(el=>{ el.placeholder = t(el.dataset.i18nPlaceholder); });
+  (root||document).querySelectorAll('[data-i18n-title]').forEach(el=>{ el.title = t(el.dataset.i18nTitle); });
+  document.querySelectorAll('.lang-pill').forEach(b=> b.classList.toggle('active', b.dataset.lang===lang));
+}
+function setLang(l){
+  lang = l;
+  try{ localStorage.setItem('sobrecarga_lang', l); }catch(e){}
+  applyStaticI18n();
+  if(typeof mRender==='function' && auth) mRender();
+}
+document.querySelectorAll('.lang-pill').forEach(btn=>{
+  btn.addEventListener('click', ()=> setLang(btn.dataset.lang));
+});
+document.getElementById('gateCoachHint')?.addEventListener('click', ()=>{
+  document.getElementById('gateCodeInput').focus();
+  showToast(t('coachHintToast'));
+});
+applyStaticI18n();
 
 /* ---------- Autenticação por código ----------
    Sem e-mail/senha: o professor tem um código fixo e cria um código por aluno.
@@ -2320,8 +2392,8 @@ const BACK_HOTSPOTS_SVG = `<ellipse cx="378.0" cy="94.5" rx="47.0" ry="32.5" cla
 
 function bodyMapHtml(view){
   return `<div class="body-map-tabs">
-    <button type="button" class="bmtab${view!=='back'?' active':''}" data-bmview="front">Frente</button>
-    <button type="button" class="bmtab${view==='back'?' active':''}" data-bmview="back">Costas</button>
+    <button type="button" class="bmtab${view!=='back'?' active':''}" data-bmview="front">${t('front')}</button>
+    <button type="button" class="bmtab${view==='back'?' active':''}" data-bmview="back">${t('back')}</button>
   </div>
   <div class="body-map">${muscleMapSvg(view==='back'?'back':'front')}</div>`;
 }
@@ -2563,16 +2635,19 @@ const TOUR_STEPS = [
 ];
 let tourIndex = -1;
 let tourOverlayEl = null, tourSpotlightEl = null, tourTooltipEl = null;
+let tourTimer = null;
 function tourStorageKey(){ return 'sobrecarga_tour_seen_' + (activeStudentId() || 'x'); }
 function startTour(){
   if(mShell.hidden) return; // tour cobre só a versão mobile por enquanto
+  endTour(false);
   mobile.tab = 'treinos'; mobile.screen = 'list'; mRender();
   tourIndex = 0;
   buildTourDOM();
   renderTourStep();
 }
-function endTour(){
-  try{ localStorage.setItem(tourStorageKey(), '1'); }catch(e){}
+function endTour(markSeen){
+  clearTimeout(tourTimer);
+  if(markSeen!==false){ try{ localStorage.setItem(tourStorageKey(), '1'); }catch(e){} }
   if(tourOverlayEl){ tourOverlayEl.remove(); tourSpotlightEl.remove(); tourTooltipEl.remove(); }
   tourOverlayEl = tourSpotlightEl = tourTooltipEl = null;
   tourIndex = -1;
@@ -2587,7 +2662,7 @@ function buildTourDOM(){
   document.body.appendChild(tourOverlayEl);
   document.body.appendChild(tourSpotlightEl);
   document.body.appendChild(tourTooltipEl);
-  tourOverlayEl.addEventListener('click', endTour);
+  tourOverlayEl.addEventListener('click', ()=> endTour());
 }
 function renderTourStep(){
   const step = TOUR_STEPS[tourIndex];
@@ -2596,7 +2671,9 @@ function renderTourStep(){
   if(targetEl){
     targetEl.scrollIntoView({block:'center', behavior:'auto'});
   }
-  setTimeout(()=>{
+  clearTimeout(tourTimer);
+  tourTimer = setTimeout(()=>{
+    if(!tourSpotlightEl || !tourTooltipEl) return; // tour foi fechado antes deste timer disparar
     if(targetEl){
       const r = targetEl.getBoundingClientRect();
       const pad = 6;
@@ -2627,7 +2704,7 @@ function renderTourStep(){
         <button class="tt-skip" id="tourSkipBtn">Pular</button>
         <button class="tt-next" id="tourNextBtn">${last ? 'Concluir' : 'Próximo'}</button>
       </div>`;
-    document.getElementById('tourSkipBtn').addEventListener('click', endTour);
+    document.getElementById('tourSkipBtn').addEventListener('click', ()=> endTour());
     document.getElementById('tourNextBtn').addEventListener('click', ()=>{
       if(tourIndex >= TOUR_STEPS.length-1){ endTour(); return; }
       tourIndex++;
@@ -2693,30 +2770,30 @@ function mRenderSessionsList(){
   let html = '';
   const next = findNextSession();
   html += `<div class="mdash-cta">
-    <div class="k">Próximo treino</div>
-    <div class="v">${next ? escapeHtml(next.name) : (state.sessions.length ? 'Tudo em dia 🎉' : 'Importe sua ficha para começar')}</div>
-    ${next ? `<button class="mprimarybtn" data-maction="gotonext" data-session="${next.id}" style="width:100%;">Ir para o treino</button>` : ''}
+    <div class="k">${t('nextWorkout')}</div>
+    <div class="v">${next ? escapeHtml(next.name) : (state.sessions.length ? 'Tudo em dia 🎉' : t('importPdfCta'))}</div>
+    ${next ? `<button class="mprimarybtn" data-maction="gotonext" data-session="${next.id}" style="width:100%;">${t('startWorkout')}</button>` : ''}
   </div>
   <div class="mdash-stats">
-    <div class="mdash-stat"><div class="n">${computeStreak()}</div><div class="l">🔥 semanas</div></div>
-    <div class="mdash-stat"><div class="n">${state.sessions.length}</div><div class="l">Sessões</div></div>
-    <div class="mdash-stat"><div class="n">${computeProgress().length}</div><div class="l">Exercícios</div></div>
+    <div class="mdash-stat"><div class="n">${computeStreak()}</div><div class="l">🔥 ${t('weeksLabel')}</div></div>
+    <div class="mdash-stat"><div class="n">${state.sessions.length}</div><div class="l">${t('sessionsLabel')}</div></div>
+    <div class="mdash-stat"><div class="n">${computeProgress().length}</div><div class="l">${t('exercisesLabel')}</div></div>
   </div>`;
-  html += `<div class="msection-title" style="margin-top:20px;"><span class="mchip">🗺️</span>Mapa Muscular</div>
-  <div class="hint" style="margin:0 16px 10px;">Toque num músculo pra montar o treino na hora</div>
+  html += `<div class="msection-title" style="margin-top:20px;"><span class="mchip">🗺️</span>${t('muscleMap')}</div>
+  <div class="hint" style="margin:0 16px 10px;">${t('muscleMapHint')}</div>
   <div style="margin:0 16px 14px;">${bodyMapHtml(homeMapView)}</div>`;
   if(!READONLY){
-    html += `<div style="padding:14px 16px 4px;"><button class="mimportbtn" data-maction="import">↥ Importar / escanear PDF</button></div>`;
+    html += `<div style="padding:14px 16px 4px;"><button class="mimportbtn" data-maction="import">${t('importPdf')}</button></div>`;
   }
-  html += `<div class="msection-title"><span class="mchip">✎</span>Treinos</div>`;
+  html += `<div class="msection-title"><span class="mchip">✎</span>${t('workoutsTab')}</div>`;
   if(!READONLY){
     html += `<div style="padding:0 16px 8px;display:flex;gap:8px;flex-wrap:wrap;">
-      <button class="mghostbtn" data-maction="addsession">+ nova sessão</button>
-      <button class="mprimarybtn" data-maction="openbuilder" style="padding:8px 14px;">🎯 montar treino</button>
+      <button class="mghostbtn" data-maction="addsession">${t('newSession')}</button>
+      <button class="mprimarybtn" data-maction="openbuilder" style="padding:8px 14px;">${t('buildWorkout')}</button>
     </div>`;
   }
   if(state.sessions.length===0){
-    html += `<div class="mempty"><strong>Nenhuma sessão ainda</strong>Importe um PDF ou crie manualmente.</div>`;
+    html += `<div class="mempty"><strong>${t('noSessionsYet')}</strong>${t('importHint')}</div>`;
   }else{
     // Bloco por protocolo; dentro dele, uma linha por semana. A divisão de
     // treino (segunda, terça…) aparece ao abrir a semana.
