@@ -318,8 +318,11 @@ footer{text-align:center;color:var(--text-faint);font-size:11px;margin-top:32px;
 @media (max-width:820px){.builder-body{grid-template-columns:1fr;overflow:visible;}}
 .builder-map{padding:14px;border-right:1px solid var(--border);flex-shrink:0;}
 @media (max-width:820px){.builder-map{border-right:none;border-bottom:1px solid var(--border);}}
-.body-map{display:flex;gap:4%;justify-content:center;align-items:flex-start;background:#EEF1F5;border-radius:var(--radius);padding:16px 10px;flex-wrap:nowrap;}
-.muscle-svg{width:48%;max-width:220px;height:auto;display:block;position:relative;}
+.body-map-tabs{display:flex;gap:8px;max-width:280px;margin:0 auto 12px;}
+.body-map-tabs button{flex:1;padding:8px;font-size:11.5px;}
+.body-map-tabs button.active{background:var(--accent);color:#fff;border-color:transparent;}
+.body-map{display:flex;justify-content:center;align-items:flex-start;background:#EEF1F5;border-radius:var(--radius);padding:16px 10px;}
+.muscle-svg{width:100%;max-width:280px;height:auto;display:block;position:relative;}
 .body-lineart{fill:#484A68;fill-rule:evenodd;pointer-events:none;}
 .muscle{fill:transparent;stroke:none;cursor:pointer;transition:fill .15s;}
 .muscle:hover{fill:rgba(255,92,40,.3);}
@@ -2286,8 +2289,12 @@ const BACK_HOTSPOTS_SVG = `<ellipse cx="378.0" cy="94.5" rx="47.0" ry="32.5" cla
     <ellipse cx="360.5" cy="654.0" rx="36.5" ry="52.0" class="muscle" data-muscle="calves" data-muscle-name="Panturrilha"/>
     <ellipse cx="198.5" cy="654.0" rx="36.5" ry="52.0" class="muscle" data-muscle="calves" data-muscle-name="Panturrilha"/>`;
 
-function bodyMapHtml(){
-  return `<div class="body-map">${muscleMapSvg('front')}${muscleMapSvg('back')}</div>`;
+function bodyMapHtml(view){
+  return `<div class="body-map-tabs">
+    <button type="button" class="bmtab${view!=='back'?' active':''}" data-bmview="front">Frente</button>
+    <button type="button" class="bmtab${view==='back'?' active':''}" data-bmview="back">Costas</button>
+  </div>
+  <div class="body-map">${muscleMapSvg(view==='back'?'back':'front')}</div>`;
 }
 function wireBodyMap(root, onPick){
   root.querySelectorAll('[data-muscle]').forEach(el=>{
@@ -2301,13 +2308,15 @@ function syncBodyMapSelection(root, activeMuscle){
 }
 
 /* ---------- Estado do construtor ---------- */
-const builder = { muscle:null, search:'', selected:[] };
+const builder = { muscle:null, view:'front', search:'', selected:[] };
 const builderOverlay = document.getElementById('builderOverlay');
 const muscleMapWrap = document.getElementById('muscleMapWrap');
 
-// initialMuscle: quando aberto a partir do mapa da tela inicial, já entra filtrado nesse músculo.
-function openBuilder(initialMuscle){
+// initialMuscle: quando aberto a partir do mapa da tela inicial, já entra filtrado nesse músculo
+// (na mesma vista frente/costas que estava aberta lá).
+function openBuilder(initialMuscle, initialView){
   builder.muscle = initialMuscle || null;
+  builder.view = initialView || 'front';
   builder.search=''; builder.selected=[];
   document.getElementById('builderSearch').value = '';
   document.getElementById('builderSessionName').value = '';
@@ -2332,7 +2341,10 @@ function renderBuilderProtocolSelect(){
 }
 
 function renderMuscleMap(){
-  muscleMapWrap.innerHTML = bodyMapHtml();
+  muscleMapWrap.innerHTML = bodyMapHtml(builder.view);
+  muscleMapWrap.querySelectorAll('[data-bmview]').forEach(btn=>{
+    btn.addEventListener('click', ()=>{ builder.view = btn.dataset.bmview; renderMuscleMap(); });
+  });
   syncBodyMapSelection(muscleMapWrap, builder.muscle);
   wireBodyMap(muscleMapWrap, m=>{
     builder.muscle = (builder.muscle===m) ? null : m;
@@ -2341,11 +2353,15 @@ function renderMuscleMap(){
   });
 }
 /* ---------- Mapa muscular da tela inicial ---------- */
+let homeMapView = 'front';
 function renderHomeMuscleMap(){
   const wrap = document.getElementById('homeMuscleMapWrap');
   if(!wrap) return;
-  wrap.innerHTML = bodyMapHtml();
-  wireBodyMap(wrap, m=> openBuilder(m));
+  wrap.innerHTML = bodyMapHtml(homeMapView);
+  wrap.querySelectorAll('[data-bmview]').forEach(btn=>{
+    btn.addEventListener('click', ()=>{ homeMapView = btn.dataset.bmview; renderHomeMuscleMap(); });
+  });
+  wireBodyMap(wrap, m=> openBuilder(m, homeMapView));
 }
 renderHomeMuscleMap();
 
@@ -2571,7 +2587,7 @@ function mRenderSessionsList(){
   </div>`;
   html += `<div class="msection-title" style="margin-top:20px;"><span class="mchip">🗺️</span>Mapa Muscular</div>
   <div class="hint" style="margin:0 16px 10px;">Toque num músculo pra montar o treino na hora</div>
-  <div style="margin:0 16px 14px;">${bodyMapHtml()}</div>`;
+  <div style="margin:0 16px 14px;">${bodyMapHtml(homeMapView)}</div>`;
   if(!READONLY){
     html += `<div style="padding:14px 16px 4px;"><button class="mimportbtn" data-maction="import">↥ Importar / escanear PDF</button></div>`;
   }
@@ -2948,8 +2964,10 @@ mContent.addEventListener('click', async e=>{
     }
     return;
   }
+  const bmviewBtn = e.target.closest('[data-bmview]');
+  if(bmviewBtn){ homeMapView = bmviewBtn.dataset.bmview; mRenderSessionsList(); return; }
   const homeMuscle = e.target.closest('[data-muscle]');
-  if(homeMuscle){ openBuilder(homeMuscle.dataset.muscle); return; }
+  if(homeMuscle){ openBuilder(homeMuscle.dataset.muscle, homeMapView); return; }
   const openWeek = e.target.closest('[data-mopen-week]');
   if(openWeek){
     mobile.weekKey = openWeek.dataset.mopenWeek;
