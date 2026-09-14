@@ -300,6 +300,57 @@ footer{text-align:center;color:var(--text-faint);font-size:11px;margin-top:32px;
 }
 .toast.show{opacity:1;transform:translate(-50%,0);}
 
+/* ---------- Montar treino (mapa muscular + banco de exercícios) ---------- */
+.builder-overlay{
+  position:fixed;inset:0;background:rgba(4,4,8,.8);z-index:1500;
+  display:flex;align-items:center;justify-content:center;padding:14px;
+}
+.builder-box{
+  background:var(--bg);border:1px solid var(--border);border-radius:var(--radius-lg);
+  width:100%;max-width:920px;height:min(92vh,860px);display:flex;flex-direction:column;overflow:hidden;
+}
+.builder-header{
+  display:flex;align-items:center;justify-content:space-between;gap:10px;
+  padding:14px 18px;border-bottom:1px solid var(--border);flex-shrink:0;
+}
+.builder-header h2{margin:0;font-family:'Oswald',sans-serif;font-weight:600;font-size:18px;text-transform:uppercase;letter-spacing:.02em;}
+.builder-body{flex:1;overflow:auto;display:grid;grid-template-columns:220px 1fr 260px;gap:0;}
+@media (max-width:820px){.builder-body{grid-template-columns:1fr;overflow:visible;}}
+.builder-map{padding:14px;border-right:1px solid var(--border);flex-shrink:0;}
+@media (max-width:820px){.builder-map{border-right:none;border-bottom:1px solid var(--border);}}
+.builder-map-tabs{display:flex;gap:6px;margin-bottom:10px;}
+.builder-map-tabs button{flex:1;padding:6px;font-size:10.5px;}
+.builder-map-tabs button.active{background:var(--accent);color:#fff;border-color:transparent;}
+.muscle-svg{width:100%;height:auto;display:block;}
+.body-silhouette{fill:var(--surface-2);}
+.muscle{fill:#4a4d59;stroke:var(--bg);stroke-width:1.5;cursor:pointer;transition:fill .12s;}
+.muscle:hover{fill:var(--accent-dark);}
+.muscle.selected{fill:var(--accent);}
+.muscle-clear{width:100%;margin-top:10px;}
+
+.builder-list-col{padding:14px;border-right:1px solid var(--border);display:flex;flex-direction:column;min-height:0;}
+@media (max-width:820px){.builder-list-col{border-right:none;border-bottom:1px solid var(--border);}}
+.builder-search{margin-bottom:8px;}
+.builder-muscle-label{font-size:12px;color:var(--accent);font-weight:700;margin-bottom:8px;text-transform:uppercase;letter-spacing:.03em;}
+.builder-exercise-list{flex:1;overflow:auto;min-height:120px;}
+.ex-pick-row{
+  display:flex;align-items:center;justify-content:space-between;gap:10px;
+  padding:9px 10px;border-radius:var(--radius-sm);cursor:pointer;
+}
+.ex-pick-row:hover{background:var(--surface-2);}
+.ex-pick-row .epn{font-size:13px;font-weight:600;}
+.ex-pick-row .epm{font-size:10.5px;color:var(--text-faint);}
+.ex-pick-row .epadd{color:var(--accent);font-size:20px;font-weight:700;flex:none;}
+
+.builder-selected-col{padding:14px;display:flex;flex-direction:column;min-height:0;}
+.builder-selected-list{flex:1;overflow:auto;margin-bottom:10px;}
+.sel-ex-row{background:var(--surface-2);border:1px solid var(--border);border-radius:var(--radius-sm);padding:8px 10px;margin-bottom:8px;}
+.sel-ex-row .sen{font-size:12.5px;font-weight:700;margin-bottom:6px;display:flex;justify-content:space-between;gap:6px;}
+.sel-ex-row .sefields{display:flex;gap:6px;}
+.sel-ex-row input{font-size:12px;padding:5px 6px;}
+.builder-finalize{border-top:1px solid var(--border);padding-top:10px;display:flex;flex-direction:column;gap:8px;}
+.builder-finalize input, .builder-finalize select{font-size:13px;}
+
 /* ---------- Mobile app shell (telas estilo app, teclado numérico) ---------- */
 .mshell{display:none;}
 @media (max-width:640px){
@@ -530,6 +581,7 @@ footer{text-align:center;color:var(--text-faint);font-size:11px;margin-top:32px;
       <div style="display:flex;gap:8px;flex-wrap:wrap;">
         <button class="small" id="addProtocolBtn">+ novo protocolo</button>
         <button class="small" id="addSessionBtn">+ nova sessão manual</button>
+        <button class="small primary" id="openBuilderBtn">🎯 montar treino</button>
       </div>
     </div>
     <div id="sessionsList"></div>
@@ -560,6 +612,40 @@ footer{text-align:center;color:var(--text-faint);font-size:11px;margin-top:32px;
   </div>
 
   <footer>Os dados sincronizam entre seus aparelhos. Uma cópia fica salva neste navegador para funcionar offline.</footer>
+</div>
+
+<div id="builderOverlay" class="builder-overlay" hidden>
+  <div class="builder-box">
+    <div class="builder-header">
+      <h2>🎯 Montar treino</h2>
+      <button class="ghost small" id="builderCloseBtn">✕</button>
+    </div>
+    <div class="builder-body">
+      <div class="builder-map">
+        <div class="builder-map-tabs">
+          <button type="button" class="active" data-mapview="front">Frente</button>
+          <button type="button" data-mapview="back">Costas</button>
+        </div>
+        <div id="muscleMapWrap"></div>
+        <button type="button" class="ghost small muscle-clear" id="muscleClearBtn">Ver todos os músculos</button>
+      </div>
+      <div class="builder-list-col">
+        <input type="text" id="builderSearch" class="builder-search" placeholder="Buscar exercício...">
+        <div class="builder-muscle-label" id="builderMuscleLabel">Todos os músculos</div>
+        <div id="builderExerciseList" class="builder-exercise-list"></div>
+      </div>
+      <div class="builder-selected-col">
+        <div class="msection-title" style="margin:0 0 10px;">Treino montado (<span id="builderCount">0</span>)</div>
+        <div id="builderSelectedList" class="builder-selected-list"></div>
+        <div class="builder-finalize">
+          <input type="text" id="builderSessionName" placeholder="nome da sessão (ex.: Treino A — Peito)">
+          <input type="date" id="builderSessionDate">
+          <select id="builderProtocolSelect"></select>
+          <button class="primary" id="builderSaveBtn" style="justify-content:center;">Salvar treino</button>
+        </div>
+      </div>
+    </div>
+  </div>
 </div>
 
 <div id="mShell" class="mshell">
@@ -2060,6 +2146,267 @@ function renderVolumeChart(){
 function escapeHtml(s){ return String(s).replace(/[&<>"']/g, c=> ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 function escapeAttr(s){ return escapeHtml(s); }
 
+/* ---------- Montar treino: banco de exercícios + mapa muscular ---------- */
+const MUSCLE_LABELS = {
+  chest:'Peito', back:'Costas', shoulders:'Ombros', biceps:'Bíceps', triceps:'Tríceps',
+  forearms:'Antebraço', abs:'Abdômen', quads:'Quadríceps', hamstrings:'Posterior de coxa',
+  glutes:'Glúteos', calves:'Panturrilha', traps:'Trapézio'
+};
+const EXERCISE_DB = [
+  // Peito
+  {name:'Supino reto (barra)', muscle:'chest', target:'8 a 12'},
+  {name:'Supino inclinado (halteres)', muscle:'chest', target:'8 a 12'},
+  {name:'Supino declinado', muscle:'chest', target:'8 a 12'},
+  {name:'Crucifixo reto', muscle:'chest', target:'10 a 15'},
+  {name:'Crucifixo inclinado (cabo)', muscle:'chest', target:'10 a 15'},
+  {name:'Peck deck (voador)', muscle:'chest', target:'12 a 15'},
+  {name:'Crossover', muscle:'chest', target:'12 a 15'},
+  {name:'Flexão de braço', muscle:'chest', target:'max'},
+  {name:'Supino máquina', muscle:'chest', target:'8 a 12'},
+  // Costas
+  {name:'Puxada frente (pulley)', muscle:'back', target:'8 a 12'},
+  {name:'Puxada supinada', muscle:'back', target:'8 a 12'},
+  {name:'Remada curvada (barra)', muscle:'back', target:'8 a 12'},
+  {name:'Remada cavalinho', muscle:'back', target:'8 a 12'},
+  {name:'Remada unilateral (halter)', muscle:'back', target:'10 a 12'},
+  {name:'Remada baixa (cabo)', muscle:'back', target:'10 a 12'},
+  {name:'Pull-over', muscle:'back', target:'10 a 15'},
+  {name:'Barra fixa', muscle:'back', target:'max'},
+  {name:'Levantamento terra', muscle:'back', target:'6 a 10'},
+  // Ombros
+  {name:'Desenvolvimento militar', muscle:'shoulders', target:'8 a 12'},
+  {name:'Desenvolvimento com halteres', muscle:'shoulders', target:'8 a 12'},
+  {name:'Elevação lateral', muscle:'shoulders', target:'12 a 15'},
+  {name:'Elevação frontal', muscle:'shoulders', target:'12 a 15'},
+  {name:'Remada alta', muscle:'shoulders', target:'10 a 12'},
+  {name:'Crucifixo invertido', muscle:'shoulders', target:'12 a 15'},
+  // Bíceps
+  {name:'Rosca direta (barra)', muscle:'biceps', target:'8 a 12'},
+  {name:'Rosca alternada (halteres)', muscle:'biceps', target:'10 a 12'},
+  {name:'Rosca scott', muscle:'biceps', target:'10 a 12'},
+  {name:'Rosca martelo', muscle:'biceps', target:'10 a 12'},
+  {name:'Rosca concentrada', muscle:'biceps', target:'10 a 12'},
+  {name:'Rosca no cabo', muscle:'biceps', target:'10 a 12'},
+  // Tríceps
+  {name:'Tríceps corda (pulley)', muscle:'triceps', target:'10 a 15'},
+  {name:'Tríceps testa', muscle:'triceps', target:'8 a 12'},
+  {name:'Tríceps francês', muscle:'triceps', target:'10 a 12'},
+  {name:'Mergulho no banco', muscle:'triceps', target:'10 a 15'},
+  {name:'Tríceps coice', muscle:'triceps', target:'12 a 15'},
+  {name:'Supino fechado', muscle:'triceps', target:'8 a 12'},
+  // Antebraço
+  {name:'Rosca de punho', muscle:'forearms', target:'15 a 20'},
+  {name:'Rosca inversa', muscle:'forearms', target:'12 a 15'},
+  {name:"Farmer's walk", muscle:'forearms', target:'20 a 30'},
+  // Abdômen
+  {name:'Abdominal supra', muscle:'abs', target:'15 a 20'},
+  {name:'Abdominal infra', muscle:'abs', target:'15 a 20'},
+  {name:'Prancha', muscle:'abs', target:'max'},
+  {name:'Abdominal oblíquo', muscle:'abs', target:'15 a 20'},
+  {name:'Elevação de pernas', muscle:'abs', target:'12 a 15'},
+  {name:'Abdominal na polia', muscle:'abs', target:'12 a 15'},
+  // Quadríceps
+  {name:'Agachamento livre', muscle:'quads', target:'8 a 12'},
+  {name:'Leg press', muscle:'quads', target:'10 a 15'},
+  {name:'Cadeira extensora', muscle:'quads', target:'12 a 15'},
+  {name:'Agachamento hack', muscle:'quads', target:'10 a 12'},
+  {name:'Afundo', muscle:'quads', target:'10 a 12'},
+  {name:'Agachamento búlgaro', muscle:'quads', target:'10 a 12'},
+  // Posterior de coxa
+  {name:'Mesa flexora', muscle:'hamstrings', target:'10 a 15'},
+  {name:'Cadeira flexora', muscle:'hamstrings', target:'10 a 15'},
+  {name:'Stiff', muscle:'hamstrings', target:'8 a 12'},
+  {name:'Levantamento terra romeno', muscle:'hamstrings', target:'8 a 12'},
+  {name:'Flexora em pé', muscle:'hamstrings', target:'12 a 15'},
+  // Glúteos
+  {name:'Elevação pélvica (hip thrust)', muscle:'glutes', target:'10 a 15'},
+  {name:'Cadeira abdutora', muscle:'glutes', target:'15 a 20'},
+  {name:'Glúteo no cabo (coice)', muscle:'glutes', target:'12 a 15'},
+  {name:'Agachamento sumô', muscle:'glutes', target:'10 a 12'},
+  // Panturrilha
+  {name:'Panturrilha em pé', muscle:'calves', target:'15 a 20'},
+  {name:'Panturrilha sentado', muscle:'calves', target:'15 a 20'},
+  {name:'Panturrilha no leg press', muscle:'calves', target:'15 a 20'},
+  // Trapézio
+  {name:'Encolhimento com halteres', muscle:'traps', target:'12 a 15'},
+  {name:'Encolhimento com barra', muscle:'traps', target:'12 a 15'},
+  {name:'Face pull', muscle:'traps', target:'12 a 15'}
+];
+
+function muscleBodySilhouette(){
+  return `<circle cx="100" cy="28" r="20" class="body-silhouette"/>
+    <path d="M72,52 L128,52 L133,175 L67,175 Z" class="body-silhouette"/>
+    <rect x="33" y="58" width="22" height="115" rx="11" class="body-silhouette"/>
+    <rect x="145" y="58" width="22" height="115" rx="11" class="body-silhouette"/>
+    <rect x="70" y="175" width="27" height="150" rx="13" class="body-silhouette"/>
+    <rect x="103" y="175" width="27" height="150" rx="13" class="body-silhouette"/>`;
+}
+function muscleMapSvg(view){
+  const front = `<ellipse cx="80" cy="68" rx="14" ry="12" class="muscle" data-muscle="shoulders"/>
+    <ellipse cx="120" cy="68" rx="14" ry="12" class="muscle" data-muscle="shoulders"/>
+    <path d="M78,72 Q100,65 122,72 L120,105 Q100,112 80,105 Z" class="muscle" data-muscle="chest"/>
+    <rect x="82" y="110" width="36" height="55" rx="6" class="muscle" data-muscle="abs"/>
+    <ellipse cx="44" cy="95" rx="11" ry="20" class="muscle" data-muscle="biceps"/>
+    <ellipse cx="156" cy="95" rx="11" ry="20" class="muscle" data-muscle="biceps"/>
+    <rect x="34" y="125" width="20" height="45" rx="9" class="muscle" data-muscle="forearms"/>
+    <rect x="146" y="125" width="20" height="45" rx="9" class="muscle" data-muscle="forearms"/>
+    <rect x="72" y="180" width="24" height="90" rx="10" class="muscle" data-muscle="quads"/>
+    <rect x="104" y="180" width="24" height="90" rx="10" class="muscle" data-muscle="quads"/>`;
+  const back = `<path d="M80,55 L120,55 L110,85 L90,85 Z" class="muscle" data-muscle="traps"/>
+    <path d="M75,85 L125,85 L120,155 L80,155 Z" class="muscle" data-muscle="back"/>
+    <ellipse cx="44" cy="95" rx="11" ry="20" class="muscle" data-muscle="triceps"/>
+    <ellipse cx="156" cy="95" rx="11" ry="20" class="muscle" data-muscle="triceps"/>
+    <path d="M72,178 L98,178 L98,208 L72,208 Z" class="muscle" data-muscle="glutes"/>
+    <path d="M102,178 L128,178 L128,208 L102,208 Z" class="muscle" data-muscle="glutes"/>
+    <rect x="72" y="212" width="24" height="60" rx="8" class="muscle" data-muscle="hamstrings"/>
+    <rect x="104" y="212" width="24" height="60" rx="8" class="muscle" data-muscle="hamstrings"/>
+    <rect x="74" y="278" width="20" height="45" rx="8" class="muscle" data-muscle="calves"/>
+    <rect x="106" y="278" width="20" height="45" rx="8" class="muscle" data-muscle="calves"/>`;
+  return `<svg viewBox="0 0 200 330" class="muscle-svg">${muscleBodySilhouette()}${view==='back'?back:front}</svg>`;
+}
+
+/* ---------- Estado do construtor ---------- */
+const builder = { view:'front', muscle:null, search:'', selected:[] };
+const builderOverlay = document.getElementById('builderOverlay');
+const muscleMapWrap = document.getElementById('muscleMapWrap');
+
+function openBuilder(){
+  builder.view='front'; builder.muscle=null; builder.search=''; builder.selected=[];
+  document.getElementById('builderSearch').value = '';
+  document.getElementById('builderSessionName').value = '';
+  document.getElementById('builderSessionDate').value = todayISO();
+  document.querySelectorAll('[data-mapview]').forEach(b=> b.classList.toggle('active', b.dataset.mapview==='front'));
+  renderBuilderProtocolSelect();
+  renderMuscleMap();
+  renderBuilderExerciseList();
+  renderBuilderSelected();
+  builderOverlay.hidden = false;
+}
+function closeBuilder(){ builderOverlay.hidden = true; }
+document.getElementById('openBuilderBtn').addEventListener('click', openBuilder);
+document.getElementById('builderCloseBtn').addEventListener('click', closeBuilder);
+builderOverlay.addEventListener('click', e=>{ if(e.target===builderOverlay) closeBuilder(); });
+
+function renderBuilderProtocolSelect(){
+  const sel = document.getElementById('builderProtocolSelect');
+  sel.innerHTML = `<option value="__new">➕ Novo protocolo</option>` +
+    state.protocols.map(p=> `<option value="${escapeAttr(p.id)}">${escapeHtml(p.name)}</option>`).join('');
+  const latest = newestProtocolId();
+  if(latest) sel.value = latest;
+}
+
+function renderMuscleMap(){
+  muscleMapWrap.innerHTML = muscleMapSvg(builder.view);
+  muscleMapWrap.querySelectorAll('[data-muscle]').forEach(el=>{
+    el.classList.toggle('selected', el.dataset.muscle===builder.muscle);
+    el.addEventListener('click', ()=>{
+      builder.muscle = (builder.muscle===el.dataset.muscle) ? null : el.dataset.muscle;
+      renderMuscleMap();
+      renderBuilderExerciseList();
+    });
+  });
+}
+document.querySelectorAll('[data-mapview]').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    builder.view = btn.dataset.mapview;
+    document.querySelectorAll('[data-mapview]').forEach(b=> b.classList.toggle('active', b===btn));
+    renderMuscleMap();
+  });
+});
+document.getElementById('muscleClearBtn').addEventListener('click', ()=>{
+  builder.muscle = null;
+  renderMuscleMap();
+  renderBuilderExerciseList();
+});
+document.getElementById('builderSearch').addEventListener('input', e=>{
+  builder.search = e.target.value.trim().toLowerCase();
+  renderBuilderExerciseList();
+});
+
+function renderBuilderExerciseList(){
+  document.getElementById('builderMuscleLabel').textContent = builder.muscle ? MUSCLE_LABELS[builder.muscle] : 'Todos os músculos';
+  const list = document.getElementById('builderExerciseList');
+  const filtered = EXERCISE_DB.filter(ex=>
+    (!builder.muscle || ex.muscle===builder.muscle) &&
+    (!builder.search || ex.name.toLowerCase().includes(builder.search))
+  );
+  if(filtered.length===0){
+    list.innerHTML = `<div class="empty" style="padding:20px 10px;">Nenhum exercício encontrado.</div>`;
+    return;
+  }
+  list.innerHTML = filtered.map((ex,i)=> `
+    <div class="ex-pick-row" data-pickex="${escapeAttr(ex.name)}">
+      <div><div class="epn">${escapeHtml(ex.name)}</div><div class="epm">${MUSCLE_LABELS[ex.muscle]} · alvo ${escapeHtml(ex.target)}</div></div>
+      <span class="epadd">+</span>
+    </div>`).join('');
+  list.querySelectorAll('[data-pickex]').forEach(row=>{
+    row.addEventListener('click', ()=>{
+      const ex = EXERCISE_DB.find(e=> e.name===row.dataset.pickex);
+      if(!ex) return;
+      builder.selected.push({ name: ex.name, muscle: ex.muscle, sets: 3, target: ex.target });
+      renderBuilderSelected();
+    });
+  });
+}
+
+function renderBuilderSelected(){
+  document.getElementById('builderCount').textContent = builder.selected.length;
+  const list = document.getElementById('builderSelectedList');
+  if(builder.selected.length===0){
+    list.innerHTML = `<div class="empty" style="padding:16px 6px;font-size:12px;">Toque num músculo ou busque um exercício para adicionar.</div>`;
+    return;
+  }
+  list.innerHTML = builder.selected.map((s,i)=> `
+    <div class="sel-ex-row">
+      <div class="sen"><span>${escapeHtml(s.name)}</span><button class="ghost small" data-rmsel="${i}" style="padding:0 4px;">✕</button></div>
+      <div class="sefields">
+        <input type="number" min="1" max="10" value="${s.sets}" data-selfield="${i}:sets" title="séries" style="width:60px;">
+        <input type="text" value="${escapeAttr(s.target)}" data-selfield="${i}:target" title="alvo (reps)" placeholder="alvo" style="flex:1;">
+      </div>
+    </div>`).join('');
+  list.querySelectorAll('[data-rmsel]').forEach(btn=>{
+    btn.addEventListener('click', ()=>{ builder.selected.splice(+btn.dataset.rmsel,1); renderBuilderSelected(); });
+  });
+  list.querySelectorAll('[data-selfield]').forEach(inp=>{
+    inp.addEventListener('input', e=>{
+      const [idx,field] = e.target.dataset.selfield.split(':');
+      builder.selected[+idx][field] = field==='sets' ? (parseInt(e.target.value,10)||1) : e.target.value;
+    });
+  });
+}
+
+document.getElementById('builderSaveBtn').addEventListener('click', ()=>{
+  if(builder.selected.length===0){ alert('Adicione ao menos um exercício.'); return; }
+  const name = document.getElementById('builderSessionName').value.trim() || 'Treino montado';
+  const date = document.getElementById('builderSessionDate').value || todayISO();
+  const protoSel = document.getElementById('builderProtocolSelect').value;
+  let protocolId;
+  if(protoSel==='__new'){
+    const prot = { id: uid(), name: suggestProtocolName(date), createdAt: todayISO() };
+    state.protocols.push(prot);
+    protocolId = prot.id;
+  }else{
+    protocolId = protoSel;
+  }
+  const exercises = builder.selected.map(s=>{
+    const reps = parseRepsTarget(s.target);
+    const target = cleanTarget(s.target);
+    const sets = [];
+    for(let i=0;i<Math.max(1,s.sets);i++) sets.push({ reps, weight:0, target });
+    return { id: uid(), name: s.name, sets };
+  });
+  const session = { id: uid(), protocolId, date, name, exercises };
+  state.sessions.push(session);
+  openProtocols.clear(); openProtocols.add(protocolId);
+  openMonths.add(getMonthKey(date)); openWeeks.add(getWeekKey(date));
+  openSessionId = session.id;
+  save();
+  closeBuilder();
+  renderAll();
+  const list = document.getElementById('sessionsList');
+  if(list) list.scrollIntoView({behavior:'smooth', block:'start'});
+});
+
 /* ---------- Mobile app shell (telas estilo app: abas embaixo, teclado numérico) ---------- */
 const mobile = {
   tab: 'treinos',
@@ -2191,7 +2538,10 @@ function mRenderSessionsList(){
   }
   html += `<div class="msection-title"><span class="mchip">✎</span>Treinos</div>`;
   if(!READONLY){
-    html += `<div style="padding:0 16px 8px;"><button class="mghostbtn" data-maction="addsession">+ nova sessão</button></div>`;
+    html += `<div style="padding:0 16px 8px;display:flex;gap:8px;flex-wrap:wrap;">
+      <button class="mghostbtn" data-maction="addsession">+ nova sessão</button>
+      <button class="mprimarybtn" data-maction="openbuilder" style="padding:8px 14px;">🎯 montar treino</button>
+    </div>`;
   }
   if(state.sessions.length===0){
     html += `<div class="mempty"><strong>Nenhuma sessão ainda</strong>Importe um PDF ou crie manualmente.</div>`;
@@ -2513,6 +2863,7 @@ mContent.addEventListener('click', async e=>{
       return;
     }
     if(act==='pickfile'){ fileInput.click(); return; }
+    if(act==='openbuilder'){ openBuilder(); return; }
     if(act==='addsession'){
       const session = newManualSession();
       mobile.sessionId = session.id;
@@ -2745,6 +3096,7 @@ function applyReadonlyUI(){
   document.getElementById('importCard').style.display = READONLY ? 'none' : '';
   document.getElementById('addSessionBtn').style.display = READONLY ? 'none' : '';
   document.getElementById('addProtocolBtn').style.display = READONLY ? 'none' : '';
+  document.getElementById('openBuilderBtn').style.display = READONLY ? 'none' : '';
   const banner = document.getElementById('readonlyBanner');
   if(READONLY){
     banner.style.display = 'block';
