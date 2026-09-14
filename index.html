@@ -831,8 +831,22 @@ async function loadRemote(){
     if(!res.ok) throw new Error('bad status');
     const data = await res.json();
     if(hasPendingSave){
-      // Já tem uma edição local esperando pra ir pro servidor — ela é mais
-      // nova que o que acabou de chegar, então não pisa nela.
+      // Uma edição local está pendente (ex.: o usuário importou/criou algo
+      // antes do primeiro carregamento terminar). Descartar o que veio do
+      // servidor aqui apagaria o histórico real — em vez disso, funde: usa
+      // o servidor como base e acrescenta só o que é novo localmente (que
+      // ainda não existe nos dados do servidor).
+      if(data && Array.isArray(data.sessions)){
+        const knownIds = new Set(data.sessions.map(s=> s.id));
+        const extraSessions = state.sessions.filter(s=> !knownIds.has(s.id));
+        const serverProtocols = Array.isArray(data.protocols) ? data.protocols : [];
+        const knownProtoIds = new Set(serverProtocols.map(p=> p.id));
+        const extraProtocols = state.protocols.filter(p=> !knownProtoIds.has(p.id));
+        state = { sessions: [...data.sessions, ...extraSessions], protocols: [...serverProtocols, ...extraProtocols] };
+        saveLocal();
+        renderAll();
+      }
+      setSyncStatus('synced');
       return;
     }
     if(data && Array.isArray(data.sessions)){
