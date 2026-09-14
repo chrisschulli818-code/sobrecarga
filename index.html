@@ -2263,15 +2263,25 @@ const EXERCISE_DB = [
 ];
 
 function muscleBodySilhouette(){
-  return `<path d="M89,10 L111,10 L114,26 L86,26 Z" class="body-silhouette"/>
+  return `<path d="M85,0 L115,0 L117,22 C117,36 110,50 100,50 C90,50 83,36 83,22 Z" class="body-silhouette"/>
+    <g transform="translate(0,40)">
+    <path d="M89,10 L111,10 L114,26 L86,26 Z" class="body-silhouette"/>
     <path d="M46,24 C64,18 136,18 154,24 L150,95 C148,128 138,152 130,168 L70,168 C62,152 52,128 50,95 Z" class="body-silhouette"/>
     <path d="M44,26 C30,28 20,40 18,58 L14,148 C13,158 20,166 28,166 C35,166 40,160 41,152 L48,80 Z" class="body-silhouette"/>
     <path d="M156,26 C170,28 180,40 182,58 L186,148 C187,158 180,166 172,166 C165,166 160,160 159,152 L152,80 Z" class="body-silhouette"/>
     <path d="M70,168 C64,208 60,258 62,308 L66,368 L84,368 L88,308 C91,258 94,212 96,170 Z" class="body-silhouette"/>
-    <path d="M130,168 C136,208 140,258 138,308 L134,368 L116,368 L112,308 C109,258 106,212 104,170 Z" class="body-silhouette"/>`;
+    <path d="M130,168 C136,208 140,258 138,308 L134,368 L116,368 L112,308 C109,258 106,212 104,170 Z" class="body-silhouette"/>
+    </g>
+    <path d="M18,192 C15,200 14,210 16,218 C18,224 24,226 28,222 C31,218 31,210 30,200 L34,192 Z" class="body-silhouette"/>
+    <path d="M182,192 C185,200 186,210 184,218 C182,224 176,226 172,222 C169,218 169,210 170,200 L166,192 Z" class="body-silhouette"/>
+    <path d="M18,222 L18,229 M23,224 L23,231 M28,222 L28,229 M182,222 L182,229 M177,224 L177,231 M172,222 L172,229" class="muscle-detail"/>
+    <path d="M64,408 L86,408 C90,408 94,412 96,418 C98,424 94,430 86,430 L64,430 C58,430 56,424 58,416 C59,412 61,408 64,408 Z" class="body-silhouette"/>
+    <path d="M136,408 L114,408 C110,408 106,412 104,418 C102,424 106,430 114,430 L136,430 C142,430 144,424 142,416 C141,412 139,408 136,408 Z" class="body-silhouette"/>
+    <path d="M78,428 L78,433 M84,429 L84,434 M90,428 L90,433 M122,428 L122,433 M116,429 L116,434 M110,428 L110,433" class="muscle-detail"/>`;
 }
 function muscleMapSvg(view){
-  const front = `<path d="M44,26 C34,28 25,38 22,52 L30,64 C38,48 46,36 54,28 Z" class="muscle" data-muscle="shoulders"/>
+  const front = `<g transform="translate(0,40)">
+    <path d="M44,26 C34,28 25,38 22,52 L30,64 C38,48 46,36 54,28 Z" class="muscle" data-muscle="shoulders"/>
     <path d="M156,26 C166,28 175,38 178,52 L170,64 C162,48 154,36 146,28 Z" class="muscle" data-muscle="shoulders"/>
     <path d="M54,28 C68,22 100,21 100,28 L100,74 C88,80 74,78 62,68 Z" class="muscle" data-muscle="chest"/>
     <path d="M146,28 C132,22 100,21 100,28 L100,74 C112,80 126,78 138,68 Z" class="muscle" data-muscle="chest"/>
@@ -2282,8 +2292,10 @@ function muscleMapSvg(view){
     <path d="M178,112 C179,126 180,140 179,150 L167,152 C166,138 165,124 164,112 Z" class="muscle" data-muscle="forearms"/>
     <path d="M72,172 C67,212 64,254 66,300 L86,300 C87,254 90,214 94,172 Z" class="muscle" data-muscle="quads"/>
     <path d="M128,172 C133,212 136,254 134,300 L114,300 C113,254 110,214 106,172 Z" class="muscle" data-muscle="quads"/>
-    <path d="M28,44 Q40,38 50,34 M172,44 Q160,38 150,34 M100,78 L100,160 M86,100 L114,100 M85,122 L115,122 M85,144 L115,144 M82,90 L70,110 M118,90 L130,110 M80,182 L80,296 M120,182 L120,296" class="muscle-detail"/>`;
-  const back = `<path d="M86,24 C93,20 107,20 114,24 L106,48 L94,48 Z" class="muscle" data-muscle="traps"/>
+    <path d="M28,44 Q40,38 50,34 M172,44 Q160,38 150,34 M100,78 L100,160 M86,100 L114,100 M85,122 L115,122 M85,144 L115,144 M82,90 L70,110 M118,90 L130,110 M80,182 L80,296 M120,182 L120,296" class="muscle-detail"/>
+    </g>`;
+  const back = `<g transform="translate(0,40)">
+    <path d="M86,24 C93,20 107,20 114,24 L106,48 L94,48 Z" class="muscle" data-muscle="traps"/>
     <path d="M62,28 C74,36 126,36 138,28 L132,118 C118,132 82,132 68,118 Z" class="muscle" data-muscle="back"/>
     <path d="M30,64 C26,74 23,90 22,106 L34,110 C36,92 39,78 42,66 Z" class="muscle" data-muscle="triceps"/>
     <path d="M170,64 C174,74 177,90 178,106 L166,110 C164,92 161,78 158,66 Z" class="muscle" data-muscle="triceps"/>
@@ -2295,8 +2307,9 @@ function muscleMapSvg(view){
     <path d="M128,172 C132,206 134,232 132,256 L114,256 C114,230 112,204 108,172 Z" class="muscle" data-muscle="hamstrings"/>
     <path d="M70,260 C68,278 68,294 70,306 L86,306 C87,292 87,276 88,260 Z" class="muscle" data-muscle="calves"/>
     <path d="M130,260 C132,278 132,294 130,306 L114,306 C113,292 113,276 112,260 Z" class="muscle" data-muscle="calves"/>
-    <path d="M100,24 L100,118 M68,40 Q72,80 82,118 M132,40 Q128,80 118,118 M82,124 L82,166 M118,124 L118,166 M79,176 L79,254 M121,176 L121,254 M79,262 L79,304 M121,262 L121,304" class="muscle-detail"/>`;
-  return `<svg viewBox="0 0 200 380" class="muscle-svg">${muscleBodySilhouette()}${view==='back'?back:front}</svg>`;
+    <path d="M100,24 L100,118 M68,40 Q72,80 82,118 M132,40 Q128,80 118,118 M82,124 L82,166 M118,124 L118,166 M79,176 L79,254 M121,176 L121,254 M79,262 L79,304 M121,262 L121,304" class="muscle-detail"/>
+    </g>`;
+  return `<svg viewBox="0 0 200 440" class="muscle-svg">${muscleBodySilhouette()}${view==='back'?back:front}</svg>`;
 }
 
 /* ---------- Estado do construtor ---------- */
