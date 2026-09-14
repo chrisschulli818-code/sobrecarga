@@ -363,6 +363,17 @@ footer{text-align:center;color:var(--text-faint);font-size:11px;margin-top:32px;
 .mheader{background:var(--surface);border-bottom:1px solid var(--border);flex-shrink:0;}
 .mheader-top{display:flex;align-items:center;gap:8px;padding:14px 16px;}
 .mback{background:none;border:none;color:var(--text);font-size:22px;padding:0 4px;cursor:pointer;line-height:1;flex:none;}
+.mtourbtn{width:22px;height:22px;flex:none;border-radius:50%;border:1px solid var(--border);background:none;color:var(--text-faint);font-family:'Archivo',sans-serif;font-weight:800;font-size:12px;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center;}
+.tour-overlay{position:fixed;inset:0;z-index:3000;}
+.tour-spotlight{position:fixed;z-index:3000;border-radius:4px;box-shadow:0 0 0 9999px rgba(4,6,3,.84);transition:top .25s ease,left .25s ease,width .25s ease,height .25s ease;pointer-events:none;}
+.tour-spotlight.none{box-shadow:0 0 0 9999px rgba(4,6,3,.84);}
+.tour-tooltip{position:fixed;left:16px;right:16px;max-width:340px;margin:0 auto;background:var(--surface);border:1px solid var(--border);border-left:3px solid var(--accent);padding:16px;z-index:3001;transition:top .25s ease,bottom .25s ease;}
+.tour-tooltip .tt-step{font-family:'Archivo',sans-serif;font-size:10.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--accent);margin-bottom:6px;}
+.tour-tooltip .tt-title{font-family:'Archivo',sans-serif;font-weight:800;font-size:16px;text-transform:uppercase;margin-bottom:6px;}
+.tour-tooltip .tt-text{font-size:13px;color:var(--text-dim);line-height:1.45;margin-bottom:14px;}
+.tour-tooltip .tt-actions{display:flex;align-items:center;justify-content:space-between;gap:10px;}
+.tour-tooltip .tt-skip{background:none;border:none;color:var(--text-faint);font-family:'Archivo',sans-serif;font-size:12px;font-weight:700;text-transform:uppercase;cursor:pointer;padding:6px 0;}
+.tour-tooltip .tt-next{background:var(--accent);color:var(--accent-ink);border:none;font-family:'Archivo',sans-serif;font-weight:800;font-size:12.5px;text-transform:uppercase;padding:10px 18px;cursor:pointer;}
 .mtitle{font-family:'Archivo',sans-serif;font-weight:600;font-size:19px;text-transform:uppercase;letter-spacing:.02em;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .mprofessor-bar{background:var(--surface-2);border-top:1px solid var(--border);padding:7px 14px;font-size:11px;color:var(--accent);font-family:'Archivo',sans-serif;text-transform:uppercase;letter-spacing:.04em;}
 .mcontent{flex:1;overflow:auto;-webkit-overflow-scrolling:touch;}
@@ -660,7 +671,7 @@ footer{text-align:center;color:var(--text-faint);font-size:11px;margin-top:32px;
     <div class="mheader-top">
       <button id="mBack" class="mback" hidden>‹</button>
       <div class="mtitle" id="mTitle">Sobrecarga</div>
-      <span style="width:22px;flex:none;"></span>
+      <button id="mTourBtn" class="mtourbtn" title="Tour do app">?</button>
     </div>
     <div id="mProfessorBar" class="mprofessor-bar" hidden>👁 Área do professor — somente leitura</div>
   </div>
@@ -2534,7 +2545,95 @@ const mContent = document.getElementById('mContent');
 const mTitle = document.getElementById('mTitle');
 const mBack = document.getElementById('mBack');
 const mProfessorBar = document.getElementById('mProfessorBar');
+const mTourBtn = document.getElementById('mTourBtn');
 if(new URLSearchParams(location.search).get('tab')==='progresso') mobile.tab = 'progresso';
+
+/* ---------- Tour guiado (primeiro acesso do aluno) ---------- */
+const TOUR_STEPS = [
+  { target: null, title: 'Bem-vindo ao Sobrecarga 👋', text: 'Vamos fazer um tour rápido pelas principais áreas do app. Leva menos de um minuto.' },
+  { target: '.mdash-cta', title: 'Próximo treino', text: 'Aqui você sempre vê qual é o próximo treino da sua ficha, com um botão pra ir direto pra ele.' },
+  { target: '.mdash-stats', title: 'Suas estatísticas', text: 'Semanas seguidas treinando, total de sessões e quantos exercícios já têm progresso registrado.' },
+  { target: '#homeMuscleMapWrap', title: 'Mapa muscular', text: 'Toque em qualquer músculo — frente ou costas — pra montar um treino na hora, já filtrado por aquele grupo.' },
+  { target: '.mimportbtn', title: 'Importar ficha em PDF', text: 'Tem uma ficha de treino em PDF? Importe aqui que o app organiza as sessões automaticamente.' },
+  { target: '[data-maction="openbuilder"]', title: 'Montar treino na mão', text: 'Sem PDF? Monte um treino na hora escolhendo os exercícios você mesmo, por grupo muscular.' },
+  { target: '.mrow, .mempty', title: 'Suas sessões', text: 'Toque numa semana pra ver os treinos dela, e em cada treino pra registrar peso e repetições de cada série.' },
+  { target: '[data-mtab="progresso"]', title: 'Aba Progresso', text: 'Aqui você acompanha o volume levantado por semana e a evolução do seu 1RM estimado em cada exercício.' },
+];
+let tourIndex = -1;
+let tourOverlayEl = null, tourSpotlightEl = null, tourTooltipEl = null;
+function tourStorageKey(){ return 'sobrecarga_tour_seen_' + (activeStudentId() || 'x'); }
+function startTour(){
+  if(mShell.hidden) return; // tour cobre só a versão mobile por enquanto
+  mobile.tab = 'treinos'; mobile.screen = 'list'; mRender();
+  tourIndex = 0;
+  buildTourDOM();
+  renderTourStep();
+}
+function endTour(){
+  try{ localStorage.setItem(tourStorageKey(), '1'); }catch(e){}
+  if(tourOverlayEl){ tourOverlayEl.remove(); tourSpotlightEl.remove(); tourTooltipEl.remove(); }
+  tourOverlayEl = tourSpotlightEl = tourTooltipEl = null;
+  tourIndex = -1;
+}
+function buildTourDOM(){
+  tourOverlayEl = document.createElement('div');
+  tourOverlayEl.className = 'tour-overlay';
+  tourSpotlightEl = document.createElement('div');
+  tourSpotlightEl.className = 'tour-spotlight none';
+  tourTooltipEl = document.createElement('div');
+  tourTooltipEl.className = 'tour-tooltip';
+  document.body.appendChild(tourOverlayEl);
+  document.body.appendChild(tourSpotlightEl);
+  document.body.appendChild(tourTooltipEl);
+  tourOverlayEl.addEventListener('click', endTour);
+}
+function renderTourStep(){
+  const step = TOUR_STEPS[tourIndex];
+  const last = tourIndex === TOUR_STEPS.length - 1;
+  const targetEl = step.target ? mContent.querySelector(step.target) : null;
+  if(targetEl){
+    targetEl.scrollIntoView({block:'center', behavior:'instant' in document.body.style ? 'instant' : 'auto'});
+  }
+  requestAnimationFrame(()=>{
+    if(targetEl){
+      const r = targetEl.getBoundingClientRect();
+      const pad = 6;
+      tourSpotlightEl.classList.remove('none');
+      tourSpotlightEl.style.top = (r.top-pad)+'px';
+      tourSpotlightEl.style.left = (r.left-pad)+'px';
+      tourSpotlightEl.style.width = (r.width+pad*2)+'px';
+      tourSpotlightEl.style.height = (r.height+pad*2)+'px';
+      const spaceBelow = window.innerHeight - r.bottom;
+      if(spaceBelow > 200 || r.top < 160){
+        tourTooltipEl.style.top = Math.min(r.bottom+16, window.innerHeight-220)+'px';
+        tourTooltipEl.style.bottom = '';
+      }else{
+        tourTooltipEl.style.bottom = (window.innerHeight-r.top+16)+'px';
+        tourTooltipEl.style.top = '';
+      }
+    }else{
+      tourSpotlightEl.classList.add('none');
+      tourSpotlightEl.style.top = '50%'; tourSpotlightEl.style.left = '50%';
+      tourSpotlightEl.style.width = '0px'; tourSpotlightEl.style.height = '0px';
+      tourTooltipEl.style.top = '40%'; tourTooltipEl.style.bottom = '';
+    }
+    tourTooltipEl.innerHTML = `
+      <div class="tt-step">${tourIndex+1} de ${TOUR_STEPS.length}</div>
+      <div class="tt-title">${escapeHtml(step.title)}</div>
+      <div class="tt-text">${escapeHtml(step.text)}</div>
+      <div class="tt-actions">
+        <button class="tt-skip" id="tourSkipBtn">Pular</button>
+        <button class="tt-next" id="tourNextBtn">${last ? 'Concluir' : 'Próximo'}</button>
+      </div>`;
+    document.getElementById('tourSkipBtn').addEventListener('click', endTour);
+    document.getElementById('tourNextBtn').addEventListener('click', ()=>{
+      if(tourIndex >= TOUR_STEPS.length-1){ endTour(); return; }
+      tourIndex++;
+      renderTourStep();
+    });
+  });
+}
+mTourBtn.addEventListener('click', startTour);
 
 document.querySelectorAll('.mtab').forEach(btn=>{
   btn.addEventListener('click', ()=>{
@@ -3212,6 +3311,11 @@ function boot(){
   if(ensureProtocols()) save();
   renderAll();
   loadRemote();
+  if(auth.role==='student' && !mShell.hidden){
+    let seen = false;
+    try{ seen = localStorage.getItem(tourStorageKey()) === '1'; }catch(e){}
+    if(!seen) setTimeout(startTour, 500);
+  }
 }
 boot();
 
