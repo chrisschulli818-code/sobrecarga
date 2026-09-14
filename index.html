@@ -2259,10 +2259,10 @@ function muscleBodySilhouette(){
     </g>
     <path d="M17,192 C13,199 12,209 14,217 C15,223 20,227 26,226 C31,225 32,219 31,211 L34,192 C30,196 21,196 17,192 Z" class="body-silhouette"/>
     <path d="M183,192 C187,199 188,209 186,217 C185,223 180,227 174,226 C169,225 168,219 169,211 L166,192 C170,196 179,196 183,192 Z" class="body-silhouette"/>
-    <path d="M18,222 L18,229 M23,224 L23,231 M28,222 L28,229 M182,222 L182,229 M177,224 L177,231 M172,222 L172,229" class="muscle-detail"/>
+    <path d="M16,222 L16,229 M20,224 L20,231 M24,224 L24,231 M28,222 L28,229 M184,222 L184,229 M180,224 L180,231 M176,224 L176,231 M172,222 L172,229" class="muscle-detail"/>
     <path d="M65,408 C71,406 82,406 88,408 C93,410 98,415 97,420 C96,426 89,430 80,430 L63,430 C57,430 55,425 57,418 C58,414 61,410 65,408 Z" class="body-silhouette"/>
     <path d="M135,408 C129,406 118,406 112,408 C107,410 102,415 103,420 C104,426 111,430 120,430 L137,430 C143,430 145,425 143,418 C142,414 139,410 135,408 Z" class="body-silhouette"/>
-    <path d="M78,427 L78,432 M84,428 L84,433 M90,427 L90,432 M122,427 L122,432 M116,428 L116,433 M110,427 L110,432" class="muscle-detail"/>`;
+    <path d="M73,427 L73,432 M78,428 L78,433 M83,428 L83,434 M88,428 L88,433 M93,427 L93,432 M127,427 L127,432 M122,428 L122,433 M117,428 L117,434 M112,428 L112,433 M107,427 L107,432" class="muscle-detail"/>`;
 }
 function muscleMapSvg(view){
   const front = `<g transform="translate(0,40)">
@@ -2277,7 +2277,9 @@ function muscleMapSvg(view){
     <path d="M178,112 C179,126 180,140 179,150 L167,152 C166,138 165,124 164,112 Z" class="muscle" data-muscle="forearms" data-muscle-name="Antebraço"/>
     <path d="M72,172 C67,212 64,254 66,300 L86,300 C87,254 90,214 94,172 Z" class="muscle" data-muscle="quads" data-muscle-name="Quadríceps"/>
     <path d="M128,172 C133,212 136,254 134,300 L114,300 C113,254 110,214 106,172 Z" class="muscle" data-muscle="quads" data-muscle-name="Quadríceps"/>
-    <path d="M28,44 Q40,38 50,34 M172,44 Q160,38 150,34 M100,78 L100,160 M86,100 L114,100 M85,122 L115,122 M85,144 L115,144 M82,90 L70,110 M118,90 L130,110 M80,182 L80,296 M120,182 L120,296" class="muscle-detail"/>
+    <path d="M28,44 Q40,38 50,34 M172,44 Q160,38 150,34 M100,78 L100,160 M86,100 L114,100 M85,122 L115,122 M85,144 L115,144 M82,90 L70,110 M118,90 L130,110 M76,86 Q66,96 68,112 M124,86 Q134,96 132,112 M80,182 L80,296 M120,182 L120,296" class="muscle-detail"/>
+    <ellipse cx="79" cy="300" rx="8" ry="6" class="muscle-detail"/>
+    <ellipse cx="121" cy="300" rx="8" ry="6" class="muscle-detail"/>
     </g>`;
   const back = `<g transform="translate(0,40)">
     <path d="M86,24 C93,20 107,20 114,24 L106,48 L94,48 Z" class="muscle" data-muscle="traps" data-muscle-name="Trapézio"/>
@@ -2290,9 +2292,11 @@ function muscleMapSvg(view){
     <path d="M132,120 C124,132 108,134 104,126 L104,168 C112,176 128,173 134,164 Z" class="muscle" data-muscle="glutes" data-muscle-name="Glúteos"/>
     <path d="M72,172 C68,206 66,232 68,256 L86,256 C86,230 88,204 92,172 Z" class="muscle" data-muscle="hamstrings" data-muscle-name="Posterior de coxa"/>
     <path d="M128,172 C132,206 134,232 132,256 L114,256 C114,230 112,204 108,172 Z" class="muscle" data-muscle="hamstrings" data-muscle-name="Posterior de coxa"/>
-    <path d="M70,260 C68,278 68,294 70,306 L86,306 C87,292 87,276 88,260 Z" class="muscle" data-muscle="calves" data-muscle-name="Panturrilha"/>
-    <path d="M130,260 C132,278 132,294 130,306 L114,306 C113,292 113,276 112,260 Z" class="muscle" data-muscle="calves" data-muscle-name="Panturrilha"/>
-    <path d="M100,24 L100,118 M68,40 Q72,80 82,118 M132,40 Q128,80 118,118 M82,124 L82,166 M118,124 L118,166 M79,176 L79,254 M121,176 L121,254 M79,262 L79,304 M121,262 L121,304" class="muscle-detail"/>
+    <path d="M70,264 C73,257 77,262 79,257 C81,262 85,257 88,264 C89,280 88,296 86,306 L72,306 C70,296 69,280 70,264 Z" class="muscle" data-muscle="calves" data-muscle-name="Panturrilha"/>
+    <path d="M130,264 C127,257 123,262 121,257 C119,262 115,257 112,264 C111,280 112,296 114,306 L128,306 C130,296 131,280 130,264 Z" class="muscle" data-muscle="calves" data-muscle-name="Panturrilha"/>
+    <path d="M100,24 L100,118 M68,40 Q72,80 82,118 M132,40 Q128,80 118,118 M82,124 L82,166 M118,124 L118,166 M79,176 L79,254 M121,176 L121,254 M79,262 L79,304 M121,262 L121,304 M94,118 L100,110 L106,118 L100,130 Z" class="muscle-detail"/>
+    <ellipse cx="79" cy="258" rx="8" ry="6" class="muscle-detail"/>
+    <ellipse cx="121" cy="258" rx="8" ry="6" class="muscle-detail"/>
     </g>`;
   return `<svg viewBox="0 0 200 440" class="muscle-svg" data-view="${view}">${muscleBodySilhouette()}${view==='back'?back:front}</svg>`;
 }
