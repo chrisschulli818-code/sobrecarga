@@ -318,19 +318,10 @@ footer{text-align:center;color:var(--text-faint);font-size:11px;margin-top:32px;
 @media (max-width:820px){.builder-body{grid-template-columns:1fr;overflow:visible;}}
 .builder-map{padding:14px;border-right:1px solid var(--border);flex-shrink:0;}
 @media (max-width:820px){.builder-map{border-right:none;border-bottom:1px solid var(--border);}}
-.builder-map-tabs{display:flex;gap:6px;margin-bottom:10px;}
-.builder-map-tabs button{flex:1;padding:6px;font-size:10.5px;}
-.builder-map-tabs button.active{background:var(--accent);color:#fff;border-color:transparent;}
-.muscle-svg{width:100%;height:auto;display:block;min-height:200px;}
-.home-map-tabs{display:flex;gap:8px;max-width:260px;margin:0 auto 14px;}
-.home-map-tabs button{flex:1;padding:7px;font-size:11px;}
-.home-map-tabs button.active{background:var(--accent);color:#fff;border-color:transparent;}
-.home-map-wrap{max-width:230px;margin:0 auto;}
-.body-silhouette{fill:var(--surface-2);stroke:var(--border);stroke-width:1.5;}
-.muscle{fill:#575b6b;stroke:var(--bg);stroke-width:1.2;cursor:pointer;transition:fill .12s;}
-.muscle:hover{fill:var(--accent-dark);}
-.muscle.selected{fill:var(--accent);}
-.muscle-detail{fill:none;stroke:rgba(0,0,0,.38);stroke-width:1;stroke-linecap:round;pointer-events:none;}
+.muscle-chips{display:flex;flex-wrap:wrap;gap:8px;}
+.muscle-chip{padding:9px 14px;border-radius:999px;border:1px solid var(--border);background:var(--surface-2);color:var(--text);font-size:12.5px;font-weight:600;cursor:pointer;transition:background .12s,border-color .12s,color .12s;}
+.muscle-chip:hover{border-color:var(--accent);}
+.muscle-chip.selected{background:var(--accent);border-color:transparent;color:#fff;}
 .muscle-clear{width:100%;margin-top:10px;}
 
 .builder-list-col{padding:14px;border-right:1px solid var(--border);display:flex;flex-direction:column;min-height:0;}
@@ -550,14 +541,10 @@ footer{text-align:center;color:var(--text-faint);font-size:11px;margin-top:32px;
 
   <div class="card" id="homeMapCard">
     <div class="card-head">
-      <h2><span class="chip">🗺️</span>Mapa Muscular</h2>
+      <h2><span class="chip">🎯</span>Grupos musculares</h2>
       <span class="hint">Toque num músculo pra montar o treino na hora</span>
     </div>
-    <div class="home-map-tabs">
-      <button type="button" class="active" data-homemapview="front">Frente</button>
-      <button type="button" data-homemapview="back">Costas</button>
-    </div>
-    <div id="homeMuscleMapWrap" class="home-map-wrap"></div>
+    <div id="homeMuscleChips" class="muscle-chips"></div>
   </div>
 
   <div class="card" id="importCard">
@@ -639,11 +626,7 @@ footer{text-align:center;color:var(--text-faint);font-size:11px;margin-top:32px;
     </div>
     <div class="builder-body">
       <div class="builder-map">
-        <div class="builder-map-tabs">
-          <button type="button" class="active" data-mapview="front">Frente</button>
-          <button type="button" data-mapview="back">Costas</button>
-        </div>
-        <div id="muscleMapWrap"></div>
+        <div id="muscleMapWrap" class="muscle-chips"></div>
         <button type="button" class="ghost small muscle-clear" id="muscleClearBtn">Ver todos os músculos</button>
       </div>
       <div class="builder-list-col">
@@ -2262,71 +2245,24 @@ const EXERCISE_DB = [
   {name:'Face pull', muscle:'traps', target:'12 a 15'}
 ];
 
-function muscleBodySilhouette(){
-  return `<path d="M85,0 L115,0 L117,22 C117,36 110,50 100,50 C90,50 83,36 83,22 Z" class="body-silhouette"/>
-    <g transform="translate(0,40)">
-    <path d="M89,10 L111,10 L114,26 L86,26 Z" class="body-silhouette"/>
-    <path d="M46,24 C64,18 136,18 154,24 L150,95 C148,128 138,152 130,168 L70,168 C62,152 52,128 50,95 Z" class="body-silhouette"/>
-    <path d="M44,26 C30,28 20,40 18,58 L14,148 C13,158 20,166 28,166 C35,166 40,160 41,152 L48,80 Z" class="body-silhouette"/>
-    <path d="M156,26 C170,28 180,40 182,58 L186,148 C187,158 180,166 172,166 C165,166 160,160 159,152 L152,80 Z" class="body-silhouette"/>
-    <path d="M70,168 C64,208 60,258 62,308 L66,368 L84,368 L88,308 C91,258 94,212 96,170 Z" class="body-silhouette"/>
-    <path d="M130,168 C136,208 140,258 138,308 L134,368 L116,368 L112,308 C109,258 106,212 104,170 Z" class="body-silhouette"/>
-    </g>
-    <path d="M18,192 C15,200 14,210 16,218 C18,224 24,226 28,222 C31,218 31,210 30,200 L34,192 Z" class="body-silhouette"/>
-    <path d="M182,192 C185,200 186,210 184,218 C182,224 176,226 172,222 C169,218 169,210 170,200 L166,192 Z" class="body-silhouette"/>
-    <path d="M18,222 L18,229 M23,224 L23,231 M28,222 L28,229 M182,222 L182,229 M177,224 L177,231 M172,222 L172,229" class="muscle-detail"/>
-    <path d="M64,408 L86,408 C90,408 94,412 96,418 C98,424 94,430 86,430 L64,430 C58,430 56,424 58,416 C59,412 61,408 64,408 Z" class="body-silhouette"/>
-    <path d="M136,408 L114,408 C110,408 106,412 104,418 C102,424 106,430 114,430 L136,430 C142,430 144,424 142,416 C141,412 139,408 136,408 Z" class="body-silhouette"/>
-    <path d="M78,428 L78,433 M84,429 L84,434 M90,428 L90,433 M122,428 L122,433 M116,429 L116,434 M110,428 L110,433" class="muscle-detail"/>`;
-}
-function muscleMapSvg(view){
-  const front = `<g transform="translate(0,40)">
-    <path d="M44,26 C34,28 25,38 22,52 L30,64 C38,48 46,36 54,28 Z" class="muscle" data-muscle="shoulders"/>
-    <path d="M156,26 C166,28 175,38 178,52 L170,64 C162,48 154,36 146,28 Z" class="muscle" data-muscle="shoulders"/>
-    <path d="M54,28 C68,22 100,21 100,28 L100,74 C88,80 74,78 62,68 Z" class="muscle" data-muscle="chest"/>
-    <path d="M146,28 C132,22 100,21 100,28 L100,74 C112,80 126,78 138,68 Z" class="muscle" data-muscle="chest"/>
-    <path d="M82,78 C90,75 110,75 118,78 L116,160 C108,168 92,168 84,160 Z" class="muscle" data-muscle="abs"/>
-    <path d="M30,64 C26,74 23,90 22,106 L34,110 C36,92 39,78 42,66 Z" class="muscle" data-muscle="biceps"/>
-    <path d="M170,64 C174,74 177,90 178,106 L166,110 C164,92 161,78 158,66 Z" class="muscle" data-muscle="biceps"/>
-    <path d="M22,112 C21,126 20,140 21,150 L33,152 C34,138 35,124 36,112 Z" class="muscle" data-muscle="forearms"/>
-    <path d="M178,112 C179,126 180,140 179,150 L167,152 C166,138 165,124 164,112 Z" class="muscle" data-muscle="forearms"/>
-    <path d="M72,172 C67,212 64,254 66,300 L86,300 C87,254 90,214 94,172 Z" class="muscle" data-muscle="quads"/>
-    <path d="M128,172 C133,212 136,254 134,300 L114,300 C113,254 110,214 106,172 Z" class="muscle" data-muscle="quads"/>
-    <path d="M28,44 Q40,38 50,34 M172,44 Q160,38 150,34 M100,78 L100,160 M86,100 L114,100 M85,122 L115,122 M85,144 L115,144 M82,90 L70,110 M118,90 L130,110 M80,182 L80,296 M120,182 L120,296" class="muscle-detail"/>
-    </g>`;
-  const back = `<g transform="translate(0,40)">
-    <path d="M86,24 C93,20 107,20 114,24 L106,48 L94,48 Z" class="muscle" data-muscle="traps"/>
-    <path d="M62,28 C74,36 126,36 138,28 L132,118 C118,132 82,132 68,118 Z" class="muscle" data-muscle="back"/>
-    <path d="M30,64 C26,74 23,90 22,106 L34,110 C36,92 39,78 42,66 Z" class="muscle" data-muscle="triceps"/>
-    <path d="M170,64 C174,74 177,90 178,106 L166,110 C164,92 161,78 158,66 Z" class="muscle" data-muscle="triceps"/>
-    <path d="M22,112 C21,126 20,140 21,150 L33,152 C34,138 35,124 36,112 Z" class="muscle" data-muscle="forearms"/>
-    <path d="M178,112 C179,126 180,140 179,150 L167,152 C166,138 165,124 164,112 Z" class="muscle" data-muscle="forearms"/>
-    <path d="M68,120 C76,132 92,134 96,126 L96,168 C88,176 72,173 66,164 Z" class="muscle" data-muscle="glutes"/>
-    <path d="M132,120 C124,132 108,134 104,126 L104,168 C112,176 128,173 134,164 Z" class="muscle" data-muscle="glutes"/>
-    <path d="M72,172 C68,206 66,232 68,256 L86,256 C86,230 88,204 92,172 Z" class="muscle" data-muscle="hamstrings"/>
-    <path d="M128,172 C132,206 134,232 132,256 L114,256 C114,230 112,204 108,172 Z" class="muscle" data-muscle="hamstrings"/>
-    <path d="M70,260 C68,278 68,294 70,306 L86,306 C87,292 87,276 88,260 Z" class="muscle" data-muscle="calves"/>
-    <path d="M130,260 C132,278 132,294 130,306 L114,306 C113,292 113,276 112,260 Z" class="muscle" data-muscle="calves"/>
-    <path d="M100,24 L100,118 M68,40 Q72,80 82,118 M132,40 Q128,80 118,118 M82,124 L82,166 M118,124 L118,166 M79,176 L79,254 M121,176 L121,254 M79,262 L79,304 M121,262 L121,304" class="muscle-detail"/>
-    </g>`;
-  return `<svg viewBox="0 0 200 440" class="muscle-svg">${muscleBodySilhouette()}${view==='back'?back:front}</svg>`;
+function muscleChipsHtml(activeMuscle){
+  return Object.keys(MUSCLE_LABELS).map(m=>
+    `<button type="button" class="muscle-chip${m===activeMuscle?' selected':''}" data-muscle="${m}">${MUSCLE_LABELS[m]}</button>`
+  ).join('');
 }
 
 /* ---------- Estado do construtor ---------- */
-const builder = { view:'front', muscle:null, search:'', selected:[] };
+const builder = { muscle:null, search:'', selected:[] };
 const builderOverlay = document.getElementById('builderOverlay');
 const muscleMapWrap = document.getElementById('muscleMapWrap');
 
-// initialMuscle: quando aberto a partir do mapa da tela inicial, já entra
-// filtrado nesse músculo (e na mesma vista frente/costas que estava lá).
+// initialMuscle: quando aberto a partir dos chips da tela inicial, já entra filtrado nesse músculo.
 function openBuilder(initialMuscle){
-  builder.view = initialMuscle ? homeMapView : 'front';
   builder.muscle = initialMuscle || null;
   builder.search=''; builder.selected=[];
   document.getElementById('builderSearch').value = '';
   document.getElementById('builderSessionName').value = '';
   document.getElementById('builderSessionDate').value = todayISO();
-  document.querySelectorAll('[data-mapview]').forEach(b=> b.classList.toggle('active', b.dataset.mapview===builder.view));
   renderBuilderProtocolSelect();
   renderMuscleMap();
   renderBuilderExerciseList();
@@ -2347,9 +2283,8 @@ function renderBuilderProtocolSelect(){
 }
 
 function renderMuscleMap(){
-  muscleMapWrap.innerHTML = muscleMapSvg(builder.view);
+  muscleMapWrap.innerHTML = muscleChipsHtml(builder.muscle);
   muscleMapWrap.querySelectorAll('[data-muscle]').forEach(el=>{
-    el.classList.toggle('selected', el.dataset.muscle===builder.muscle);
     el.addEventListener('click', ()=>{
       builder.muscle = (builder.muscle===el.dataset.muscle) ? null : el.dataset.muscle;
       renderMuscleMap();
@@ -2357,30 +2292,15 @@ function renderMuscleMap(){
     });
   });
 }
-document.querySelectorAll('[data-mapview]').forEach(btn=>{
-  btn.addEventListener('click', ()=>{
-    builder.view = btn.dataset.mapview;
-    document.querySelectorAll('[data-mapview]').forEach(b=> b.classList.toggle('active', b===btn));
-    renderMuscleMap();
-  });
-});
-/* ---------- Mapa muscular da tela inicial ---------- */
-let homeMapView = 'front';
+/* ---------- Grupos musculares da tela inicial ---------- */
 function renderHomeMuscleMap(){
-  const wrap = document.getElementById('homeMuscleMapWrap');
+  const wrap = document.getElementById('homeMuscleChips');
   if(!wrap) return;
-  wrap.innerHTML = muscleMapSvg(homeMapView);
+  wrap.innerHTML = muscleChipsHtml(null);
   wrap.querySelectorAll('[data-muscle]').forEach(el=>{
     el.addEventListener('click', ()=> openBuilder(el.dataset.muscle));
   });
 }
-document.querySelectorAll('[data-homemapview]').forEach(btn=>{
-  btn.addEventListener('click', ()=>{
-    homeMapView = btn.dataset.homemapview;
-    document.querySelectorAll('[data-homemapview]').forEach(b=> b.classList.toggle('active', b===btn));
-    renderHomeMuscleMap();
-  });
-});
 renderHomeMuscleMap();
 
 document.getElementById('muscleClearBtn').addEventListener('click', ()=>{
@@ -2603,13 +2523,9 @@ function mRenderSessionsList(){
     <div class="mdash-stat"><div class="n">${state.sessions.length}</div><div class="l">Sessões</div></div>
     <div class="mdash-stat"><div class="n">${computeProgress().length}</div><div class="l">Exercícios</div></div>
   </div>`;
-  html += `<div class="msection-title" style="margin-top:20px;"><span class="mchip">🗺️</span>Mapa Muscular</div>
+  html += `<div class="msection-title" style="margin-top:20px;"><span class="mchip">🎯</span>Grupos musculares</div>
   <div class="hint" style="margin:0 16px 10px;">Toque num músculo pra montar o treino na hora</div>
-  <div class="home-map-tabs" style="margin:0 16px 14px;max-width:none;">
-    <button class="mghostbtn" data-maction="homemapview" data-view="front" style="flex:1;${homeMapView==='front'?'background:var(--accent);color:#fff;border-color:transparent;':''}">Frente</button>
-    <button class="mghostbtn" data-maction="homemapview" data-view="back" style="flex:1;${homeMapView==='back'?'background:var(--accent);color:#fff;border-color:transparent;':''}">Costas</button>
-  </div>
-  <div class="home-map-wrap">${muscleMapSvg(homeMapView)}</div>`;
+  <div class="muscle-chips" style="margin:0 16px 14px;">${muscleChipsHtml(null)}</div>`;
   if(!READONLY){
     html += `<div style="padding:14px 16px 4px;"><button class="mimportbtn" data-maction="import">↥ Importar / escanear PDF</button></div>`;
   }
@@ -2941,7 +2857,6 @@ mContent.addEventListener('click', async e=>{
     }
     if(act==='pickfile'){ fileInput.click(); return; }
     if(act==='openbuilder'){ openBuilder(); return; }
-    if(act==='homemapview'){ homeMapView = action.dataset.view; mRenderSessionsList(); return; }
     if(act==='addsession'){
       const session = newManualSession();
       mobile.sessionId = session.id;
