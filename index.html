@@ -321,7 +321,11 @@ footer{text-align:center;color:var(--text-faint);font-size:11px;margin-top:32px;
 .builder-map-tabs{display:flex;gap:6px;margin-bottom:10px;}
 .builder-map-tabs button{flex:1;padding:6px;font-size:10.5px;}
 .builder-map-tabs button.active{background:var(--accent);color:#fff;border-color:transparent;}
-.muscle-svg{width:100%;height:auto;display:block;}
+.muscle-svg{width:100%;height:auto;display:block;min-height:200px;}
+.home-map-tabs{display:flex;gap:8px;max-width:260px;margin:0 auto 14px;}
+.home-map-tabs button{flex:1;padding:7px;font-size:11px;}
+.home-map-tabs button.active{background:var(--accent);color:#fff;border-color:transparent;}
+.home-map-wrap{max-width:230px;margin:0 auto;}
 .body-silhouette{fill:var(--surface-2);}
 .muscle{fill:#4a4d59;stroke:var(--bg);stroke-width:1.5;cursor:pointer;transition:fill .12s;}
 .muscle:hover{fill:var(--accent-dark);}
@@ -541,6 +545,18 @@ footer{text-align:center;color:var(--text-faint);font-size:11px;margin-top:32px;
         <div class="dash-stat"><div class="n" id="statUp">0</div><div class="l">Em alta</div></div>
       </div>
     </div>
+  </div>
+
+  <div class="card" id="homeMapCard">
+    <div class="card-head">
+      <h2><span class="chip">🗺️</span>Mapa Muscular</h2>
+      <span class="hint">Toque num músculo pra montar o treino na hora</span>
+    </div>
+    <div class="home-map-tabs">
+      <button type="button" class="active" data-homemapview="front">Frente</button>
+      <button type="button" data-homemapview="back">Costas</button>
+    </div>
+    <div id="homeMuscleMapWrap" class="home-map-wrap"></div>
   </div>
 
   <div class="card" id="importCard">
@@ -2282,12 +2298,16 @@ const builder = { view:'front', muscle:null, search:'', selected:[] };
 const builderOverlay = document.getElementById('builderOverlay');
 const muscleMapWrap = document.getElementById('muscleMapWrap');
 
-function openBuilder(){
-  builder.view='front'; builder.muscle=null; builder.search=''; builder.selected=[];
+// initialMuscle: quando aberto a partir do mapa da tela inicial, já entra
+// filtrado nesse músculo (e na mesma vista frente/costas que estava lá).
+function openBuilder(initialMuscle){
+  builder.view = initialMuscle ? homeMapView : 'front';
+  builder.muscle = initialMuscle || null;
+  builder.search=''; builder.selected=[];
   document.getElementById('builderSearch').value = '';
   document.getElementById('builderSessionName').value = '';
   document.getElementById('builderSessionDate').value = todayISO();
-  document.querySelectorAll('[data-mapview]').forEach(b=> b.classList.toggle('active', b.dataset.mapview==='front'));
+  document.querySelectorAll('[data-mapview]').forEach(b=> b.classList.toggle('active', b.dataset.mapview===builder.view));
   renderBuilderProtocolSelect();
   renderMuscleMap();
   renderBuilderExerciseList();
@@ -2295,7 +2315,7 @@ function openBuilder(){
   builderOverlay.hidden = false;
 }
 function closeBuilder(){ builderOverlay.hidden = true; }
-document.getElementById('openBuilderBtn').addEventListener('click', openBuilder);
+document.getElementById('openBuilderBtn').addEventListener('click', ()=> openBuilder());
 document.getElementById('builderCloseBtn').addEventListener('click', closeBuilder);
 builderOverlay.addEventListener('click', e=>{ if(e.target===builderOverlay) closeBuilder(); });
 
@@ -2325,6 +2345,25 @@ document.querySelectorAll('[data-mapview]').forEach(btn=>{
     renderMuscleMap();
   });
 });
+/* ---------- Mapa muscular da tela inicial ---------- */
+let homeMapView = 'front';
+function renderHomeMuscleMap(){
+  const wrap = document.getElementById('homeMuscleMapWrap');
+  if(!wrap) return;
+  wrap.innerHTML = muscleMapSvg(homeMapView);
+  wrap.querySelectorAll('[data-muscle]').forEach(el=>{
+    el.addEventListener('click', ()=> openBuilder(el.dataset.muscle));
+  });
+}
+document.querySelectorAll('[data-homemapview]').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    homeMapView = btn.dataset.homemapview;
+    document.querySelectorAll('[data-homemapview]').forEach(b=> b.classList.toggle('active', b===btn));
+    renderHomeMuscleMap();
+  });
+});
+renderHomeMuscleMap();
+
 document.getElementById('muscleClearBtn').addEventListener('click', ()=>{
   builder.muscle = null;
   renderMuscleMap();
@@ -2545,6 +2584,13 @@ function mRenderSessionsList(){
     <div class="mdash-stat"><div class="n">${state.sessions.length}</div><div class="l">Sessões</div></div>
     <div class="mdash-stat"><div class="n">${computeProgress().length}</div><div class="l">Exercícios</div></div>
   </div>`;
+  html += `<div class="msection-title" style="margin-top:20px;"><span class="mchip">🗺️</span>Mapa Muscular</div>
+  <div class="hint" style="margin:0 16px 10px;">Toque num músculo pra montar o treino na hora</div>
+  <div class="home-map-tabs" style="margin:0 16px 14px;max-width:none;">
+    <button class="mghostbtn" data-maction="homemapview" data-view="front" style="flex:1;${homeMapView==='front'?'background:var(--accent);color:#fff;border-color:transparent;':''}">Frente</button>
+    <button class="mghostbtn" data-maction="homemapview" data-view="back" style="flex:1;${homeMapView==='back'?'background:var(--accent);color:#fff;border-color:transparent;':''}">Costas</button>
+  </div>
+  <div class="home-map-wrap">${muscleMapSvg(homeMapView)}</div>`;
   if(!READONLY){
     html += `<div style="padding:14px 16px 4px;"><button class="mimportbtn" data-maction="import">↥ Importar / escanear PDF</button></div>`;
   }
@@ -2876,6 +2922,7 @@ mContent.addEventListener('click', async e=>{
     }
     if(act==='pickfile'){ fileInput.click(); return; }
     if(act==='openbuilder'){ openBuilder(); return; }
+    if(act==='homemapview'){ homeMapView = action.dataset.view; mRenderSessionsList(); return; }
     if(act==='addsession'){
       const session = newManualSession();
       mobile.sessionId = session.id;
@@ -2921,6 +2968,8 @@ mContent.addEventListener('click', async e=>{
     }
     return;
   }
+  const homeMuscle = e.target.closest('[data-muscle]');
+  if(homeMuscle){ openBuilder(homeMuscle.dataset.muscle); return; }
   const openWeek = e.target.closest('[data-mopen-week]');
   if(openWeek){
     mobile.weekKey = openWeek.dataset.mopenWeek;
