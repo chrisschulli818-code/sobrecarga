@@ -6,9 +6,12 @@ const { Pool } = require('pg');
 const app = express();
 app.use(express.json({ limit: '8mb' }));
 
+// O banco (Supabase) é compartilhado com outros apps do usuário; todas as
+// tabelas do Sobrecarga vivem isoladas no schema "sobrecarga", nunca em public.
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
-  ssl: process.env.DATABASE_URL ? { rejectUnauthorized: false } : false
+  ssl: process.env.DATABASE_URL ? { rejectUnauthorized: false } : false,
+  options: '-c search_path=sobrecarga'
 });
 
 // Código curto e fácil de digitar/ditar (sem 0/O/1/I, que se confundem).

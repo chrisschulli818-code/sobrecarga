@@ -1,9 +1,3 @@
-databases:
-  - name: sobrecarga-db
-    plan: free
-    databaseName: sobrecarga
-    user: sobrecarga
-
 services:
   - type: web
     name: sobrecarga
@@ -12,7 +6,10 @@ services:
     buildCommand: npm install
     startCommand: npm start
     envVars:
+      # O Postgres gratuito do Render expira e é apagado depois de ~30 dias
+      # (foi o que aconteceu). O banco agora é um projeto Supabase (plano
+      # gratuito, não expira), configurado manualmente no painel do Render em
+      # vez de gerenciado por este blueprint. Cole a connection string em
+      # Environment → DATABASE_URL.
       - key: DATABASE_URL
-        fromDatabase:
-          name: sobrecarga-db
-          property: connectionString
+        sync: false
