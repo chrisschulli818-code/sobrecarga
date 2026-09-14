@@ -790,6 +790,11 @@ let STORE_KEY = 'sobrecarga_v1';
 let state = { sessions: [], protocols: [] };
 let stageRows = [];
 let syncTimer = null;
+// true entre uma edição local (save()) e ela realmente ir pro servidor —
+// enquanto isso, loadRemote() não pode sobrescrever state com dados velhos
+// do servidor, senão a edição em andamento some (foi o que duplicava
+// protocolo/sessão quando dois cliques aconteciam antes do primeiro salvar).
+let hasPendingSave = false;
 const syncBadge = () => document.getElementById('syncBadge');
 
 function loadLocal(){
@@ -820,6 +825,11 @@ async function loadRemote(){
     const res = await fetch(`/api/state/${sid}`, { headers: apiHeaders() });
     if(!res.ok) throw new Error('bad status');
     const data = await res.json();
+    if(hasPendingSave){
+      // Já tem uma edição local esperando pra ir pro servidor — ela é mais
+      // nova que o que acabou de chegar, então não pisa nela.
+      return;
+    }
     if(data && Array.isArray(data.sessions)){
       if(!Array.isArray(data.protocols)) data.protocols = [];
       state = data;
@@ -834,6 +844,7 @@ async function loadRemote(){
 }
 function save(){
   saveLocal();
+  hasPendingSave = true;
   clearTimeout(syncTimer);
   syncTimer = setTimeout(syncRemote, 500);
 }
@@ -848,6 +859,7 @@ async function syncRemote(){
       body: JSON.stringify(state)
     });
     if(!res.ok) throw new Error('bad status');
+    hasPendingSave = false;
     setSyncStatus('synced');
   }catch(e){
     setSyncStatus('offline');
