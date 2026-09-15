@@ -199,11 +199,13 @@ app.post('/api/students/bulk', requireProfessor, async (req, res) => {
 });
 
 // O próprio aluno define o nome no primeiro acesso (ou o professor corrige depois).
-app.put('/api/students/:id/name', requireStudentAccess, async (req, res) => {
+// Nota: a rota usa :studentId (não :id) porque requireStudentAccess lê esse
+// nome de parâmetro especificamente — foi assim que um 403 apareceu aqui antes.
+app.put('/api/students/:studentId/name', requireStudentAccess, async (req, res) => {
   const name = String((req.body || {}).name || '').trim().slice(0, 60);
   if (!name) return res.status(400).json({ error: 'missing_name' });
   try {
-    await pool.query('UPDATE students SET name = $1 WHERE id = $2', [name, req.params.id]);
+    await pool.query('UPDATE students SET name = $1 WHERE id = $2', [name, req.params.studentId]);
     res.json({ ok: true, name });
   } catch (err) {
     console.error(err);
