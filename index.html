@@ -855,6 +855,13 @@ document.getElementById('professorLink').addEventListener('click', e=>{
 });
 
 /* ---------- Painel do professor: gerenciar alunos ---------- */
+// Monta um link wa.me com o telefone (assume DDI 55/Brasil se vier só DDD+número).
+function whatsappLink(phone, name){
+  let digits = String(phone||'').replace(/\D/g,'');
+  if(digits.length<=11) digits = '55'+digits;
+  const msg = `Oi${name?' '+name:''}! Passando aqui sobre o Sobrecarga.`;
+  return `https://wa.me/${digits}?text=${encodeURIComponent(msg)}`;
+}
 const studentsList = document.getElementById('studentsList');
 async function loadStudents(){
   try{
@@ -878,7 +885,9 @@ async function renderProfessorDashboard(){
       </div>
       <div class="student-actions">
         ${s.name ? `<button class="small" data-viewstudent="${s.id}">Ver treino</button>` : ''}
+        ${s.phone ? `<a class="ghost small" href="${whatsappLink(s.phone, s.name)}" target="_blank" rel="noopener" title="Chamar no WhatsApp">💬</a>` : ''}
         ${s.locked ? `<button class="ghost small" data-unlockstudent="${s.id}" title="Liberar aparelho">🔓</button>` : ''}
+        <button class="ghost small" data-editphone="${s.id}" data-phone="${escapeAttr(s.phone)}" title="Telefone (WhatsApp)">📱</button>
         <button class="ghost small" data-renamestudent="${s.id}" data-name="${escapeAttr(s.name)}" title="Renomear">✎</button>
         <button class="ghost small" data-delstudent="${s.id}" data-name="${escapeAttr(s.name)}" title="Remover aluno">✕</button>
       </div>
@@ -944,6 +953,14 @@ studentsList.addEventListener('click', async e=>{
   const unlock = e.target.closest('[data-unlockstudent]');
   if(unlock){
     await fetch(`/api/students/${unlock.dataset.unlockstudent}/unlock`, { method:'PUT', headers: apiHeaders() });
+    renderProfessorDashboard();
+    return;
+  }
+  const editphone = e.target.closest('[data-editphone]');
+  if(editphone){
+    const novo = prompt('Telefone (com DDD) para WhatsApp:', editphone.dataset.phone||'');
+    if(novo===null) return;
+    await fetch(`/api/students/${editphone.dataset.editphone}/phone`, { method:'PUT', headers: apiHeaders({'Content-Type':'application/json'}), body: JSON.stringify({phone: novo}) });
     renderProfessorDashboard();
   }
 });

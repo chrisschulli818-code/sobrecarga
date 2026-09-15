@@ -49,6 +49,13 @@ async function ensureTable() {
   } catch (err) {
     console.error('Não consegui adicionar a coluna device_id (trava por aparelho ficará desativada):', err.message);
   }
+  // telefone do aluno (opcional) — usado só pra gerar o link de WhatsApp no
+  // painel do professor, mesma lógica defensiva do device_id acima.
+  try {
+    await pool.query(`ALTER TABLE students ADD COLUMN IF NOT EXISTS phone TEXT`);
+  } catch (err) {
+    console.error('Não consegui adicionar a coluna phone (link de WhatsApp ficará desativado):', err.message);
+  }
   await pool.query(`CREATE TABLE IF NOT EXISTS meta (
     key TEXT PRIMARY KEY,
     value TEXT
@@ -180,11 +187,11 @@ app.get('/api/students', requireProfessor, async (req, res) => {
   try {
     let rows;
     try {
-      rows = (await pool.query('SELECT id, name, code, device_id FROM students ORDER BY created_at ASC')).rows;
+      rows = (await pool.query('SELECT id, name, code, device_id, phone FROM students ORDER BY created_at ASC')).rows;
     } catch (colErr) {
       rows = (await pool.query('SELECT id, name, code FROM students ORDER BY created_at ASC')).rows;
     }
-    const students = rows.map(s => ({ id: s.id, name: s.name, code: s.code, locked: !!s.device_id }));
+    const students = rows.map(s => ({ id: s.id, name: s.name, code: s.code, locked: !!s.device_id, phone: s.phone || '' }));
     res.json(students);
   } catch (err) {
     console.error(err);
@@ -269,6 +276,18 @@ app.put('/api/students/:id/unlock', requireProfessor, async (req, res) => {
   try {
     await pool.query('UPDATE students SET device_id = NULL WHERE id = $1', [req.params.id]);
     res.json({ ok: true });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'db_error' });
+  }
+});
+
+// Professor cadastra/edita o telefone do aluno, usado só pra montar o link do WhatsApp no painel.
+app.put('/api/students/:id/phone', requireProfessor, async (req, res) => {
+  const phone = String((req.body || {}).phone || '').replace(/\D/g, '').slice(0, 20);
+  try {
+    await pool.query('UPDATE students SET phone = $1 WHERE id = $2', [phone, req.params.id]);
+    res.json({ ok: true, phone });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'db_error' });
