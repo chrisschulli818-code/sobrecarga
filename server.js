@@ -39,8 +39,16 @@ async function ensureTable() {
   // device_id: trava o código de aluno no primeiro aparelho que logar com ele
   // (evita duas pessoas usando o mesmo código ao mesmo tempo e sobrescrevendo
   // os dados uma da outra). Coluna adicionada depois — por isso o ADD COLUMN
-  // separado, pra não quebrar quem já tinha a tabela criada.
-  await pool.query(`ALTER TABLE students ADD COLUMN IF NOT EXISTS device_id TEXT`);
+  // separado, pra não quebrar quem já tinha a tabela criada. Em try/catch
+  // próprio: se a role do banco não puder alterar a tabela (aconteceu em
+  // produção — "must be owner of table students"), isso NÃO pode travar o
+  // resto do ensureTable (login/código do professor dependem do que vem
+  // depois), então só avisa no log e segue.
+  try {
+    await pool.query(`ALTER TABLE students ADD COLUMN IF NOT EXISTS device_id TEXT`);
+  } catch (err) {
+    console.error('Não consegui adicionar a coluna device_id (trava por aparelho ficará desativada):', err.message);
+  }
   await pool.query(`CREATE TABLE IF NOT EXISTS meta (
     key TEXT PRIMARY KEY,
     value TEXT
@@ -116,16 +124,26 @@ app.post('/api/auth', async (req, res) => {
     return res.json({ role: 'professor', code });
   }
   try {
-    const r = await pool.query('SELECT id, name, device_id FROM students WHERE code = $1', [code]);
-    if (!r.rows[0]) return res.status(404).json({ error: 'invalid_code' });
-    const student = r.rows[0];
+    // Se a coluna device_id não existir ainda (ex.: role do banco sem
+    // permissão pra ALTER TABLE em produção), cai pra uma consulta sem ela
+    // em vez de derrubar o login inteiro — a trava por aparelho fica
+    // desativada até a coluna existir, mas o acesso continua funcionando.
+    let student;
+    try {
+      const r = await pool.query('SELECT id, name, device_id FROM students WHERE code = $1', [code]);
+      student = r.rows[0];
+    } catch (colErr) {
+      const r = await pool.query('SELECT id, name FROM students WHERE code = $1', [code]);
+      student = r.rows[0];
+    }
+    if (!student) return res.status(404).json({ error: 'invalid_code' });
     if (student.device_id && deviceId && student.device_id !== deviceId) {
       // Código já reivindicado por outro aparelho — recusa pra não deixar
       // duas pessoas editando a mesma ficha ao mesmo tempo.
       return res.status(409).json({ error: 'device_locked' });
     }
     if (!student.device_id && deviceId) {
-      await pool.query('UPDATE students SET device_id = $1 WHERE id = $2', [deviceId, student.id]);
+      pool.query('UPDATE students SET device_id = $1 WHERE id = $2', [deviceId, student.id]).catch(()=>{});
     }
     const needsName = !student.name || !student.name.trim();
     return res.json({ role: 'student', studentId: student.id, name: student.name, needsName, code });
@@ -160,8 +178,13 @@ async function requireStudentAccess(req, res, next) {
 
 app.get('/api/students', requireProfessor, async (req, res) => {
   try {
-    const r = await pool.query('SELECT id, name, code, device_id FROM students ORDER BY created_at ASC');
-    const students = r.rows.map(s => ({ id: s.id, name: s.name, code: s.code, locked: !!s.device_id }));
+    let rows;
+    try {
+      rows = (await pool.query('SELECT id, name, code, device_id FROM students ORDER BY created_at ASC')).rows;
+    } catch (colErr) {
+      rows = (await pool.query('SELECT id, name, code FROM students ORDER BY created_at ASC')).rows;
+    }
+    const students = rows.map(s => ({ id: s.id, name: s.name, code: s.code, locked: !!s.device_id }));
     res.json(students);
   } catch (err) {
     console.error(err);
