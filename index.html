@@ -483,6 +483,8 @@ footer{text-align:center;color:var(--text-faint);font-size:11px;margin-top:32px;
 }
 .student-row .sname{font-weight:700;font-size:14.5px;}
 .student-row .scode{font-family:'Archivo',sans-serif;color:var(--accent);font-size:15px;letter-spacing:.1em;margin-top:2px;}
+.student-row-unclaimed{border-left-color:var(--text-faint);border-style:dashed;}
+.student-row-unclaimed .sname{color:var(--text-faint);font-style:italic;font-weight:600;}
 .student-actions{display:flex;gap:6px;align-items:center;}
 </style>
 
@@ -524,7 +526,10 @@ footer{text-align:center;color:var(--text-faint);font-size:11px;margin-top:32px;
   <div class="card">
     <div class="card-head">
       <h2><span class="chip">👥</span>Alunos</h2>
-      <button class="small primary" id="addStudentBtn">+ novo aluno</button>
+      <div style="display:flex;gap:8px;">
+        <button class="small ghost" id="bulkCodesBtn">🎲 Gerar 10 códigos</button>
+        <button class="small primary" id="addStudentBtn">+ novo aluno</button>
+      </div>
     </div>
     <div id="studentsList"></div>
   </div>
@@ -804,6 +809,19 @@ async function submitGateCode(){
     const res = await fetch('/api/auth', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({code}) });
     if(!res.ok){ gateError.textContent = 'Código inválido.'; return; }
     const data = await res.json();
+    if(data.role==='student' && data.needsName){
+      const chosen = await promptStudentName();
+      if(chosen){
+        try{
+          await fetch(`/api/students/${data.studentId}/name`, {
+            method:'PUT',
+            headers:{'Content-Type':'application/json','x-student-code':data.code},
+            body: JSON.stringify({name: chosen})
+          });
+          data.name = chosen;
+        }catch(e){}
+      }
+    }
     saveAuth(data);
     boot();
   }catch(e){
@@ -837,18 +855,48 @@ async function renderProfessorDashboard(){
     return;
   }
   studentsList.innerHTML = students.map(s=> `
-    <div class="student-row">
+    <div class="student-row${s.name?'':' student-row-unclaimed'}">
       <div>
-        <div class="sname">${escapeHtml(s.name)}</div>
+        <div class="sname">${s.name ? escapeHtml(s.name) : '— aguardando aluno —'}</div>
         <div class="scode">${escapeHtml(s.code)}</div>
       </div>
       <div class="student-actions">
-        <button class="small" data-viewstudent="${s.id}">Ver treino</button>
+        ${s.name ? `<button class="small" data-viewstudent="${s.id}">Ver treino</button>` : ''}
         <button class="ghost small" data-renamestudent="${s.id}" data-name="${escapeAttr(s.name)}" title="Renomear">✎</button>
         <button class="ghost small" data-delstudent="${s.id}" data-name="${escapeAttr(s.name)}" title="Remover aluno">✕</button>
       </div>
     </div>`).join('');
 }
+function showCodesModal(title, codes){
+  const overlay = document.createElement('div');
+  overlay.className = 'confirm-overlay';
+  overlay.innerHTML = `
+    <div class="confirm-box" style="max-width:360px;">
+      <p style="margin-bottom:10px;"><strong>${escapeHtml(title)}</strong></p>
+      <div style="background:var(--surface-2);border:1px solid var(--border);padding:10px;max-height:260px;overflow:auto;font-family:'Archivo',sans-serif;">
+        ${codes.map(c=> `<div style="padding:5px 2px;letter-spacing:.08em;font-weight:700;color:var(--accent);">${escapeHtml(c)}</div>`).join('')}
+      </div>
+      <div class="confirm-actions">
+        <button class="ghost small" data-act="copy">Copiar tudo</button>
+        <button class="primary small" data-act="ok">Fechar</button>
+      </div>
+    </div>`;
+  document.body.appendChild(overlay);
+  overlay.addEventListener('click', e=>{
+    const act = e.target.dataset && e.target.dataset.act;
+    if(act==='copy'){
+      navigator.clipboard?.writeText(codes.join('\n')).then(()=> showToast('Códigos copiados!')).catch(()=>{});
+    }
+    if(act==='ok' || e.target===overlay) overlay.remove();
+  });
+}
+document.getElementById('bulkCodesBtn').addEventListener('click', async ()=>{
+  const res = await fetch('/api/students/bulk', { method:'POST', headers: apiHeaders({'Content-Type':'application/json'}), body: JSON.stringify({count:10}) });
+  if(!res.ok){ alert('Não consegui gerar os códigos.'); return; }
+  const created = await res.json();
+  await renderProfessorDashboard();
+  showCodesModal('10 códigos gerados — distribua um pra cada aluno. Cada um coloca o próprio nome ao entrar pela primeira vez.', created.map(c=> c.code));
+});
 document.getElementById('addStudentBtn').addEventListener('click', async ()=>{
   const name = prompt('Nome do novo aluno:');
   if(!name || !name.trim()) return;
@@ -992,6 +1040,38 @@ function confirmDialog(message, opts={}){
       const act = e.target.dataset && e.target.dataset.act;
       if(act==='cancel') done(false);
       if(act==='ok') done(true);
+    });
+  });
+}
+
+// Primeiro acesso de um código gerado em lote (sem nome ainda) — pede o nome
+// do aluno antes de entrar no app. Só aparece uma vez, quando o nome está vazio.
+function promptStudentName(){
+  return new Promise(resolve=>{
+    const overlay = document.createElement('div');
+    overlay.className = 'confirm-overlay';
+    overlay.innerHTML = `
+      <div class="confirm-box">
+        <p style="margin-bottom:4px;"><strong>Bem-vindo! 👋</strong></p>
+        <p style="margin-bottom:12px;color:var(--text-dim);font-size:13px;">Como podemos te chamar?</p>
+        <input type="text" id="studentNameInput" class="minput" maxlength="60" placeholder="Seu nome" autocomplete="off" style="margin-bottom:4px;">
+        <div class="confirm-actions">
+          <button class="primary small" data-act="ok" style="width:100%;justify-content:center;">Continuar</button>
+        </div>
+      </div>`;
+    document.body.appendChild(overlay);
+    const input = overlay.querySelector('#studentNameInput');
+    setTimeout(()=> input.focus(), 50);
+    function submit(){
+      const v = input.value.trim();
+      if(!v) return;
+      overlay.remove();
+      resolve(v);
+    }
+    input.addEventListener('keydown', e=>{ if(e.key==='Enter') submit(); });
+    overlay.addEventListener('click', e=>{
+      const act = e.target.dataset && e.target.dataset.act;
+      if(act==='ok') submit();
     });
   });
 }

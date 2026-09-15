@@ -110,7 +110,8 @@ app.post('/api/auth', async (req, res) => {
   try {
     const r = await pool.query('SELECT id, name FROM students WHERE code = $1', [code]);
     if (r.rows[0]) {
-      return res.json({ role: 'student', studentId: r.rows[0].id, name: r.rows[0].name, code });
+      const needsName = !r.rows[0].name || !r.rows[0].name.trim();
+      return res.json({ role: 'student', studentId: r.rows[0].id, name: r.rows[0].name, needsName, code });
     }
     res.status(404).json({ error: 'invalid_code' });
   } catch (err) {
@@ -166,6 +167,44 @@ app.post('/api/students', requireProfessor, async (req, res) => {
     await pool.query('INSERT INTO students (id, name, code) VALUES ($1,$2,$3)', [id, name, code]);
     await pool.query(`INSERT INTO app_state (id, data) VALUES ($1, $2)`, [id, { sessions: [], protocols: [] }]);
     res.json({ id, name, code });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'db_error' });
+  }
+});
+
+// Gera vários códigos de uma vez, sem nome — pra distribuir aleatoriamente e
+// deixar cada aluno colocar o próprio nome no primeiro acesso (needsName).
+app.post('/api/students/bulk', requireProfessor, async (req, res) => {
+  const count = Math.min(50, Math.max(1, parseInt((req.body || {}).count, 10) || 10));
+  try {
+    const created = [];
+    for (let i = 0; i < count; i++) {
+      const id = crypto.randomUUID();
+      let code;
+      for (let tries = 0; tries < 8; tries++) {
+        code = generateCode();
+        const clash = await pool.query('SELECT 1 FROM students WHERE code = $1', [code]);
+        if (!clash.rows[0]) break;
+      }
+      await pool.query('INSERT INTO students (id, name, code) VALUES ($1,$2,$3)', [id, '', code]);
+      await pool.query(`INSERT INTO app_state (id, data) VALUES ($1, $2)`, [id, { sessions: [], protocols: [] }]);
+      created.push({ id, code });
+    }
+    res.json(created);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'db_error' });
+  }
+});
+
+// O próprio aluno define o nome no primeiro acesso (ou o professor corrige depois).
+app.put('/api/students/:id/name', requireStudentAccess, async (req, res) => {
+  const name = String((req.body || {}).name || '').trim().slice(0, 60);
+  if (!name) return res.status(400).json({ error: 'missing_name' });
+  try {
+    await pool.query('UPDATE students SET name = $1 WHERE id = $2', [name, req.params.id]);
+    res.json({ ok: true, name });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'db_error' });
