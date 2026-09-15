@@ -14,17 +14,17 @@
   --text:#e8efe9;
   --text-dim:#9fb2a2;
   --text-faint:#5c6b5f;
-  --accent:#3e8f5f;
-  --accent-dark:#2c6944;
+  --accent:#d97b3f;
+  --accent-dark:#b8632e;
   --accent-ink:#0b0f0c;
-    --accent-tint-bg:#15291d;
-    --accent-tint-text:#8fd6ab;
+    --accent-tint-bg:#2b1c12;
+    --accent-tint-text:#e3a878;
   --up:#8fd6ab;
   --down:#e0725f;
   --shadow: none;
-  --radius-lg:0px;
-  --radius-md:0px;
-  --radius-sm:0px;
+  --radius-lg:16px;
+  --radius-md:12px;
+  --radius-sm:10px;
   color-scheme: dark;
 }
 *{box-sizing:border-box;}
@@ -44,7 +44,7 @@ body{
   margin-bottom:22px;padding:4px 2px;flex-wrap:wrap;
 }
 .brand{display:flex;align-items:center;gap:12px;}
-.mark{width:42px;height:42px;flex:none;border-radius:0px;background:var(--accent);display:flex;align-items:center;justify-content:center;box-shadow:0 8px 18px -8px rgba(62,143,95,.35);}
+.mark{width:42px;height:42px;flex:none;border-radius:var(--radius-md);background:var(--accent);display:flex;align-items:center;justify-content:center;box-shadow:0 8px 18px -8px rgba(217,123,63,.35);}
 .mark svg{width:24px;height:24px;}
 h1{
   font-family:'Archivo',sans-serif;
@@ -141,7 +141,7 @@ button{
 }
 button:hover{background:var(--surface-3);}
 button:active{transform:scale(.96);}
-button.primary{background:var(--accent);color:var(--accent-ink);border-color:transparent;font-weight:800;box-shadow:0 8px 18px -10px rgba(62,143,95,.35);}
+button.primary{background:var(--accent);color:var(--accent-ink);border-color:transparent;font-weight:800;box-shadow:0 8px 18px -10px rgba(217,123,63,.35);}
 button.primary:hover{background:var(--accent-dark);}
 button.ghost{background:transparent;border-color:transparent;color:var(--text-faint);padding:5px 7px;font-weight:600;text-transform:none;letter-spacing:0;}
 button.ghost:hover{color:var(--down);background:var(--surface-2);}
@@ -298,7 +298,7 @@ footer{text-align:center;color:var(--text-faint);font-size:11px;margin-top:32px;
   position:fixed;left:50%;bottom:28px;transform:translate(-50%,20px);
   background:var(--surface-3);border:1px solid var(--accent);color:var(--text);
   padding:12px 20px;border-radius:999px;font-size:13px;font-weight:700;
-  box-shadow:0 12px 30px -10px rgba(62,143,95,.3);
+  box-shadow:0 12px 30px -10px rgba(217,123,63,.3);
   opacity:0;transition:opacity .25s, transform .25s;z-index:2000;white-space:nowrap;
 }
 .toast.show{opacity:1;transform:translate(-50%,0);}
@@ -385,9 +385,13 @@ footer{text-align:center;color:var(--text-faint);font-size:11px;margin-top:32px;
 .mtab.active{color:var(--accent);}
 .msection-title{display:flex;align-items:center;font-family:'Archivo',sans-serif;font-weight:600;font-size:14px;text-transform:uppercase;letter-spacing:.03em;margin:18px 16px 10px;}
 .mbottom-tabs{display:flex;gap:8px;margin-top:20px;padding:16px 16px 0;border-top:1px solid var(--border);}
-.mbottom-tab{flex:1;display:flex;align-items:center;justify-content:center;gap:6px;padding:11px 8px;border:1px solid var(--border);background:var(--surface-2);color:var(--text-dim);font-family:'Archivo',sans-serif;font-weight:700;font-size:11px;text-transform:uppercase;letter-spacing:.02em;cursor:pointer;}
+.mbottom-tab{flex:1;display:flex;align-items:center;justify-content:center;gap:6px;padding:11px 8px;border:1px solid var(--border);background:var(--surface-2);color:var(--text-dim);font-family:'Archivo',sans-serif;font-weight:700;font-size:11px;text-transform:uppercase;letter-spacing:.02em;cursor:pointer;border-radius:var(--radius-sm);}
 .mbottom-tab.active{background:var(--accent);color:var(--accent-ink);border-color:transparent;}
-.mchip{display:inline-flex;align-items:center;justify-content:center;background:var(--accent);color:var(--accent-ink);width:22px;height:22px;border-radius:0px;font-family:'Archivo',sans-serif;font-size:10.5px;font-weight:700;margin-right:8px;}
+.msticky-actions{position:sticky;bottom:0;display:flex;gap:10px;padding:12px 16px calc(12px + env(safe-area-inset-bottom,0px));margin-top:18px;background:var(--bg);border-top:1px solid var(--border);}
+.msticky-actions .mprimarybtn{flex:2;}
+.msticky-actions .mghostbtn{flex:1;}
+.mseeall{display:flex;align-items:center;justify-content:space-between;background:none;border:1px dashed var(--border);border-radius:var(--radius-md);padding:12px 15px;margin:4px 16px 8px;color:var(--text-dim);font-family:'Archivo',sans-serif;font-weight:700;font-size:12.5px;cursor:pointer;}
+.mchip{display:inline-flex;align-items:center;justify-content:center;background:var(--accent);color:var(--accent-ink);width:22px;height:22px;border-radius:50%;font-family:'Archivo',sans-serif;font-size:10.5px;font-weight:700;margin-right:8px;}
 .mgrouplabel{font-family:'Archivo',sans-serif;font-size:10.5px;text-transform:uppercase;letter-spacing:.07em;color:var(--text-faint);margin:14px 16px 6px;}
 .mrow{display:flex;align-items:center;justify-content:space-between;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-md);padding:13px 15px;margin:0 16px 8px;gap:10px;cursor:pointer;}
 .mrow-main{min-width:0;flex:1;}
@@ -401,7 +405,7 @@ footer{text-align:center;color:var(--text-faint);font-size:11px;margin-top:32px;
 .mghostbtn{border:1px solid var(--border);background:var(--surface-2);color:var(--text);border-radius:var(--radius-sm);padding:8px 14px;font-family:'Archivo',sans-serif;font-size:11.5px;font-weight:700;cursor:pointer;}
 .mghostbtn.small{padding:5px 9px;font-size:10.5px;}
 .mghostbtn.mdanger{color:var(--down);border-color:var(--down);background:transparent;}
-.mprimarybtn{border:none;background:var(--accent);color:var(--accent-ink);border-radius:var(--radius-sm);padding:13px;font-family:'Archivo',sans-serif;font-size:13px;font-weight:800;cursor:pointer;box-shadow:0 8px 20px -10px rgba(62,143,95,.35);}
+.mprimarybtn{border:none;background:var(--accent);color:var(--accent-ink);border-radius:var(--radius-sm);padding:13px;font-family:'Archivo',sans-serif;font-size:13px;font-weight:800;cursor:pointer;box-shadow:0 8px 20px -10px rgba(217,123,63,.35);}
 .micon-btn{background:none;border:none;color:var(--text-faint);font-size:15px;cursor:pointer;padding:4px 6px;flex:none;}
 .minput{width:100%;background:var(--surface-2);border:1px solid var(--border);color:var(--text);border-radius:var(--radius-sm);padding:9px 11px;font-family:'Archivo',sans-serif;font-size:14px;box-sizing:border-box;}
 .mcard{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-md);padding:12px;margin:0 16px 10px;}
@@ -2837,9 +2841,8 @@ const TOUR_STEPS = [
   { target: null, title: 'Bem-vindo ao Sobrecarga 👋', text: 'Vamos fazer um tour rápido pelas principais áreas do app. Leva menos de um minuto.' },
   { target: '.mdash-cta', title: 'Próximo treino', text: 'Aqui você sempre vê qual é o próximo treino da sua ficha, com um botão pra ir direto pra ele.' },
   { target: '.mdash-stats', title: 'Suas estatísticas', text: 'Semanas seguidas treinando, total de sessões e quantos exercícios já têm progresso registrado.' },
-  { target: '#homeMuscleMapWrap', title: 'Mapa muscular', text: 'Toque em qualquer músculo — frente ou costas — pra montar um treino na hora, já filtrado por aquele grupo.' },
-  { target: '.mimportbtn', title: 'Importar ficha em PDF', text: 'Tem uma ficha de treino em PDF? Importe aqui que o app organiza as sessões automaticamente.' },
-  { target: '[data-maction="openbuilder"]', title: 'Montar treino na mão', text: 'Sem PDF? Monte um treino na hora escolhendo os exercícios você mesmo, por grupo muscular.' },
+  { target: '[data-maction="openbuilder"]', title: 'Montar treino', text: 'Toque em qualquer músculo — frente ou costas — pra montar um treino na hora, já filtrado por aquele grupo.' },
+  { target: '[data-maction="import"]', title: 'Importar ficha em PDF', text: 'Tem uma ficha de treino em PDF? Importe aqui que o app organiza as sessões automaticamente.' },
   { target: '.mrow, .mempty', title: 'Suas sessões', text: 'Toque numa semana pra ver os treinos dela, e em cada treino pra registrar peso e repetições de cada série.' },
   { target: '[data-mtab="progresso"]', title: 'Aba Progresso', text: 'Aqui você acompanha o volume levantado por semana e a evolução do seu 1RM estimado em cada exercício.' },
 ];
@@ -2940,7 +2943,8 @@ mBack.addEventListener('click', ()=>{
       mobile.sessionId=null;
       mobile.screen = mobile.weekKey ? 'week' : 'list';
     }
-    else if(mobile.screen==='week'){ mobile.screen='list'; mobile.weekKey=null; mobile.protKey=null; }
+    else if(mobile.screen==='week'){ mobile.screen='history'; mobile.weekKey=null; mobile.protKey=null; }
+    else if(mobile.screen==='history'){ mobile.screen='list'; }
     else{ mobile.screen='list'; mobile.sessionId=null; }
   }else if(mobile.tab==='progresso'){
     mobile.screen='list'; mobile.progKey=null;
@@ -2964,6 +2968,7 @@ function mRenderTreinos(){
   if(mobile.screen==='entry') return mRenderEntryScreen();
   if(mobile.screen==='import') return mRenderImportScreen();
   if(mobile.screen==='week') return mRenderWeekScreen();
+  if(mobile.screen==='history') return mRenderHistoryScreen();
   mRenderSessionsList();
 }
 
@@ -2974,14 +2979,23 @@ function mWeekSessions(){
     .sort((a,b)=> a.date.localeCompare(b.date));
 }
 
+// Sessões da semana atual (calendário real, não a semana do protocolo) —
+// é isso que a home mostra de forma achatada; o resto vive em "Histórico".
+function mThisWeekSessions(){
+  const wk = getWeekKey(todayISO());
+  return state.sessions.filter(s=> getWeekKey(s.date)===wk).sort((a,b)=> a.date.localeCompare(b.date));
+}
+
 function mRenderSessionsList(){
   mTitle.textContent = 'Sobrecarga';
   mBack.hidden = true;
   let html = '';
   const next = findNextSession();
+  const nextSub = next ? `${next.exercises.length} ${next.exercises.length===1?'exercício':'exercícios'} · ${next.exercises.reduce((a,e)=>a+e.sets.length,0)} séries` : '';
   html += `<div class="mdash-cta">
     <div class="k">${t('nextWorkout')}</div>
     <div class="v">${next ? escapeHtml(next.name) : (state.sessions.length ? 'Tudo em dia 🎉' : t('importPdfCta'))}</div>
+    ${next ? `<div class="mrow-sub" style="margin:-6px 0 10px;">${nextSub}</div>` : ''}
     ${next ? `<button class="mprimarybtn" data-maction="gotonext" data-session="${next.id}" style="width:100%;">${t('startWorkout')}</button>` : ''}
   </div>
   <div class="mdash-stats">
@@ -2989,11 +3003,39 @@ function mRenderSessionsList(){
     <div class="mdash-stat"><div class="n">${state.sessions.length}</div><div class="l">${t('sessionsLabel')}</div></div>
     <div class="mdash-stat"><div class="n">${computeProgress().length}</div><div class="l">${t('exercisesLabel')}</div></div>
   </div>`;
-  html += `<div class="msection-title" style="margin-top:20px;"><span class="mchip">✎</span>${t('workoutsTab')}</div>`;
+  html += `<div class="msection-title" style="margin-top:20px;"><span class="mchip">✎</span>Esta semana</div>`;
+  const thisWeek = mThisWeekSessions();
+  if(thisWeek.length===0){
+    html += `<div class="mempty"><strong>${t('noSessionsYet')}</strong>${t('importHint')}</div>`;
+  }else{
+    thisWeek.forEach(s=>{
+      const feito = s.exercises.some(e=> e.sets.some(x=> x.weight>0));
+      html += `<div class="mrow" data-mopen-session="${s.id}" data-fromhome="1">
+        <div class="mrow-main">
+          <div class="mrow-title">${escapeHtml(s.name)}</div>
+          <div class="mrow-sub">${fmtDayMonth(s.date)}${feito?' · iniciado':''}</div>
+        </div>
+        <span class="mchev">›</span>
+      </div>`;
+    });
+  }
+  html += `<div class="mseeall" data-maction="history">Ver histórico completo<span class="mchev">›</span></div>`;
   if(!READONLY){
-    html += `<div style="padding:0 16px 8px;display:flex;gap:8px;flex-wrap:wrap;">
+    html += `<div class="msticky-actions">
+      <button class="mprimarybtn" data-maction="openbuilder">${t('buildWorkout')}</button>
+      <button class="mghostbtn" data-maction="import">${t('importPdf')}</button>
+    </div>`;
+  }
+  mContent.innerHTML = html;
+}
+
+function mRenderHistoryScreen(){
+  mTitle.textContent = 'Histórico';
+  mBack.hidden = false;
+  let html = '';
+  if(!READONLY){
+    html += `<div style="padding:16px 16px 4px;display:flex;gap:8px;flex-wrap:wrap;">
       <button class="mghostbtn" data-maction="addsession">${t('newSession')}</button>
-      <button class="mprimarybtn" data-maction="openbuilder" style="padding:8px 14px;">${t('buildWorkout')}</button>
     </div>`;
   }
   if(state.sessions.length===0){
@@ -3031,23 +3073,12 @@ function mRenderSessionsList(){
       }
     });
   }
-  // Ferramentas secundárias (mapa muscular, importar PDF) ficam separadas lá
-  // embaixo como abas lado a lado, fora do caminho principal — quem só quer
-  // ver o treino de hoje não precisa rolar por elas.
-  html += `<div class="mbottom-tabs">
-    <button type="button" class="mbottom-tab${homeMapOpen?' active':''}" data-maction="togglemap"><span>🗺️</span>${t('muscleMap')}</button>
-    ${!READONLY ? `<button type="button" class="mbottom-tab" data-maction="import"><span>↥</span>${t('importPdf')}</button>` : ''}
-  </div>`;
-  if(homeMapOpen){
-    html += `<div class="hint" style="margin:14px 16px 10px;">${t('muscleMapHint')}</div>
-    <div style="margin:0 16px 14px;">${bodyMapHtml(homeMapView)}</div>`;
-  }
   mContent.innerHTML = html;
 }
 
 function mRenderWeekScreen(){
   const sessions = mWeekSessions();
-  if(sessions.length===0){ mobile.screen='list'; return mRenderSessionsList(); }
+  if(sessions.length===0){ mobile.screen='history'; return mRenderHistoryScreen(); }
   const end = addDaysISO(mobile.weekKey, 6);
   const n = mobile.protKey ? protocolWeekKeys(mobile.protKey).indexOf(mobile.weekKey)+1 : 0;
   mTitle.textContent = n>0 ? `Semana ${n}` : `${fmtDayMonth(mobile.weekKey)} – ${fmtDayMonth(end)}`;
@@ -3207,7 +3238,7 @@ function mRenderImportScreen(){
   mBack.hidden = false;
   if(!stageGroups.length){
     mContent.innerHTML = `<div style="padding:24px 16px;text-align:center;">
-      <div style="border:2px dashed var(--border);border-radius:0px;padding:34px 18px;margin-bottom:18px;">
+      <div style="border:2px dashed var(--border);border-radius:var(--radius-lg);padding:34px 18px;margin-bottom:18px;">
         <div style="font-size:13px;color:var(--text-dim);margin-bottom:14px;">Escolha um PDF do treino</div>
         <button class="mghostbtn" data-maction="pickfile">📄 Escolher arquivo</button>
       </div>
@@ -3294,7 +3325,7 @@ function mRenderProgressDetail(){
   let html = `<div style="padding:16px 16px 24px;">
     <div class="mbig-num">${cur.rm.toFixed(1)}kg</div>
     <div style="font-size:13px;font-weight:600;margin:4px 0 16px;">${deltaHtml} desde a sessão anterior</div>
-    <svg width="100%" height="120" viewBox="0 0 280 110" style="background:var(--surface);border-radius:0px;border:1px solid var(--border);">
+    <svg width="100%" height="120" viewBox="0 0 280 110" style="background:var(--surface);border-radius:var(--radius-md);border:1px solid var(--border);">
       <path d="${path}" fill="none" stroke="var(--accent)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
     </svg>
     <div class="msection-title" style="margin:18px 0 10px;">Histórico</div>`;
@@ -3316,6 +3347,7 @@ mContent.addEventListener('click', async e=>{
     const act = action.dataset.maction;
     if(act==='import'){ mobile.screen='import'; mRenderImportScreen(); return; }
     if(act==='togglemap'){ homeMapOpen = !homeMapOpen; mRenderSessionsList(); return; }
+    if(act==='history'){ mobile.screen='history'; mRender(); return; }
     if(act==='gotonext'){
       const session = state.sessions.find(s=> s.id===action.dataset.session);
       if(session){
@@ -3387,7 +3419,11 @@ mContent.addEventListener('click', async e=>{
     return;
   }
   const openSession = e.target.closest('[data-mopen-session]');
-  if(openSession){ mobile.sessionId = openSession.dataset.mopenSession; mobile.screen='session'; mRender(); return; }
+  if(openSession){
+    mobile.sessionId = openSession.dataset.mopenSession;
+    if(openSession.dataset.fromhome){ mobile.weekKey = null; mobile.protKey = null; }
+    mobile.screen='session'; mRender(); return;
+  }
   const delSession = e.target.closest('[data-mdel-session]');
   if(delSession){
     const id = delSession.dataset.mdelSession;
