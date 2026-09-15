@@ -384,11 +384,9 @@ footer{text-align:center;color:var(--text-faint);font-size:11px;margin-top:32px;
 .mtab span:last-child{font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:.03em;}
 .mtab.active{color:var(--accent);}
 .msection-title{display:flex;align-items:center;font-family:'Archivo',sans-serif;font-weight:600;font-size:14px;text-transform:uppercase;letter-spacing:.03em;margin:18px 16px 10px;}
-.mmap-collapse{margin-top:4px;border-top:1px solid var(--border);}
-.mmap-collapse summary{display:flex;align-items:center;font-family:'Archivo',sans-serif;font-weight:600;font-size:14px;text-transform:uppercase;letter-spacing:.03em;margin:0;padding:16px;cursor:pointer;list-style:none;}
-.mmap-collapse summary::-webkit-details-marker{display:none;}
-.mmap-collapse summary::after{content:'⌄';margin-left:auto;font-size:16px;color:var(--text-faint);transition:transform .15s;}
-.mmap-collapse[open] summary::after{transform:rotate(180deg);}
+.mbottom-tabs{display:flex;gap:8px;margin-top:20px;padding:16px 16px 0;border-top:1px solid var(--border);}
+.mbottom-tab{flex:1;display:flex;align-items:center;justify-content:center;gap:6px;padding:11px 8px;border:1px solid var(--border);background:var(--surface-2);color:var(--text-dim);font-family:'Archivo',sans-serif;font-weight:700;font-size:11px;text-transform:uppercase;letter-spacing:.02em;cursor:pointer;}
+.mbottom-tab.active{background:var(--accent);color:var(--accent-ink);border-color:transparent;}
 .mchip{display:inline-flex;align-items:center;justify-content:center;background:var(--accent);color:var(--accent-ink);width:22px;height:22px;border-radius:0px;font-family:'Archivo',sans-serif;font-size:10.5px;font-weight:700;margin-right:8px;}
 .mgrouplabel{font-family:'Archivo',sans-serif;font-size:10.5px;text-transform:uppercase;letter-spacing:.07em;color:var(--text-faint);margin:14px 16px 6px;}
 .mrow{display:flex;align-items:center;justify-content:space-between;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-md);padding:13px 15px;margin:0 16px 8px;gap:10px;cursor:pointer;}
@@ -2629,6 +2627,7 @@ function renderMuscleMap(){
 }
 /* ---------- Mapa muscular da tela inicial ---------- */
 let homeMapView = 'front';
+let homeMapOpen = false; // aba "Mapa Muscular" retraída por padrão na tela inicial
 function renderHomeMuscleMap(){
   const wrap = document.getElementById('homeMuscleMapWrap');
   if(!wrap) return;
@@ -2995,17 +2994,17 @@ function mRenderSessionsList(){
       }
     });
   }
-  // Ferramentas secundárias (importar PDF, mapa muscular) ficam separadas lá
-  // embaixo, fora do caminho principal — quem só quer ver o treino de hoje
-  // não precisa rolar por elas.
-  if(!READONLY){
-    html += `<div style="padding:20px 16px 4px;"><button class="mimportbtn" data-maction="import">${t('importPdf')}</button></div>`;
+  // Ferramentas secundárias (mapa muscular, importar PDF) ficam separadas lá
+  // embaixo como abas lado a lado, fora do caminho principal — quem só quer
+  // ver o treino de hoje não precisa rolar por elas.
+  html += `<div class="mbottom-tabs">
+    <button type="button" class="mbottom-tab${homeMapOpen?' active':''}" data-maction="togglemap"><span>🗺️</span>${t('muscleMap')}</button>
+    ${!READONLY ? `<button type="button" class="mbottom-tab" data-maction="import"><span>↥</span>${t('importPdf')}</button>` : ''}
+  </div>`;
+  if(homeMapOpen){
+    html += `<div class="hint" style="margin:14px 16px 10px;">${t('muscleMapHint')}</div>
+    <div style="margin:0 16px 14px;">${bodyMapHtml(homeMapView)}</div>`;
   }
-  html += `<details class="mmap-collapse">
-    <summary><span class="mchip">🗺️</span>${t('muscleMap')}</summary>
-    <div class="hint" style="margin:10px 16px 10px;">${t('muscleMapHint')}</div>
-    <div style="margin:0 16px 14px;">${bodyMapHtml(homeMapView)}</div>
-  </details>`;
   mContent.innerHTML = html;
 }
 
@@ -3279,6 +3278,7 @@ mContent.addEventListener('click', async e=>{
   if(action){
     const act = action.dataset.maction;
     if(act==='import'){ mobile.screen='import'; mRenderImportScreen(); return; }
+    if(act==='togglemap'){ homeMapOpen = !homeMapOpen; mRenderSessionsList(); return; }
     if(act==='gotonext'){
       const session = state.sessions.find(s=> s.id===action.dataset.session);
       if(session){
