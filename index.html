@@ -798,6 +798,15 @@ function apiHeaders(extra){
   return h;
 }
 
+function getDeviceId(){
+  let id = localStorage.getItem('sobrecarga_device_id');
+  if(!id){
+    id = (crypto.randomUUID ? crypto.randomUUID() : (Date.now().toString(36)+Math.random().toString(36).slice(2)));
+    localStorage.setItem('sobrecarga_device_id', id);
+  }
+  return id;
+}
+
 const gateScreen = document.getElementById('gateScreen');
 const gateCodeInput = document.getElementById('gateCodeInput');
 const gateError = document.getElementById('gateError');
@@ -809,8 +818,12 @@ async function submitGateCode(){
   if(!code) return;
   gateError.textContent = '';
   try{
-    const res = await fetch('/api/auth', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({code}) });
-    if(!res.ok){ gateError.textContent = 'Código inválido.'; return; }
+    const res = await fetch('/api/auth', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({code, deviceId: getDeviceId()}) });
+    if(!res.ok){
+      if(res.status===409){ gateError.textContent = 'Esse código já está em uso em outro aparelho. Peça pro seu professor liberar o acesso.'; }
+      else{ gateError.textContent = 'Código inválido.'; }
+      return;
+    }
     const data = await res.json();
     if(data.role==='student' && data.needsName){
       const chosen = await promptStudentName();
@@ -860,11 +873,12 @@ async function renderProfessorDashboard(){
   studentsList.innerHTML = students.map(s=> `
     <div class="student-row${s.name?'':' student-row-unclaimed'}">
       <div>
-        <div class="sname">${s.name ? escapeHtml(s.name) : '— aguardando aluno —'}</div>
+        <div class="sname">${s.name ? escapeHtml(s.name) : '— aguardando aluno —'}${s.locked ? ' <span title="Aparelho travado" style="opacity:.7;">🔒</span>' : ''}</div>
         <div class="scode">${escapeHtml(s.code)}</div>
       </div>
       <div class="student-actions">
         ${s.name ? `<button class="small" data-viewstudent="${s.id}">Ver treino</button>` : ''}
+        ${s.locked ? `<button class="ghost small" data-unlockstudent="${s.id}" title="Liberar aparelho">🔓</button>` : ''}
         <button class="ghost small" data-renamestudent="${s.id}" data-name="${escapeAttr(s.name)}" title="Renomear">✎</button>
         <button class="ghost small" data-delstudent="${s.id}" data-name="${escapeAttr(s.name)}" title="Remover aluno">✕</button>
       </div>
@@ -924,6 +938,12 @@ studentsList.addEventListener('click', async e=>{
   if(del){
     if(!(await confirmDialog(`Remover "${del.dataset.name}" e apagar todos os treinos dele? Isso não pode ser desfeito.`))) return;
     await fetch(`/api/students/${del.dataset.delstudent}`, { method:'DELETE', headers: apiHeaders() });
+    renderProfessorDashboard();
+    return;
+  }
+  const unlock = e.target.closest('[data-unlockstudent]');
+  if(unlock){
+    await fetch(`/api/students/${unlock.dataset.unlockstudent}/unlock`, { method:'PUT', headers: apiHeaders() });
     renderProfessorDashboard();
   }
 });

@@ -36,6 +36,11 @@ async function ensureTable() {
     code TEXT UNIQUE NOT NULL,
     created_at TIMESTAMPTZ NOT NULL DEFAULT now()
   )`);
+  // device_id: trava o código de aluno no primeiro aparelho que logar com ele
+  // (evita duas pessoas usando o mesmo código ao mesmo tempo e sobrescrevendo
+  // os dados uma da outra). Coluna adicionada depois — por isso o ADD COLUMN
+  // separado, pra não quebrar quem já tinha a tabela criada.
+  await pool.query(`ALTER TABLE students ADD COLUMN IF NOT EXISTS device_id TEXT`);
   await pool.query(`CREATE TABLE IF NOT EXISTS meta (
     key TEXT PRIMARY KEY,
     value TEXT
@@ -103,17 +108,27 @@ app.get('/api/bootstrap-code', async (req, res) => {
 
 app.post('/api/auth', async (req, res) => {
   const code = String((req.body || {}).code || '').trim().toUpperCase();
+  const deviceId = String((req.body || {}).deviceId || '').trim().slice(0, 100);
   if (!code) return res.status(400).json({ error: 'missing_code' });
   if (code === PROFESSOR_CODE) {
+    // O código do professor não trava por aparelho — normal ele acessar de
+    // vários lugares (celular, computador) pra acompanhar os alunos.
     return res.json({ role: 'professor', code });
   }
   try {
-    const r = await pool.query('SELECT id, name FROM students WHERE code = $1', [code]);
-    if (r.rows[0]) {
-      const needsName = !r.rows[0].name || !r.rows[0].name.trim();
-      return res.json({ role: 'student', studentId: r.rows[0].id, name: r.rows[0].name, needsName, code });
+    const r = await pool.query('SELECT id, name, device_id FROM students WHERE code = $1', [code]);
+    if (!r.rows[0]) return res.status(404).json({ error: 'invalid_code' });
+    const student = r.rows[0];
+    if (student.device_id && deviceId && student.device_id !== deviceId) {
+      // Código já reivindicado por outro aparelho — recusa pra não deixar
+      // duas pessoas editando a mesma ficha ao mesmo tempo.
+      return res.status(409).json({ error: 'device_locked' });
     }
-    res.status(404).json({ error: 'invalid_code' });
+    if (!student.device_id && deviceId) {
+      await pool.query('UPDATE students SET device_id = $1 WHERE id = $2', [deviceId, student.id]);
+    }
+    const needsName = !student.name || !student.name.trim();
+    return res.json({ role: 'student', studentId: student.id, name: student.name, needsName, code });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'db_error' });
@@ -145,8 +160,9 @@ async function requireStudentAccess(req, res, next) {
 
 app.get('/api/students', requireProfessor, async (req, res) => {
   try {
-    const r = await pool.query('SELECT id, name, code FROM students ORDER BY created_at ASC');
-    res.json(r.rows);
+    const r = await pool.query('SELECT id, name, code, device_id FROM students ORDER BY created_at ASC');
+    const students = r.rows.map(s => ({ id: s.id, name: s.name, code: s.code, locked: !!s.device_id }));
+    res.json(students);
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'db_error' });
@@ -218,6 +234,17 @@ app.put('/api/students/:id', requireProfessor, async (req, res) => {
   if (!name) return res.status(400).json({ error: 'missing_name' });
   try {
     await pool.query('UPDATE students SET name = $1 WHERE id = $2', [name, req.params.id]);
+    res.json({ ok: true });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'db_error' });
+  }
+});
+
+// Professor libera o código pra ser reivindicado por outro aparelho (ex: aluno trocou de celular).
+app.put('/api/students/:id/unlock', requireProfessor, async (req, res) => {
+  try {
+    await pool.query('UPDATE students SET device_id = NULL WHERE id = $1', [req.params.id]);
     res.json({ ok: true });
   } catch (err) {
     console.error(err);
