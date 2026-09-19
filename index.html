@@ -2843,6 +2843,10 @@ const mTourBtn = document.getElementById('mTourBtn');
 if(new URLSearchParams(location.search).get('tab')==='progresso') mobile.tab = 'progresso';
 
 /* ---------- Tour guiado (primeiro acesso do aluno) ---------- */
+// TOUR_VERSION sobe sempre que o tour ganha passos novos sobre funcionalidades
+// recém-lançadas — isso faz o tour reaparecer uma vez até pra quem já tinha
+// visto uma versão anterior, sem precisar de um fluxo de "novidades" à parte.
+const TOUR_VERSION = 2;
 const TOUR_STEPS = [
   { target: null, title: 'Bem-vindo ao Sobrecarga 👋', text: 'Vamos fazer um tour rápido pelas principais áreas do app. Leva menos de um minuto.' },
   { target: '.mdash-cta', title: 'Próximo treino', text: 'Aqui você sempre vê qual é o próximo treino da sua ficha, com um botão pra ir direto pra ele.' },
@@ -2850,12 +2854,15 @@ const TOUR_STEPS = [
   { target: '[data-maction="openbuilder"]', title: 'Montar treino', text: 'Toque em qualquer músculo — frente ou costas — pra montar um treino na hora, já filtrado por aquele grupo.' },
   { target: '[data-maction="import"]', title: 'Importar ficha em PDF', text: 'Tem uma ficha de treino em PDF? Importe aqui que o app organiza as sessões automaticamente.' },
   { target: '.mrow, .mempty', title: 'Suas sessões', text: 'Toque numa semana pra ver os treinos dela, e em cada treino pra registrar peso e repetições de cada série.' },
+  { target: null, title: 'Últimas cargas na tela ✨', text: 'Ao abrir um exercício pra preencher uma série, o app já mostra a carga da última vez e sugere o mesmo peso e reps nos campos — é só ajustar se for progredir.' },
+  { target: null, title: 'Teclado do seu celular ✨', text: 'Peso e repetições agora usam o teclado numérico nativo do celular, em vez de um teclado dentro do app — mais rápido e familiar.' },
   { target: '[data-mtab="progresso"]', title: 'Aba Progresso', text: 'Aqui você acompanha o volume levantado por semana e a evolução do seu 1RM estimado em cada exercício.' },
+  { target: '[data-mtab="evolucao"]', title: 'Aba Evolução ✨', text: 'Novidade: gráficos de carga x repetição organizados por mês, separados por treino e por exercício, pra você ver sua evolução de perto.' },
 ];
 let tourIndex = -1;
 let tourOverlayEl = null, tourSpotlightEl = null, tourTooltipEl = null;
 let tourTimer = null;
-function tourStorageKey(){ return 'sobrecarga_tour_seen_' + (activeStudentId() || 'x'); }
+function tourStorageKey(){ return 'sobrecarga_tour_seen_v' + TOUR_VERSION + '_' + (activeStudentId() || 'x'); }
 function startTour(){
   if(mShell.hidden) return; // tour cobre só a versão mobile por enquanto
   endTour(false);
