@@ -521,6 +521,30 @@ footer{text-align:center;color:var(--text-faint);font-size:11px;margin-top:32px;
   </div>
 </div>
 
+<div id="adminDashboard" class="prof-wrap" hidden>
+  <div class="hero">
+    <div class="brand">
+      <span class="mark">
+        <svg viewBox="0 0 24 24" fill="none">
+          <path d="M4 12h2M18 12h2M7 9v6M17 9v6M7 12h10" stroke="#fff" stroke-width="2" stroke-linecap="round"/>
+        </svg>
+      </span>
+      <div>
+        <h1>Sobrecarga</h1>
+        <div class="tagline">Área do admin — cadastre professores e navegue pelo painel de cada um.</div>
+      </div>
+    </div>
+    <button class="ghost small" id="logoutBtnAdmin" data-i18n="logout">sair</button>
+  </div>
+  <div class="card">
+    <div class="card-head">
+      <h2><span class="chip">🧑‍🏫</span>Professores</h2>
+      <button class="small primary" id="addProfessorBtn">+ novo professor</button>
+    </div>
+    <div id="professorsList"></div>
+  </div>
+</div>
+
 <div id="professorDashboard" class="prof-wrap" hidden>
   <div class="hero">
     <div class="brand">
@@ -531,9 +555,10 @@ footer{text-align:center;color:var(--text-faint);font-size:11px;margin-top:32px;
       </span>
       <div>
         <h1>Sobrecarga</h1>
-        <div class="tagline">Área do professor — gerencie os alunos e acompanhe o treino de cada um.</div>
+        <div class="tagline" id="profDashTagline">Área do professor — gerencie os alunos e acompanhe o treino de cada um.</div>
       </div>
     </div>
+    <a href="#" id="profDashBackToAdmin" class="hint" style="text-decoration:underline;display:none;">‹ voltar aos professores</a>
     <button class="ghost small" id="logoutBtnProf" data-i18n="logout">sair</button>
   </div>
   <div class="card">
@@ -785,9 +810,11 @@ applyStaticI18n();
    Sem e-mail/senha: o professor tem um código fixo e cria um código por aluno.
    O código fica guardado neste aparelho para não pedir de novo toda hora. */
 const AUTH_KEY = 'sobrecarga_auth';
-let auth = loadAuth();          // {role:'student', studentId, code, name} | {role:'professor', code} | null
-let currentStudentId = null;    // aluno que o professor está vendo agora
-let READONLY = false;           // true quando o professor está vendo a ficha de alguém
+let auth = loadAuth();          // {role:'student', studentId, code, name} | {role:'professor', code} | {role:'admin', code} | null
+let currentStudentId = null;    // aluno que o professor (ou o admin) está vendo agora
+let currentProfessorCode = null; // quando o admin entra no painel de um professor, o código real dele
+let currentProfessorName = null;
+let READONLY = false;           // true quando o professor/admin está vendo a ficha de alguém
 
 function loadAuth(){
   try{ return JSON.parse(localStorage.getItem(AUTH_KEY)); }catch(e){ return null; }
@@ -797,14 +824,21 @@ function saveAuth(a){
   try{ localStorage.setItem(AUTH_KEY, JSON.stringify(a)); }catch(e){}
 }
 function logout(){
-  auth = null; currentStudentId = null;
+  auth = null; currentStudentId = null; currentProfessorCode = null; currentProfessorName = null;
   try{ localStorage.removeItem(AUTH_KEY); }catch(e){}
   boot();
 }
-function activeStudentId(){ return auth && auth.role==='professor' ? currentStudentId : (auth && auth.studentId); }
+function activeStudentId(){ return auth && (auth.role==='professor' || auth.role==='admin') ? currentStudentId : (auth && auth.studentId); }
 function apiHeaders(extra){
   const h = Object.assign({}, extra);
-  if(auth && auth.role==='professor') h['x-professor-code'] = auth.code;
+  if(auth && auth.role==='admin'){
+    // Navegando dentro do painel de um professor: usa o código real dele
+    // (só o admin consegue ver esse código, na própria lista de professores).
+    // Ainda sem escolher um professor: usa o código de admin (endpoints /api/admin/*).
+    if(currentProfessorCode) h['x-professor-code'] = currentProfessorCode;
+    else h['x-admin-code'] = auth.code;
+  }
+  else if(auth && auth.role==='professor') h['x-professor-code'] = auth.code;
   else if(auth) h['x-student-code'] = auth.code;
   return h;
 }
@@ -821,6 +855,7 @@ function getDeviceId(){
 const gateScreen = document.getElementById('gateScreen');
 const gateCodeInput = document.getElementById('gateCodeInput');
 const gateError = document.getElementById('gateError');
+const adminDashboard = document.getElementById('adminDashboard');
 const professorDashboard = document.getElementById('professorDashboard');
 const appWrap = document.getElementById('appWrap');
 
@@ -859,10 +894,61 @@ document.getElementById('gateSubmitBtn').addEventListener('click', submitGateCod
 gateCodeInput.addEventListener('keydown', e=>{ if(e.key==='Enter') submitGateCode(); });
 
 document.getElementById('logoutBtnProf').addEventListener('click', logout);
+document.getElementById('logoutBtnAdmin').addEventListener('click', logout);
+document.getElementById('profDashBackToAdmin').addEventListener('click', e=>{
+  e.preventDefault();
+  currentProfessorCode = null; currentProfessorName = null; currentStudentId = null;
+  boot();
+});
 document.getElementById('professorLink').addEventListener('click', e=>{
   e.preventDefault();
-  if(auth.role==='professor'){ currentStudentId = null; boot(); }
+  if(auth.role==='professor' || auth.role==='admin'){ currentStudentId = null; boot(); }
   else{ logout(); }
+});
+
+/* ---------- Painel do admin: cadastrar professores ---------- */
+async function loadProfessors(){
+  try{
+    const res = await fetch('/api/admin/professors', { headers: apiHeaders() });
+    if(!res.ok) throw new Error('bad status');
+    return await res.json();
+  }catch(e){ return []; }
+}
+async function renderAdminDashboard(){
+  const list = document.getElementById('professorsList');
+  list.innerHTML = `<div class="empty">Carregando…</div>`;
+  const professors = await loadProfessors();
+  if(professors.length===0){
+    list.innerHTML = `<div class="empty"><strong>Nenhum professor ainda</strong>Cadastre o primeiro professor para gerar o código dele.</div>`;
+    return;
+  }
+  list.innerHTML = professors.map(p=> `
+    <div class="student-row">
+      <div>
+        <div class="sname">${escapeHtml(p.name)}</div>
+        <div class="scode">${escapeHtml(p.code)} · ${p.studentCount} ${p.studentCount===1?'aluno':'alunos'}</div>
+      </div>
+      <div class="student-actions">
+        <button class="small" data-viewprofessor="${p.id}" data-code="${escapeAttr(p.code)}" data-name="${escapeAttr(p.name)}">Ver painel</button>
+      </div>
+    </div>`).join('');
+}
+document.getElementById('addProfessorBtn').addEventListener('click', async ()=>{
+  const name = prompt('Nome do novo professor:');
+  if(!name || !name.trim()) return;
+  const res = await fetch('/api/admin/professors', { method:'POST', headers: apiHeaders({'Content-Type':'application/json'}), body: JSON.stringify({name: name.trim()}) });
+  if(!res.ok){ alert('Não consegui criar o professor.'); return; }
+  const prof = await res.json();
+  await renderAdminDashboard();
+  alert(`Professor "${prof.name}" criado!\n\nCódigo de acesso: ${prof.code}\n\nPasse esse código para ele entrar como professor.`);
+});
+document.getElementById('professorsList').addEventListener('click', e=>{
+  const view = e.target.closest('[data-viewprofessor]');
+  if(view){
+    currentProfessorCode = view.dataset.code;
+    currentProfessorName = view.dataset.name;
+    boot();
+  }
 });
 
 /* ---------- Painel do professor: gerenciar alunos ---------- */
@@ -3644,10 +3730,11 @@ function applyReadonlyUI(){
   mProfessorBar.hidden = !READONLY;
 }
 
-/* ---------- Decide o que mostrar: login, painel do professor ou o app ---------- */
+/* ---------- Decide o que mostrar: login, painel do admin/professor ou o app ---------- */
 function boot(){
   gateScreen.hidden = !!auth;
   if(!auth){
+    adminDashboard.hidden = true;
     professorDashboard.hidden = true;
     appWrap.hidden = true;
     mShell.hidden = true;
@@ -3656,17 +3743,33 @@ function boot(){
     setTimeout(()=> gateCodeInput.focus(), 50);
     return;
   }
-  if(auth.role==='professor' && !currentStudentId){
+  if(auth.role==='admin' && !currentProfessorCode){
+    adminDashboard.hidden = false;
+    professorDashboard.hidden = true;
+    appWrap.hidden = true;
+    mShell.hidden = true;
+    renderAdminDashboard();
+    return;
+  }
+  if((auth.role==='professor' || auth.role==='admin') && !currentStudentId){
+    adminDashboard.hidden = true;
     professorDashboard.hidden = false;
     appWrap.hidden = true;
     mShell.hidden = true;
+    const isAdminBrowsing = auth.role==='admin';
+    document.getElementById('profDashBackToAdmin').style.display = isAdminBrowsing ? '' : 'none';
+    document.getElementById('logoutBtnProf').style.display = isAdminBrowsing ? 'none' : '';
+    document.getElementById('profDashTagline').textContent = isAdminBrowsing
+      ? `Painel de ${currentProfessorName || 'professor'} — gerencie os alunos dele.`
+      : 'Área do professor — gerencie os alunos e acompanhe o treino de cada um.';
     renderProfessorDashboard();
     return;
   }
+  adminDashboard.hidden = true;
   professorDashboard.hidden = true;
   appWrap.hidden = false;
   mShell.hidden = false;
-  READONLY = (auth.role==='professor');
+  READONLY = (auth.role==='professor' || auth.role==='admin');
   STORE_KEY = 'sobrecarga_v1_' + activeStudentId();
   state = loadLocal();
   applyReadonlyUI();
