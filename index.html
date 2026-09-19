@@ -418,9 +418,6 @@ footer{text-align:center;color:var(--text-faint);font-size:11px;margin-top:32px;
 .mpad-input:focus{outline:none;color:var(--accent);}
 .mlast-load{font-size:11.5px;color:var(--text-faint);margin:-6px 0 10px;}
 .mlast-load strong{color:var(--text-dim);font-weight:700;}
-.mevo-chart-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-md);padding:12px 14px;margin:0 16px 10px;}
-.mevo-chart-title{font-size:13px;font-weight:700;color:var(--text);margin-bottom:6px;}
-.mevo-chart-row{display:flex;justify-content:space-between;padding:4px 0;font-size:11.5px;color:var(--text-dim);border-top:1px solid var(--surface-2);}
 .mbig-num{font-family:'Archivo',sans-serif;font-size:32px;color:var(--text);font-weight:700;}
 .mtarget-bar{
   display:flex;align-items:center;justify-content:space-between;gap:10px;
@@ -710,7 +707,6 @@ footer{text-align:center;color:var(--text-faint);font-size:11px;margin-top:32px;
   <div class="mtabbar">
     <button class="mtab" data-mtab="treinos"><span class="micon">🏋</span><span data-i18n="workoutsTab">Treinos</span></button>
     <button class="mtab" data-mtab="progresso"><span class="micon">Δ</span><span data-i18n="progressTab">Progresso</span></button>
-    <button class="mtab" data-mtab="evolucao"><span class="micon">📈</span><span data-i18n="evolutionTab">Evolução</span></button>
   </div>
 </div>
 
@@ -734,7 +730,7 @@ const I18N = {
     weeksLabel:'semanas', sessionsLabel:'Sessões', exercisesLabel:'Exercícios',
     muscleMap:'Mapa Muscular', muscleMapHint:'Toque num músculo pra montar o treino na hora',
     front:'Frente', back:'Costas', importPdf:'↥ Importar / escanear PDF',
-    workoutsTab:'Treinos', progressTab:'Progresso', evolutionTab:'Evolução',
+    workoutsTab:'Treinos', progressTab:'Progresso',
     newSession:'+ nova sessão', buildWorkout:'🎯 montar treino',
     noSessionsYet:'Nenhuma sessão ainda', importHint:'Importe um PDF ou crie manualmente.',
     importPdfCta:'Importe sua ficha para começar',
@@ -748,7 +744,7 @@ const I18N = {
     weeksLabel:'weeks', sessionsLabel:'Sessions', exercisesLabel:'Exercises',
     muscleMap:'Muscle map', muscleMapHint:'Tap a muscle to build a workout right now',
     front:'Front', back:'Back', importPdf:'↥ Import / scan PDF',
-    workoutsTab:'Workouts', progressTab:'Progress', evolutionTab:'Evolution',
+    workoutsTab:'Workouts', progressTab:'Progress',
     newSession:'+ new session', buildWorkout:'🎯 build workout',
     noSessionsYet:'No sessions yet', importHint:'Import a PDF or create one manually.',
     importPdfCta:'Import your workout sheet to get started',
@@ -2789,7 +2785,6 @@ const mobile = {
   exId: null,
   setIdx: null,      // série sendo preenchida (null = adicionando uma nova)
   progKey: null,
-  evoMonthKey: null,
   padWeight: '',
   padReps: '',
   padActive: 'weight',
@@ -2846,7 +2841,7 @@ if(new URLSearchParams(location.search).get('tab')==='progresso') mobile.tab = '
 // TOUR_VERSION sobe sempre que o tour ganha passos novos sobre funcionalidades
 // recém-lançadas — isso faz o tour reaparecer uma vez até pra quem já tinha
 // visto uma versão anterior, sem precisar de um fluxo de "novidades" à parte.
-const TOUR_VERSION = 2;
+const TOUR_VERSION = 3;
 const TOUR_STEPS = [
   { target: null, title: 'Bem-vindo ao Sobrecarga 👋', text: 'Vamos fazer um tour rápido pelas principais áreas do app. Leva menos de um minuto.' },
   { target: '.mdash-cta', title: 'Próximo treino', text: 'Aqui você sempre vê qual é o próximo treino da sua ficha, com um botão pra ir direto pra ele.' },
@@ -2857,7 +2852,6 @@ const TOUR_STEPS = [
   { target: null, title: 'Últimas cargas na tela ✨', text: 'Ao abrir um exercício pra preencher uma série, o app já mostra a carga da última vez e sugere o mesmo peso e reps nos campos — é só ajustar se for progredir.' },
   { target: null, title: 'Teclado do seu celular ✨', text: 'Peso e repetições agora usam o teclado numérico nativo do celular, em vez de um teclado dentro do app — mais rápido e familiar.' },
   { target: '[data-mtab="progresso"]', title: 'Aba Progresso', text: 'Aqui você acompanha o volume levantado por semana e a evolução do seu 1RM estimado em cada exercício.' },
-  { target: '[data-mtab="evolucao"]', title: 'Aba Evolução ✨', text: 'Novidade: gráficos de carga x repetição organizados por mês, separados por treino e por exercício, pra você ver sua evolução de perto.' },
 ];
 let tourIndex = -1;
 let tourOverlayEl = null, tourSpotlightEl = null, tourTooltipEl = null;
@@ -2961,9 +2955,6 @@ mBack.addEventListener('click', ()=>{
     else{ mobile.screen='list'; mobile.sessionId=null; }
   }else if(mobile.tab==='progresso'){
     mobile.screen='list'; mobile.progKey=null;
-  }else if(mobile.tab==='evolucao'){
-    if(mobile.screen==='month'){ mobile.screen='list'; mobile.evoMonthKey=null; }
-    else{ mobile.screen='list'; }
   }
   mRender();
 });
@@ -2975,7 +2966,6 @@ function mSetActiveTabUI(){
 function mRender(){
   mSetActiveTabUI();
   if(mobile.tab==='progresso') mRenderProgresso();
-  else if(mobile.tab==='evolucao') mRenderEvolucao();
   else mRenderTreinos();
 }
 
@@ -3371,103 +3361,6 @@ function mRenderProgressDetail(){
   mContent.innerHTML = html;
 }
 
-/* --- Evolução (gráfico por mês, separado por treino e exercício) --- */
-function computeEvolutionData(){
-  const months = {};
-  state.sessions.slice().sort((a,b)=> a.date.localeCompare(b.date)).forEach(session=>{
-    const monthKey = session.date.slice(0,7);
-    if(!months[monthKey]){
-      const d = new Date(session.date+'T00:00:00');
-      const rawLabel = d.toLocaleDateString('pt-BR',{month:'long',year:'numeric'});
-      months[monthKey] = { key: monthKey, label: rawLabel.charAt(0).toUpperCase()+rawLabel.slice(1), treinos: {} };
-    }
-    const month = months[monthKey];
-    const treinoName = session.name.trim() || 'Treino';
-    if(!month.treinos[treinoName]) month.treinos[treinoName] = { name: treinoName, exercises: {} };
-    const treino = month.treinos[treinoName];
-    session.exercises.forEach(ex=>{
-      const exName = ex.name.trim();
-      if(!exName) return;
-      const top = ex.sets.reduce((best,s)=> (s.weight>0 && (!best || s.weight>best.weight || (s.weight===best.weight && s.reps>best.reps))) ? s : best, null);
-      if(!top) return;
-      if(!treino.exercises[exName]) treino.exercises[exName] = { name: exName, points: [] };
-      treino.exercises[exName].points.push({date: session.date, weight: top.weight, reps: top.reps});
-    });
-  });
-  return Object.values(months).map(m=>({
-    key: m.key, label: m.label,
-    treinos: Object.values(m.treinos)
-      .map(tr=> ({ name: tr.name, exercises: Object.values(tr.exercises).filter(ex=> ex.points.length>0).sort((a,b)=> a.name.localeCompare(b.name,'pt-BR')) }))
-      .filter(tr=> tr.exercises.length>0)
-      .sort((a,b)=> a.name.localeCompare(b.name,'pt-BR'))
-  })).filter(m=> m.treinos.length>0).sort((a,b)=> b.key.localeCompare(a.key));
-}
-
-function mEvoPathCoords(points, field, w, h, pad){
-  const vals = points.map(p=> p[field]);
-  const min = Math.min(...vals), max = Math.max(...vals), span = (max-min)||1;
-  const step = (w-pad*2)/Math.max(1,points.length-1);
-  return vals.map((v,i)=> [pad+i*step, h-pad-((v-min)/span)*(h-pad*2)]);
-}
-function mEvoPathStr(coords){
-  return coords.map((p,i)=> (i===0?'M':'L')+p[0].toFixed(1)+','+p[1].toFixed(1)).join(' ');
-}
-
-function mRenderEvolucao(){
-  if(mobile.screen==='month') return mRenderEvolucaoMonth();
-  mTitle.textContent = t('evolutionTab');
-  mBack.hidden = true;
-  const months = computeEvolutionData();
-  let html = '';
-  if(months.length===0){
-    html += `<div class="mempty"><strong>Sem dados suficientes</strong>Registre cargas nas sessões para ver a evolução mês a mês.</div>`;
-  }else{
-    html += `<div class="msection-title" style="margin-top:14px;">Evolução por mês</div>`;
-    months.forEach(m=>{
-      const nTreinos = m.treinos.length;
-      const nExercicios = new Set(m.treinos.flatMap(tr=> tr.exercises.map(e=> e.name.toLowerCase()))).size;
-      html += `<div class="mrow" data-mopen-month="${m.key}">
-        <div class="mrow-main">
-          <div class="mrow-title">${escapeHtml(m.label)}</div>
-          <div class="mrow-sub">${nTreinos} ${nTreinos===1?'treino':'treinos'} · ${nExercicios} ${nExercicios===1?'exercício':'exercícios'}</div>
-        </div>
-        <span class="mchev">›</span>
-      </div>`;
-    });
-  }
-  mContent.innerHTML = html;
-}
-
-function mRenderEvolucaoMonth(){
-  const months = computeEvolutionData();
-  const m = months.find(x=> x.key===mobile.evoMonthKey);
-  if(!m){ mobile.screen='list'; return mRenderEvolucao(); }
-  mTitle.textContent = m.label;
-  mBack.hidden = false;
-  let html = '';
-  m.treinos.forEach(tr=>{
-    html += `<div class="mgrouplabel" style="margin-top:16px;">${escapeHtml(tr.name)}</div>`;
-    tr.exercises.forEach(ex=>{
-      const pts = ex.points;
-      html += `<div class="mevo-chart-card"><div class="mevo-chart-title">${escapeHtml(ex.name)}</div>`;
-      if(pts.length>1){
-        const w=260,h=90,pad=8;
-        const coords = mEvoPathCoords(pts,'weight',w,h,pad);
-        const path = mEvoPathStr(coords);
-        html += `<svg width="100%" height="90" viewBox="0 0 ${w} ${h}">
-          <path d="${path}" fill="none" stroke="var(--accent)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
-          ${coords.map(c=> `<circle cx="${c[0].toFixed(1)}" cy="${c[1].toFixed(1)}" r="2.6" fill="var(--accent)"/>`).join('')}
-        </svg>`;
-      }
-      pts.slice().reverse().forEach(p=>{
-        html += `<div class="mevo-chart-row"><span>${fmtDate(p.date)}</span><span class="mmono">${p.weight}kg × ${p.reps}</span></div>`;
-      });
-      html += `</div>`;
-    });
-  });
-  mContent.innerHTML = html;
-}
-
 /* --- Event delegation --- */
 mContent.addEventListener('click', async e=>{
   const action = e.target.closest('[data-maction]');
@@ -3538,13 +3431,6 @@ mContent.addEventListener('click', async e=>{
   if(bmviewBtn){ homeMapView = bmviewBtn.dataset.bmview; mRenderSessionsList(); return; }
   const homeMuscle = e.target.closest('[data-muscle]');
   if(homeMuscle){ openBuilder(homeMuscle.dataset.muscle, homeMapView); return; }
-  const openMonth = e.target.closest('[data-mopen-month]');
-  if(openMonth){
-    mobile.evoMonthKey = openMonth.dataset.mopenMonth;
-    mobile.screen = 'month';
-    mRender();
-    return;
-  }
   const openWeek = e.target.closest('[data-mopen-week]');
   if(openWeek){
     mobile.weekKey = openWeek.dataset.mopenWeek;
