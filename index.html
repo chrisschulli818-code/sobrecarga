@@ -705,6 +705,7 @@ footer{text-align:center;color:var(--text-faint);font-size:11px;margin-top:32px;
         <button type="button" class="lang-pill" data-lang="en">EN</button>
       </div>
       <button id="mTourBtn" class="mtourbtn" data-i18n-title="tourBtnTitle" title="Tour do app">?</button>
+      <button id="mLogoutBtn" class="mtourbtn" data-i18n-title="logout" title="sair">⎋</button>
     </div>
     <div id="mProfessorBar" class="mprofessor-bar" hidden>👁 Área do professor — somente leitura</div>
   </div>
@@ -2938,6 +2939,12 @@ function renderTourStep(){
   }, 60);
 }
 mTourBtn.addEventListener('click', startTour);
+const mLogoutBtn = document.getElementById('mLogoutBtn');
+mLogoutBtn.addEventListener('click', async ()=>{
+  if(await confirmDialog('Sair da sua conta? Você pode entrar de novo como aluno ou como professor.', {okLabel:'Sair', danger:false})){
+    logout();
+  }
+});
 
 document.querySelectorAll('.mtab').forEach(btn=>{
   btn.addEventListener('click', ()=>{
