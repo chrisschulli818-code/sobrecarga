@@ -1,0 +1,10 @@
+rules_version = '2';
+// Este banco é só uma CÓPIA DE SEGURANÇA escrita pelo servidor (firebase-admin,
+// que ignora as regras). Nenhum navegador/aplicativo acessa direto: tudo negado.
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

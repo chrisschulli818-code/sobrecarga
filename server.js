@@ -3,6 +3,7 @@ const path = require('path');
 const crypto = require('crypto');
 const { Pool } = require('pg');
 const { createLimiter } = require('./lib/ratelimit');
+const { initFromEnv: initFirebaseMirror } = require('./lib/firebase-mirror');
 
 const app = express();
 // O Render fica atrás de um proxy: sem isso req.ip seria sempre o do proxy e
@@ -280,12 +281,40 @@ function whenReady() {
   }
   return readyPromise;
 }
-whenReady().catch(() => {});
+// Cópia de segurança no Firebase (Firestore). Só liga se FIREBASE_SERVICE_ACCOUNT_B64
+// (ou FIREBASE_SERVICE_ACCOUNT) estiver definida; qualquer falha aqui é só registrada
+// e nunca atrapalha o app.
+let mirror = null;
+try { mirror = initFirebaseMirror(process.env, (...a) => console.error(...a)); }
+catch (err) { console.error('Não consegui iniciar o espelho Firebase:', err.message); }
+if (mirror) console.log('Espelho Firebase ligado.');
+
+async function runMirrorSync(force) {
+  if (!mirror) return null;
+  const counts = await mirror.syncAll(pool);
+  const snapshot = await mirror.dailySnapshot(pool, { force: !!force });
+  return { counts, snapshot };
+}
+let mirrorTimer = null;
+function scheduleMirrorSync() {
+  if (!mirror) return;
+  clearTimeout(mirrorTimer);
+  mirrorTimer = setTimeout(() => runMirrorSync().catch(() => {}), 20 * 1000);
+}
+setInterval(() => { if (mirror) runMirrorSync().catch(() => {}); }, 6 * 60 * 60 * 1000).unref();
+
+whenReady().then(() => { if (mirror) runMirrorSync().catch(() => {}); }).catch(() => {});
 app.use('/api', (req, res, next) => {
   apiLimiter.fail(req.ip);
   if (apiLimiter.blocked(req.ip)) {
     res.set('Retry-After', String(apiLimiter.retryAfterSec(req.ip)));
     return res.status(429).json({ error: 'too_many_requests' });
+  }
+  next();
+});
+app.use('/api', (req, res, next) => {
+  if (mirror && req.method !== 'GET' && !req.path.startsWith('/state/')) {
+    res.on('finish', () => { if (res.statusCode < 400) scheduleMirrorSync(); });
   }
   next();
 });
@@ -691,6 +720,7 @@ app.put('/api/state/:studentId', requireStudentAccess, async (req, res) => {
        ON CONFLICT (id) DO UPDATE SET data = $2, updated_at = now()`,
       [req.params.studentId, data]
     );
+    if (mirror) mirror.mirrorState(req.params.studentId, data).catch(() => {});
     res.json({ ok: true });
   } catch (err) {
     console.error(err);
@@ -766,6 +796,17 @@ app.post('/api/admin/history/:studentId/restore/:versionId', requireAdmin, async
   }
 });
 
+// Força a cópia no Firebase agora (e um instantâneo do dia) e devolve o estado.
+app.post('/api/admin/firebase-sync', requireAdmin, async (req, res) => {
+  if (!mirror) return res.status(409).json({ error: 'firebase_disabled' });
+  try {
+    const result = await runMirrorSync(true);
+    res.json({ ok: true, ...result, status: mirror.status() });
+  } catch (err) {
+    res.status(502).json({ error: 'firebase_error', status: mirror.status() });
+  }
+});
+
 // Estado do servidor e do esquema, sem nenhum dado sensível — serve pra
 // monitorar e pra descobrir cedo uma coluna faltando (foi o que derrubou o
 // painel duas vezes). 503 se algo essencial faltar.
@@ -785,6 +826,7 @@ app.get('/api/health', async (req, res) => {
   }
   // Quem não é admin só vê ok/não ok; o detalhe de quais colunas faltam fica pro admin.
   const isAdmin = safeEqual(req.get('x-admin-code') || '', ADMIN_CODE);
+  if (isAdmin) out.firebase = mirror ? mirror.status() : { enabled: false };
   res.status(out.ok ? 200 : 503).json(isAdmin ? out : { ok: out.ok });
 });
 

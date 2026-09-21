@@ -7,7 +7,7 @@ const { execFileSync } = require('child_process');
 const root = path.join(__dirname, '..');
 
 test('server.js e sw.js compilam', () => {
-  for (const f of ['server.js', 'sw.js', 'lib/ratelimit.js']) {
+  for (const f of ['server.js', 'sw.js', 'lib/ratelimit.js', 'lib/firebase-mirror.js', 'tools/encode-firebase-key.js']) {
     execFileSync(process.execPath, ['--check', path.join(root, f)]);
   }
 });

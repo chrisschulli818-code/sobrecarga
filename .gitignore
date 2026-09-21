@@ -8,6 +8,8 @@ node_modules/
 *.p12
 credentials*.json
 service-account*.json
+*-firebase-adminsdk-*.json
+firebase-key.b64.txt
 
 # Backups exportados pelo admin (contêm códigos de acesso dos alunos)
 sobrecarga-backup-*.json

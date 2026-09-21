@@ -48,7 +48,11 @@ O plano gratuito do Supabase **não tem backup**. Por isso o app se protege sozi
 
 - **Histórico de versões:** antes de sobrescrever a ficha de um aluno, guarda a versão anterior (no máx. 1 a cada 30 min por aluno, por 30 dias). Ver versões: `GET /api/admin/history/:studentId` (header `x-admin-code`). Restaurar: `POST /api/admin/history/:studentId/restore/:versionId`.
 - **Backup completo:** botão **⬇ backup** na área do admin (ou `GET /api/admin/export`) baixa um JSON com professores, alunos (com códigos) e fichas. Guarde o arquivo em local privado — ele contém os códigos de acesso.
-- Sugestão: baixar um backup por semana.
+- **Cópia no Firebase (Firestore):** um espelho fora do Supabase. Cada salvamento de ficha é copiado na hora; cadastros e fichas são sincronizados a cada 6 h e depois de cada mudança; e há um instantâneo por dia (`backups/AAAA-MM-DD`, 30 dias). Aluno/professor removido continua lá, só marcado com `deletedAt`. Projeto: `sobrecarga-app-191822843` (região São Paulo, regras que negam todo acesso direto — só o servidor escreve).
+  - **Como ligar:** Console do Firebase → Configurações do projeto → Contas de serviço → *Gerar nova chave privada*. Depois `node tools/encode-firebase-key.js "<arquivo baixado>"` (copia a chave em base64 sem mostrá-la) e cole no Render em **Environment → `FIREBASE_SERVICE_ACCOUNT_B64`**. Sem essa variável o espelho fica desligado e o app funciona normal.
+  - **Conferir:** `GET /api/health` com `x-admin-code` mostra `firebase` (última sincronização, erro). `POST /api/admin/firebase-sync` força uma cópia agora.
+  - Nunca versione o arquivo da chave (o `.gitignore` já bloqueia).
+- Sugestão: baixar um backup manual por semana também.
 
 ## Desenvolvimento
 
