@@ -5,7 +5,9 @@
   "description": "Diário de treino com sincronização entre dispositivos",
   "main": "server.js",
   "scripts": {
-    "start": "node server.js"
+    "start": "node server.js",
+    "test": "node --test tests/*.test.js",
+    "smoke": "node tests/smoke.js"
   },
   "engines": {
     "node": ">=18"
