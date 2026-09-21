@@ -1,8 +1,8 @@
 // Service worker: deixa o app abrir sem internet. NUNCA mexe em /api — os dados
 // do treino continuam indo direto pro servidor (e ficando no localStorage
 // quando offline, sincronizando depois).
-const CACHE = 'sobrecarga-shell-v1';
-const SHELL = ['/', '/manifest.webmanifest', '/icons/icon-192.png', '/icons/icon-512.png'];
+const CACHE = 'sobrecarga-shell-v2';
+const SHELL = ['/', '/styles.css', '/app.js', '/manifest.webmanifest', '/icons/icon-192.png', '/icons/icon-512.png'];
 
 self.addEventListener('install', event => {
   event.waitUntil(caches.open(CACHE).then(c => c.addAll(SHELL)).then(() => self.skipWaiting()));

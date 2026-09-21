@@ -12,11 +12,14 @@ test('server.js e sw.js compilam', () => {
   }
 });
 
-test('todos os <script> inline do index.html compilam', () => {
+test('app.js compila e o index.html carrega app.js e styles.css', () => {
+  assert.doesNotThrow(() => new Function(fs.readFileSync(path.join(root, 'app.js'), 'utf8')));
   const html = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
-  const blocks = [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].map(m => m[1]);
-  assert.ok(blocks.length > 0);
-  blocks.forEach((code, i) => assert.doesNotThrow(() => new Function(code), `script #${i}`));
+  assert.ok(html.includes('<script src="/app.js"></script>'));
+  assert.ok(html.includes('<link rel="stylesheet" href="/styles.css">'));
+  const inline = [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].map(m => m[1]).join('');
+  assert.ok(inline.length < 2000, 'script inline grande voltou pro index.html');
+  assert.ok(!/<style>/.test(html), 'CSS inline voltou pro index.html');
 });
 
 test('manifest é JSON válido e aponta pra ícones que existem', () => {

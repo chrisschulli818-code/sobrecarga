@@ -1,6 +1,6 @@
 // O app é um arquivo só de JS de navegador (sem exports), então pra testar as
 // funções puras (leitor de PDF etc.) a gente recorta o código-fonte delas do
-// index.html e roda num contexto isolado, sem DOM.
+// app.js e roda num contexto isolado, sem DOM.
 const fs = require('fs');
 const path = require('path');
 const vm = require('node:vm');
@@ -19,7 +19,7 @@ function extractFunction(source, name) {
 }
 
 function loadFunctions(names) {
-  const file = path.join(__dirname, '..', '..', 'index.html');
+  const file = path.join(__dirname, '..', '..', 'app.js');
   const source = fs.readFileSync(file, 'utf8');
   const code = names.map(n => extractFunction(source, n)).join('\n\n');
   const ctx = {};

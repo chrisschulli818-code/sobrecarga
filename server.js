@@ -685,15 +685,15 @@ app.get('/api/health', async (req, res) => {
 // Serve só o que é do site — antes servia a pasta inteira, inclusive
 // server.js e package.json.
 const PUBLIC_FILES = new Set([
-  'index.html', 'manifest.webmanifest', 'sw.js',
+  'index.html', 'styles.css', 'app.js', 'manifest.webmanifest', 'sw.js',
   'icons/icon-180.png', 'icons/icon-192.png', 'icons/icon-512.png'
 ]);
 app.use((req, res, next) => {
   if (req.method !== 'GET' && req.method !== 'HEAD') return next();
   const file = req.path === '/' ? 'index.html' : req.path.replace(/^\//, '');
   if (!PUBLIC_FILES.has(file)) return next();
-  // O service worker e a página não podem ficar presos em cache velho.
-  if (file === 'sw.js' || file === 'index.html') res.set('Cache-Control', 'no-cache');
+  // Página, scripts e service worker sempre revalidam (ETag), pra um deploy novo chegar na hora.
+  if (/\.(html|js|css)$/.test(file)) res.set('Cache-Control', 'no-cache');
   res.sendFile(path.join(__dirname, file));
 });
 
