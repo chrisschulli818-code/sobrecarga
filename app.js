@@ -601,12 +601,22 @@ fileInput.addEventListener('change', e=>{
   if(f) handleFile(f);
 });
 
+// O PDF é lido só no aparelho (nada é enviado ao servidor), mas mesmo assim
+// limita tamanho e páginas pra um arquivo enorme ou malformado não travar a aba.
+const MAX_PDF_BYTES = 15 * 1024 * 1024;
+const MAX_PDF_PAGES = 60;
 async function handleFile(file){
-  if(file.type !== 'application/pdf'){ alert('Envie um arquivo PDF.'); return; }
-  dropLabel.innerHTML = `<strong>Lendo…</strong> ${file.name}`;
+  const isPdf = file.type === 'application/pdf' || /\.pdf$/i.test(file.name);
+  if(!isPdf){ alert('Envie um arquivo PDF.'); return; }
+  if(file.size > MAX_PDF_BYTES){ alert('Esse PDF é grande demais (máximo 15 MB).'); return; }
+  const safeName = escapeHtml(file.name);
+  dropLabel.innerHTML = `<strong>Lendo…</strong> ${safeName}`;
   try{
     const buf = await file.arrayBuffer();
+    const head = new Uint8Array(buf, 0, Math.min(1024, buf.byteLength));
+    if(!new TextDecoder('latin1').decode(head).includes('%PDF-')){ alert('Esse arquivo não parece ser um PDF de verdade.'); dropLabel.innerHTML = '<strong>Clique para escolher</strong> ou arraste um PDF de treino aqui'; return; }
     const pdf = await pdfjsLib.getDocument({data:buf}).promise;
+    if(pdf.numPages > MAX_PDF_PAGES){ alert(`Esse PDF tem páginas demais (máximo ${MAX_PDF_PAGES}).`); dropLabel.innerHTML = '<strong>Clique para escolher</strong> ou arraste um PDF de treino aqui'; return; }
 
     const gridGroups = await extractGridWorkouts(pdf);
 
@@ -635,7 +645,7 @@ async function handleFile(file){
       if(groups.length===0) groups = [{ title: baseTitle, rows: [] }];
     }
 
-    dropLabel.innerHTML = `<strong>${file.name}</strong> — clique para trocar o arquivo`;
+    dropLabel.innerHTML = `<strong>${safeName}</strong> — clique para trocar o arquivo`;
     openStage(groups, file.name);
     mobile.tab = 'treinos'; mobile.screen = 'import'; mRenderImportScreen();
   }catch(err){

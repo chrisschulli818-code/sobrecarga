@@ -9,20 +9,73 @@ const app = express();
 // o limite de tentativas valeria pro site inteiro em vez de por pessoa.
 app.set('trust proxy', 1);
 app.disable('x-powered-by');
+
+// Em produção (Render) manda tudo pra HTTPS. Sem isso, um código digitado numa
+// rede aberta passaria em texto puro. Localmente (sem RENDER/NODE_ENV) não mexe.
+const FORCE_HTTPS = !!process.env.RENDER || process.env.NODE_ENV === 'production';
+app.use((req, res, next) => {
+  if (FORCE_HTTPS && !req.secure) {
+    return res.redirect(301, 'https://' + req.get('host') + req.originalUrl);
+  }
+  next();
+});
+
+// Content-Security-Policy: só scripts do próprio site e das 3 bibliotecas de
+// CDN que o app usa (pdf.js, jsPDF, jspdf-autotable), sem script inline — então
+// mesmo que algum texto de usuário escapasse do escape de HTML, não executaria.
+const CSP = [
+  "default-src 'self'",
+  "script-src 'self' https://cdnjs.cloudflare.com",
+  "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+  "font-src https://fonts.gstatic.com",
+  "img-src 'self' data: blob:",
+  "connect-src 'self' https://cdnjs.cloudflare.com",
+  "worker-src 'self' blob: https://cdnjs.cloudflare.com",
+  "manifest-src 'self'",
+  "object-src 'none'",
+  "base-uri 'self'",
+  "form-action 'self'",
+  "frame-ancestors 'none'"
+].join('; ');
 app.use((req, res, next) => {
   res.set({
+    'Content-Security-Policy': CSP,
+    'Strict-Transport-Security': 'max-age=15552000; includeSubDomains',
     'X-Content-Type-Options': 'nosniff',
     'X-Frame-Options': 'DENY',
-    'Referrer-Policy': 'same-origin'
+    'Referrer-Policy': 'same-origin',
+    'Permissions-Policy': 'camera=(), microphone=(), geolocation=(), payment=()',
+    'Cross-Origin-Opener-Policy': 'same-origin'
   });
   next();
 });
-app.use(express.json({ limit: '8mb' }));
+// A ficha inteira de um aluno tem alguns KB; 2 MB é folga de sobra.
+app.use(express.json({ limit: '2mb' }));
 
 // Chutar códigos: 15 falhas por IP a cada 10 min bloqueia (vale pro login e
 // pro pedido de liberação, que também aceita um código sem autenticação).
 const authLimiter = createLimiter({ max: 15, windowMs: 10 * 60 * 1000 });
 setInterval(() => authLimiter.sweep(), 10 * 60 * 1000).unref();
+// Teto geral da API por IP (600 requisições/min): segura abuso/raspagem sem
+// atrapalhar quem só treina (a sincronização é ~1 requisição por edição).
+const apiLimiter = createLimiter({ max: 600, windowMs: 60 * 1000 });
+setInterval(() => apiLimiter.sweep(), 60 * 1000).unref();
+
+// Comparação de segredos em tempo constante (não vaza, pelo tempo de resposta,
+// quantos caracteres do código estavam certos).
+function safeEqual(a, b) {
+  const x = Buffer.from(String(a || ''));
+  const y = Buffer.from(String(b || ''));
+  if (x.length !== y.length) { crypto.timingSafeEqual(x, x); return false; }
+  return crypto.timingSafeEqual(x, y);
+}
+
+// Formatos aceitos (tudo que vem do cliente é validado antes de tocar no banco).
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const CODE_RE = /^[A-Z0-9_-]{4,32}$/;
+function cleanText(v, max) {
+  return String(v == null ? '' : v).replace(/[\u0000-\u001f\u007f]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, max);
+}
 
 // O banco (Supabase) é compartilhado com outros apps do usuário; todas as
 // tabelas do Sobrecarga vivem isoladas no schema "sobrecarga", nunca em public.
@@ -107,6 +160,13 @@ async function ensureTable() {
     student_id TEXT PRIMARY KEY,
     requested_at TIMESTAMPTZ NOT NULL DEFAULT now()
   )`);
+  // Segurança em nível de linha, como defesa extra: o dono da tabela (o app)
+  // continua acessando normalmente, mas qualquer outra role que ganhe acesso
+  // por engano (ex.: a API pública do Supabase) enxerga zero linhas.
+  for (const t of ['professors', 'app_state_history', 'unlock_requests']) {
+    try { await pool.query(`ALTER TABLE ${t} ENABLE ROW LEVEL SECURITY`); }
+    catch (err) { console.error(`Não consegui ativar RLS em ${t}:`, err.message); }
+  }
   await pruneHistory();
 
   // Código do professor: a variável de ambiente sempre manda; sem ela, usa o
@@ -221,10 +281,24 @@ function whenReady() {
   return readyPromise;
 }
 whenReady().catch(() => {});
+app.use('/api', (req, res, next) => {
+  apiLimiter.fail(req.ip);
+  if (apiLimiter.blocked(req.ip)) {
+    res.set('Retry-After', String(apiLimiter.retryAfterSec(req.ip)));
+    return res.status(429).json({ error: 'too_many_requests' });
+  }
+  next();
+});
 app.use('/api', async (req, res, next) => {
   try { await whenReady(); next(); }
   catch (e) { res.status(503).json({ error: 'starting' }); }
 });
+
+// Todo id que chega na URL tem que ter o formato certo (uuid, ou número no
+// caso de versão do histórico) — nada de texto livre indo pro banco.
+app.param('id', (req, res, next, v) => UUID_RE.test(v) ? next() : res.status(400).json({ error: 'invalid_id' }));
+app.param('studentId', (req, res, next, v) => UUID_RE.test(v) ? next() : res.status(400).json({ error: 'invalid_id' }));
+app.param('versionId', (req, res, next, v) => /^\d{1,12}$/.test(v) ? next() : res.status(400).json({ error: 'invalid_id' }));
 
 /* ---------- Autenticação por código (sem senha/e-mail) ----------
    O professor tem um código fixo (env PROFESSOR_CODE ou gerado uma vez).
@@ -237,7 +311,11 @@ app.post('/api/auth', async (req, res) => {
     res.set('Retry-After', String(authLimiter.retryAfterSec(req.ip)));
     return res.status(429).json({ error: 'too_many_attempts' });
   }
-  if (code === ADMIN_CODE) {
+  if (!CODE_RE.test(code)) {
+    authLimiter.fail(req.ip);
+    return res.status(404).json({ error: 'invalid_code' });
+  }
+  if (safeEqual(code, ADMIN_CODE)) {
     // O admin não é dono de alunos — ele cadastra professores e navega pelo
     // painel de qualquer um deles usando o código de cada professor.
     return res.json({ role: 'admin', code });
@@ -293,6 +371,7 @@ app.post('/api/unlock-request', async (req, res) => {
   const code = String((req.body || {}).code || '').trim().toUpperCase();
   if (!code) return res.status(400).json({ error: 'missing_code' });
   if (authLimiter.blocked(req.ip)) return res.status(429).json({ error: 'too_many_attempts' });
+  if (!CODE_RE.test(code)) { authLimiter.fail(req.ip); return res.json({ ok: true }); }
   try {
     const r = await pool.query('SELECT id FROM students WHERE code = $1', [code]);
     if (!r.rows[0]) { authLimiter.fail(req.ip); return res.json({ ok: true }); }
@@ -308,10 +387,22 @@ app.post('/api/unlock-request', async (req, res) => {
   }
 });
 
+// Falha de credencial nos cabeçalhos também conta pro limite: senão dava pra
+// chutar código de professor/admin direto na API, sem passar pelo /api/auth.
+function denyCredentials(req, res) {
+  authLimiter.fail(req.ip);
+  return res.status(403).json({ error: 'forbidden' });
+}
+function credentialsBlocked(req, res) {
+  if (!authLimiter.blocked(req.ip)) return false;
+  res.set('Retry-After', String(authLimiter.retryAfterSec(req.ip)));
+  res.status(429).json({ error: 'too_many_attempts' });
+  return true;
+}
+
 function requireAdmin(req, res, next) {
-  if ((req.get('x-admin-code') || '') !== ADMIN_CODE) {
-    return res.status(403).json({ error: 'forbidden' });
-  }
+  if (credentialsBlocked(req, res)) return;
+  if (!safeEqual(req.get('x-admin-code') || '', ADMIN_CODE)) return denyCredentials(req, res);
   next();
 }
 
@@ -320,11 +411,12 @@ function requireAdmin(req, res, next) {
 // O admin "navega como" um professor simplesmente usando o código real dele
 // (que só o admin consegue ver na própria lista de professores).
 async function requireProfessor(req, res, next) {
-  const code = req.get('x-professor-code') || '';
-  if (!code) return res.status(403).json({ error: 'forbidden' });
+  if (credentialsBlocked(req, res)) return;
+  const code = (req.get('x-professor-code') || '').trim().toUpperCase();
+  if (!CODE_RE.test(code)) return denyCredentials(req, res);
   try {
     const r = await pool.query('SELECT id FROM professors WHERE code = $1', [code]);
-    if (!r.rows[0]) return res.status(403).json({ error: 'forbidden' });
+    if (!r.rows[0]) return denyCredentials(req, res);
     req.professorId = r.rows[0].id;
     next();
   } catch (err) {
@@ -336,8 +428,9 @@ async function requireProfessor(req, res, next) {
 // Aluno só acessa a própria ficha (código bate com o id pedido); professor
 // só acessa alunos da própria turma (professor_id bate com o id pedido).
 async function requireStudentAccess(req, res, next) {
+  if (credentialsBlocked(req, res)) return;
   const studentId = req.params.studentId;
-  const profCode = req.get('x-professor-code') || '';
+  const profCode = (req.get('x-professor-code') || '').trim().toUpperCase();
   if (profCode) {
     try {
       const r = await pool.query(
@@ -345,7 +438,7 @@ async function requireStudentAccess(req, res, next) {
         [studentId, profCode]
       );
       if (r.rows[0]) return next();
-      return res.status(403).json({ error: 'forbidden' });
+      return denyCredentials(req, res);
     } catch (err) {
       console.error(err);
       return res.status(500).json({ error: 'db_error' });
@@ -355,7 +448,7 @@ async function requireStudentAccess(req, res, next) {
   try {
     const r = await pool.query('SELECT 1 FROM students WHERE id = $1 AND code = $2', [studentId, studentCode]);
     if (r.rows[0]) return next();
-    res.status(403).json({ error: 'forbidden' });
+    denyCredentials(req, res);
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'db_error' });
@@ -381,7 +474,7 @@ app.get('/api/admin/professors', requireAdmin, async (req, res) => {
 });
 
 app.post('/api/admin/professors', requireAdmin, async (req, res) => {
-  const name = String((req.body || {}).name || '').trim().slice(0, 60);
+  const name = cleanText((req.body || {}).name, 60);
   if (!name) return res.status(400).json({ error: 'missing_name' });
   try {
     const id = crypto.randomUUID();
@@ -444,7 +537,7 @@ app.get('/api/students', requireProfessor, async (req, res) => {
 });
 
 app.post('/api/students', requireProfessor, async (req, res) => {
-  const name = String((req.body || {}).name || '').trim().slice(0, 60);
+  const name = cleanText((req.body || {}).name, 60);
   if (!name) return res.status(400).json({ error: 'missing_name' });
   try {
     const id = crypto.randomUUID();
@@ -492,7 +585,7 @@ app.post('/api/students/bulk', requireProfessor, async (req, res) => {
 // Nota: a rota usa :studentId (não :id) porque requireStudentAccess lê esse
 // nome de parâmetro especificamente — foi assim que um 403 apareceu aqui antes.
 app.put('/api/students/:studentId/name', requireStudentAccess, async (req, res) => {
-  const name = String((req.body || {}).name || '').trim().slice(0, 60);
+  const name = cleanText((req.body || {}).name, 60);
   if (!name) return res.status(400).json({ error: 'missing_name' });
   try {
     await pool.query('UPDATE students SET name = $1 WHERE id = $2', [name, req.params.studentId]);
@@ -504,7 +597,7 @@ app.put('/api/students/:studentId/name', requireStudentAccess, async (req, res) 
 });
 
 app.put('/api/students/:id', requireProfessor, async (req, res) => {
-  const name = String((req.body || {}).name || '').trim().slice(0, 60);
+  const name = cleanText((req.body || {}).name, 60);
   if (!name) return res.status(400).json({ error: 'missing_name' });
   try {
     await pool.query('UPDATE students SET name = $1 WHERE id = $2 AND professor_id = $3', [name, req.params.id, req.professorId]);
@@ -566,9 +659,20 @@ app.get('/api/state/:studentId', requireStudentAccess, async (req, res) => {
   }
 });
 
+// Só guarda o que o app realmente usa (sessions e protocols): qualquer outro
+// campo que venha no corpo é descartado em vez de ir parar no banco.
+function sanitizeState(body) {
+  if (!body || typeof body !== 'object' || !Array.isArray(body.sessions)) return null;
+  const protocols = Array.isArray(body.protocols) ? body.protocols : [];
+  if (body.sessions.length > 3000 || protocols.length > 300) return null;
+  const isObj = v => v && typeof v === 'object' && !Array.isArray(v);
+  if (!body.sessions.every(isObj) || !protocols.every(isObj)) return null;
+  return { sessions: body.sessions, protocols };
+}
+
 app.put('/api/state/:studentId', requireStudentAccess, async (req, res) => {
-  const data = req.body;
-  if (!data || !Array.isArray(data.sessions)) {
+  const data = sanitizeState(req.body);
+  if (!data) {
     return res.status(400).json({ error: 'invalid_body' });
   }
   try {
@@ -601,7 +705,7 @@ app.delete('/api/admin/professors/:id', requireAdmin, async (req, res) => {
     const own = await pool.query('SELECT COUNT(*)::int AS n FROM students WHERE professor_id = $1', [req.params.id]);
     if (own.rows[0].n > 0) {
       const to = String(req.query.transferTo || '');
-      if (!to || to === req.params.id) return res.status(409).json({ error: 'has_students', students: own.rows[0].n });
+      if (!UUID_RE.test(to) || to === req.params.id) return res.status(409).json({ error: 'has_students', students: own.rows[0].n });
       const dest = await pool.query('SELECT 1 FROM professors WHERE id = $1', [to]);
       if (!dest.rows[0]) return res.status(400).json({ error: 'invalid_transfer' });
       await pool.query('UPDATE students SET professor_id = $1 WHERE professor_id = $2', [to, req.params.id]);
@@ -677,9 +781,21 @@ app.get('/api/health', async (req, res) => {
       if (!have.has(c)) out.ok = false;
     }
   } catch (err) {
-    return res.status(503).json({ ok: false, error: 'db_unreachable' });
+    return res.status(503).json({ ok: false });
   }
-  res.status(out.ok ? 200 : 503).json(out);
+  // Quem não é admin só vê ok/não ok; o detalhe de quais colunas faltam fica pro admin.
+  const isAdmin = safeEqual(req.get('x-admin-code') || '', ADMIN_CODE);
+  res.status(out.ok ? 200 : 503).json(isAdmin ? out : { ok: out.ok });
+});
+
+// JSON malformado ou grande demais vira 400/413 limpo; qualquer erro inesperado
+// vira 500 genérico (sem stack trace nem mensagem interna na resposta).
+app.use((err, req, res, next) => {
+  if (res.headersSent) return next(err);
+  if (err && err.type === 'entity.too.large') return res.status(413).json({ error: 'too_large' });
+  if (err && (err.type === 'entity.parse.failed' || err instanceof SyntaxError)) return res.status(400).json({ error: 'invalid_json' });
+  console.error(err);
+  res.status(500).json({ error: 'server_error' });
 });
 
 // Serve só o que é do site — antes servia a pasta inteira, inclusive

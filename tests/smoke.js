@@ -24,6 +24,28 @@ const need = (cond, msg) => { if (!cond) throw new Error(msg); };
       const r = await fetch(base + p); need(r.status === 404, 'status ' + r.status);
     });
   }
+  await check('cabeçalhos de segurança (CSP, HSTS, sem x-powered-by)', async () => {
+    const r = await fetch(base + '/');
+    need(/default-src 'self'/.test(r.headers.get('content-security-policy') || ''), 'sem CSP');
+    need(!/script-src[^;]*unsafe-inline/.test(r.headers.get('content-security-policy') || ''), 'CSP libera script inline');
+    need(/max-age=/.test(r.headers.get('strict-transport-security') || ''), 'sem HSTS');
+    need(!r.headers.get('x-powered-by'), 'expõe x-powered-by');
+  });
+  if (base.startsWith('https://')) {
+    await check('HTTP redireciona para HTTPS', async () => {
+      const r = await fetch(base.replace('https://', 'http://') + '/', { redirect: 'manual' });
+      need([301, 302, 307, 308].includes(r.status), 'status ' + r.status);
+      need((r.headers.get('location') || '').startsWith('https://'), 'location ' + r.headers.get('location'));
+    });
+  }
+  await check('/api/health não expõe detalhes do esquema a anônimos', async () => {
+    const j = await (await fetch(base + '/api/health')).json();
+    need(!('columns' in j), 'expôs colunas');
+  });
+  await check('id inválido na URL é recusado (400)', async () => {
+    const r = await fetch(base + "/api/state/1'%20OR%20'1'='1", { headers: { 'x-student-code': 'ZZZZZZ' } });
+    need(r.status === 400, 'status ' + r.status);
+  });
   await check('código inválido é recusado', async () => {
     const r = await fetch(base + '/api/auth', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ code: 'ZZZZZZ' }) });
     need(r.status === 404 || r.status === 429, 'status ' + r.status);

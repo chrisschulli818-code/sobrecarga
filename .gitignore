@@ -1,1 +1,13 @@
 node_modules/
+
+# Segredos: nunca versionar
+.env
+.env.*
+*.pem
+*.key
+*.p12
+credentials*.json
+service-account*.json
+
+# Backups exportados pelo admin (contêm códigos de acesso dos alunos)
+sobrecarga-backup-*.json
