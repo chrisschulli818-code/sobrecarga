@@ -23,6 +23,7 @@ function generateCode(len){
 }
 
 let PROFESSOR_CODE = null;
+let ADMIN_CODE = null;
 
 async function ensureTable() {
   await pool.query(`CREATE TABLE IF NOT EXISTS app_state (
@@ -36,6 +37,19 @@ async function ensureTable() {
     code TEXT UNIQUE NOT NULL,
     created_at TIMESTAMPTZ NOT NULL DEFAULT now()
   )`);
+  // Cada professor tem sua própria turma de alunos; o admin cadastra os
+  // professores e pode navegar pelo painel de qualquer um deles.
+  await pool.query(`CREATE TABLE IF NOT EXISTS professors (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    code TEXT UNIQUE NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+  )`);
+  try {
+    await pool.query(`ALTER TABLE students ADD COLUMN IF NOT EXISTS professor_id TEXT`);
+  } catch (err) {
+    console.error('Não consegui adicionar a coluna professor_id (alunos ficarão sem dono até isso ser corrigido):', err.message);
+  }
   // device_id: trava o código de aluno no primeiro aparelho que logar com ele
   // (evita duas pessoas usando o mesmo código ao mesmo tempo e sobrescrevendo
   // os dados uma da outra). Coluna adicionada depois — por isso o ADD COLUMN
@@ -80,6 +94,57 @@ async function ensureTable() {
   }
   console.log('Código do professor:', PROFESSOR_CODE);
 
+  // Código do admin: mesma lógica do professor acima (env var manda; senão
+  // persiste o gerado). O admin cadastra os professores e pode navegar pelo
+  // painel de qualquer um deles.
+  const envAdminCode = (process.env.ADMIN_CODE || '').trim();
+  const storedAdmin = await pool.query(`SELECT value FROM meta WHERE key='admin_code'`);
+  if (envAdminCode) {
+    ADMIN_CODE = envAdminCode;
+    await pool.query(
+      `INSERT INTO meta (key, value) VALUES ('admin_code', $1)
+       ON CONFLICT (key) DO UPDATE SET value = $1`,
+      [envAdminCode]
+    );
+  } else if (storedAdmin.rows[0]) {
+    ADMIN_CODE = storedAdmin.rows[0].value;
+  } else {
+    ADMIN_CODE = generateCode(8);
+    await pool.query(`INSERT INTO meta (key, value) VALUES ('admin_code', $1)`, [ADMIN_CODE]);
+  }
+  console.log('Código do admin:', ADMIN_CODE);
+
+  // Migração: antes só existia um professor (PROFESSOR_CODE). Agora cada
+  // professor é uma linha em "professors" e alunos pertencem a um deles.
+  // Na primeira vez que isso roda, cria esse professor legado com o código
+  // que já estava em uso, e transfere pra ele todo aluno ainda sem dono —
+  // assim quem já usava o código antigo continua acessando exatamente os
+  // mesmos alunos, sem precisar fazer nada.
+  let legacyProfessorId = null;
+  try {
+    const legacyMeta = await pool.query(`SELECT value FROM meta WHERE key='legacy_professor_id'`);
+    legacyProfessorId = legacyMeta.rows[0] && legacyMeta.rows[0].value;
+    if (legacyProfessorId) {
+      // Mantém o código do professor legado sincronizado com PROFESSOR_CODE
+      // (caso a env var mude depois).
+      await pool.query('UPDATE professors SET code = $1 WHERE id = $2', [PROFESSOR_CODE, legacyProfessorId]);
+    } else {
+      legacyProfessorId = crypto.randomUUID();
+      await pool.query(
+        'INSERT INTO professors (id, name, code) VALUES ($1,$2,$3) ON CONFLICT (code) DO NOTHING',
+        [legacyProfessorId, 'Professor', PROFESSOR_CODE]
+      );
+      await pool.query(
+        `INSERT INTO meta (key, value) VALUES ('legacy_professor_id', $1)
+         ON CONFLICT (key) DO UPDATE SET value = $1`,
+        [legacyProfessorId]
+      );
+    }
+    await pool.query('UPDATE students SET professor_id = $1 WHERE professor_id IS NULL', [legacyProfessorId]);
+  } catch (err) {
+    console.error('Não consegui migrar o professor legado (alunos antigos podem ficar sem dono):', err.message);
+  }
+
   // Migração: a base antiga (sem contas) guardava tudo em app_state id='default'.
   // Na primeira vez que rodar com o sistema de códigos, isso vira o aluno inicial.
   const noStudents = await pool.query('SELECT 1 FROM students LIMIT 1');
@@ -88,7 +153,7 @@ async function ensureTable() {
     if (oldState.rows[0]) {
       const studentId = crypto.randomUUID();
       const code = generateCode();
-      await pool.query('INSERT INTO students (id, name, code) VALUES ($1,$2,$3)', [studentId, 'Meu treino', code]);
+      await pool.query('INSERT INTO students (id, name, code, professor_id) VALUES ($1,$2,$3,$4)', [studentId, 'Meu treino', code, legacyProfessorId]);
       await pool.query(
         `INSERT INTO app_state (id, data, updated_at) VALUES ($1, $2, now())
          ON CONFLICT (id) DO UPDATE SET data = $2, updated_at = now()`,
@@ -121,14 +186,39 @@ app.get('/api/bootstrap-code', async (req, res) => {
   }
 });
 
+// Mesma ideia do bootstrap-code acima, só que pro código do admin — criado
+// depois, então tem sua própria trava de "já foi lido uma vez" independente.
+app.get('/api/bootstrap-admin-code', async (req, res) => {
+  try {
+    const claimed = await pool.query(`SELECT value FROM meta WHERE key='admin_bootstrap_claimed'`);
+    if (claimed.rows[0]) return res.status(410).json({ error: 'already_claimed' });
+    await pool.query(`INSERT INTO meta (key, value) VALUES ('admin_bootstrap_claimed','1')`);
+    res.json({ adminCode: ADMIN_CODE });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'db_error' });
+  }
+});
+
 app.post('/api/auth', async (req, res) => {
   const code = String((req.body || {}).code || '').trim().toUpperCase();
   const deviceId = String((req.body || {}).deviceId || '').trim().slice(0, 100);
   if (!code) return res.status(400).json({ error: 'missing_code' });
-  if (code === PROFESSOR_CODE) {
-    // O código do professor não trava por aparelho — normal ele acessar de
-    // vários lugares (celular, computador) pra acompanhar os alunos.
-    return res.json({ role: 'professor', code });
+  if (code === ADMIN_CODE) {
+    // O admin não é dono de alunos — ele cadastra professores e navega pelo
+    // painel de qualquer um deles usando o código de cada professor.
+    return res.json({ role: 'admin', code });
+  }
+  try {
+    const profRow = await pool.query('SELECT id, name FROM professors WHERE code = $1', [code]);
+    if (profRow.rows[0]) {
+      // O código do professor não trava por aparelho — normal ele acessar de
+      // vários lugares (celular, computador) pra acompanhar os alunos.
+      return res.json({ role: 'professor', code, professorId: profRow.rows[0].id, name: profRow.rows[0].name });
+    }
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ error: 'db_error' });
   }
   try {
     // Se a coluna device_id não existir ainda (ex.: role do banco sem
@@ -160,18 +250,49 @@ app.post('/api/auth', async (req, res) => {
   }
 });
 
-function requireProfessor(req, res, next) {
-  if ((req.get('x-professor-code') || '') !== PROFESSOR_CODE) {
+function requireAdmin(req, res, next) {
+  if ((req.get('x-admin-code') || '') !== ADMIN_CODE) {
     return res.status(403).json({ error: 'forbidden' });
   }
   next();
 }
 
-// Aluno só acessa a própria ficha (código bate com o id pedido); professor acessa qualquer uma.
+// Identifica o professor pelo código enviado no header e anexa req.professorId
+// — todas as rotas de aluno abaixo ficam restritas à turma desse professor.
+// O admin "navega como" um professor simplesmente usando o código real dele
+// (que só o admin consegue ver na própria lista de professores).
+async function requireProfessor(req, res, next) {
+  const code = req.get('x-professor-code') || '';
+  if (!code) return res.status(403).json({ error: 'forbidden' });
+  try {
+    const r = await pool.query('SELECT id FROM professors WHERE code = $1', [code]);
+    if (!r.rows[0]) return res.status(403).json({ error: 'forbidden' });
+    req.professorId = r.rows[0].id;
+    next();
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'db_error' });
+  }
+}
+
+// Aluno só acessa a própria ficha (código bate com o id pedido); professor
+// só acessa alunos da própria turma (professor_id bate com o id pedido).
 async function requireStudentAccess(req, res, next) {
   const studentId = req.params.studentId;
   const profCode = req.get('x-professor-code') || '';
-  if (profCode === PROFESSOR_CODE) return next();
+  if (profCode) {
+    try {
+      const r = await pool.query(
+        'SELECT 1 FROM students s JOIN professors p ON p.id = s.professor_id WHERE s.id = $1 AND p.code = $2',
+        [studentId, profCode]
+      );
+      if (r.rows[0]) return next();
+      return res.status(403).json({ error: 'forbidden' });
+    } catch (err) {
+      console.error(err);
+      return res.status(500).json({ error: 'db_error' });
+    }
+  }
   const studentCode = (req.get('x-student-code') || '').trim().toUpperCase();
   try {
     const r = await pool.query('SELECT 1 FROM students WHERE id = $1 AND code = $2', [studentId, studentCode]);
@@ -183,13 +304,50 @@ async function requireStudentAccess(req, res, next) {
   }
 }
 
+// Admin cadastra os professores; cada um recebe um código próprio (mesma
+// mecânica dos códigos de aluno).
+app.get('/api/admin/professors', requireAdmin, async (req, res) => {
+  try {
+    const rows = (await pool.query(`
+      SELECT p.id, p.name, p.code, COUNT(s.id)::int AS student_count
+      FROM professors p
+      LEFT JOIN students s ON s.professor_id = p.id
+      GROUP BY p.id
+      ORDER BY p.created_at ASC
+    `)).rows;
+    res.json(rows.map(r => ({ id: r.id, name: r.name, code: r.code, studentCount: r.student_count })));
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'db_error' });
+  }
+});
+
+app.post('/api/admin/professors', requireAdmin, async (req, res) => {
+  const name = String((req.body || {}).name || '').trim().slice(0, 60);
+  if (!name) return res.status(400).json({ error: 'missing_name' });
+  try {
+    const id = crypto.randomUUID();
+    let code;
+    for (let tries = 0; tries < 8; tries++) {
+      code = generateCode(8);
+      const clash = await pool.query('SELECT 1 FROM professors WHERE code = $1', [code]);
+      if (!clash.rows[0]) break;
+    }
+    await pool.query('INSERT INTO professors (id, name, code) VALUES ($1,$2,$3)', [id, name, code]);
+    res.json({ id, name, code });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'db_error' });
+  }
+});
+
 app.get('/api/students', requireProfessor, async (req, res) => {
   try {
     let rows;
     try {
-      rows = (await pool.query('SELECT id, name, code, device_id, phone FROM students ORDER BY created_at ASC')).rows;
+      rows = (await pool.query('SELECT id, name, code, device_id, phone FROM students WHERE professor_id = $1 ORDER BY created_at ASC', [req.professorId])).rows;
     } catch (colErr) {
-      rows = (await pool.query('SELECT id, name, code FROM students ORDER BY created_at ASC')).rows;
+      rows = (await pool.query('SELECT id, name, code FROM students WHERE professor_id = $1 ORDER BY created_at ASC', [req.professorId])).rows;
     }
     const students = rows.map(s => ({ id: s.id, name: s.name, code: s.code, locked: !!s.device_id, phone: s.phone || '' }));
     res.json(students);
@@ -210,7 +368,7 @@ app.post('/api/students', requireProfessor, async (req, res) => {
       const clash = await pool.query('SELECT 1 FROM students WHERE code = $1', [code]);
       if (!clash.rows[0]) break;
     }
-    await pool.query('INSERT INTO students (id, name, code) VALUES ($1,$2,$3)', [id, name, code]);
+    await pool.query('INSERT INTO students (id, name, code, professor_id) VALUES ($1,$2,$3,$4)', [id, name, code, req.professorId]);
     await pool.query(`INSERT INTO app_state (id, data) VALUES ($1, $2)`, [id, { sessions: [], protocols: [] }]);
     res.json({ id, name, code });
   } catch (err) {
@@ -233,7 +391,7 @@ app.post('/api/students/bulk', requireProfessor, async (req, res) => {
         const clash = await pool.query('SELECT 1 FROM students WHERE code = $1', [code]);
         if (!clash.rows[0]) break;
       }
-      await pool.query('INSERT INTO students (id, name, code) VALUES ($1,$2,$3)', [id, '', code]);
+      await pool.query('INSERT INTO students (id, name, code, professor_id) VALUES ($1,$2,$3,$4)', [id, '', code, req.professorId]);
       await pool.query(`INSERT INTO app_state (id, data) VALUES ($1, $2)`, [id, { sessions: [], protocols: [] }]);
       created.push({ id, code });
     }
@@ -263,7 +421,7 @@ app.put('/api/students/:id', requireProfessor, async (req, res) => {
   const name = String((req.body || {}).name || '').trim().slice(0, 60);
   if (!name) return res.status(400).json({ error: 'missing_name' });
   try {
-    await pool.query('UPDATE students SET name = $1 WHERE id = $2', [name, req.params.id]);
+    await pool.query('UPDATE students SET name = $1 WHERE id = $2 AND professor_id = $3', [name, req.params.id, req.professorId]);
     res.json({ ok: true });
   } catch (err) {
     console.error(err);
@@ -274,7 +432,7 @@ app.put('/api/students/:id', requireProfessor, async (req, res) => {
 // Professor libera o código pra ser reivindicado por outro aparelho (ex: aluno trocou de celular).
 app.put('/api/students/:id/unlock', requireProfessor, async (req, res) => {
   try {
-    await pool.query('UPDATE students SET device_id = NULL WHERE id = $1', [req.params.id]);
+    await pool.query('UPDATE students SET device_id = NULL WHERE id = $1 AND professor_id = $2', [req.params.id, req.professorId]);
     res.json({ ok: true });
   } catch (err) {
     console.error(err);
@@ -286,7 +444,7 @@ app.put('/api/students/:id/unlock', requireProfessor, async (req, res) => {
 app.put('/api/students/:id/phone', requireProfessor, async (req, res) => {
   const phone = String((req.body || {}).phone || '').replace(/\D/g, '').slice(0, 20);
   try {
-    await pool.query('UPDATE students SET phone = $1 WHERE id = $2', [phone, req.params.id]);
+    await pool.query('UPDATE students SET phone = $1 WHERE id = $2 AND professor_id = $3', [phone, req.params.id, req.professorId]);
     res.json({ ok: true, phone });
   } catch (err) {
     console.error(err);
@@ -296,7 +454,7 @@ app.put('/api/students/:id/phone', requireProfessor, async (req, res) => {
 
 app.delete('/api/students/:id', requireProfessor, async (req, res) => {
   try {
-    await pool.query('DELETE FROM students WHERE id = $1', [req.params.id]);
+    await pool.query('DELETE FROM students WHERE id = $1 AND professor_id = $2', [req.params.id, req.professorId]);
     await pool.query('DELETE FROM app_state WHERE id = $1', [req.params.id]);
     res.json({ ok: true });
   } catch (err) {
