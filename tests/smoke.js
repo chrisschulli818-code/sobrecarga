@@ -43,7 +43,7 @@ const need = (cond, msg) => { if (!cond) throw new Error(msg); };
     need(!('columns' in j), 'expôs colunas');
   });
   await check('id inválido na URL é recusado (400)', async () => {
-    const r = await fetch(base + "/api/state/1'%20OR%20'1'='1", { headers: { 'x-student-code': 'ZZZZZZ' } });
+    const r = await fetch(base + '/api/state/nao-e-um-uuid', { headers: { 'x-student-code': 'ZZZZZZ' } });
     need(r.status === 400, 'status ' + r.status);
   });
   await check('código inválido é recusado', async () => {
