@@ -422,6 +422,55 @@ let syncTimer = null;
 // do servidor, senão a edição em andamento some (foi o que duplicava
 // protocolo/sessão quando dois cliques aconteciam antes do primeiro salvar).
 let hasPendingSave = false;
+// Marca de "tem edição que ainda não chegou no servidor" GUARDADA no aparelho.
+// A variável acima morre quando a página recarrega; foi assim que cargas
+// registradas sem conexão sumiam: ao reabrir, o app achava que não havia nada
+// pendente e trocava a cópia local pela do servidor (sem as cargas).
+let saveSeq = 0;
+const dirtyKey = () => STORE_KEY + '_dirty';
+const prevKey = () => STORE_KEY + '_prev';
+function markDirty(){ try{ localStorage.setItem(dirtyKey(), String(Date.now())); }catch(e){} }
+function clearDirty(){ try{ localStorage.removeItem(dirtyKey()); }catch(e){} }
+function isDirtyStored(){ try{ return !!localStorage.getItem(dirtyKey()); }catch(e){ return false; } }
+function needsSync(){ return hasPendingSave || isDirtyStored(); }
+
+function countWeightedSets(st){
+  return ((st && st.sessions) || []).reduce((n, s)=>
+    n + ((s && s.exercises) || []).reduce((m, e)=> m + ((e && e.sets) || []).filter(t=> t && t.weight > 0).length, 0), 0);
+}
+
+// Funde a ficha do servidor com a do aparelho, sem perder carga registrada.
+// preferLocal=true (há edição não enviada): sessão com o mesmo id fica como está
+// no aparelho, que é a mais nova. false: o servidor manda, mas cargas que o
+// aparelho tem e o servidor tem zeradas são preservadas. Nunca altera os argumentos.
+function mergeStates(server, local, preferLocal){
+  const clone = v => JSON.parse(JSON.stringify(v));
+  const out = { sessions: clone(server.sessions || []), protocols: clone(server.protocols || []) };
+  const byId = new Map(out.sessions.map(s=> [s.id, s]));
+  (local.sessions || []).forEach(ls=>{
+    const ss = byId.get(ls.id);
+    if(!ss){ const c = clone(ls); out.sessions.push(c); byId.set(c.id, c); return; }
+    if(preferLocal){
+      const idx = out.sessions.indexOf(ss);
+      out.sessions[idx] = clone(ls);
+      byId.set(ls.id, out.sessions[idx]);
+      return;
+    }
+    (ls.exercises || []).forEach(le=>{
+      const se = (ss.exercises || []).find(e=> e.id === le.id);
+      if(!se){ (ss.exercises = ss.exercises || []).push(clone(le)); return; }
+      (le.sets || []).forEach((lt, i)=>{
+        const st = (se.sets || [])[i];
+        if(!st){ (se.sets = se.sets || []).push(clone(lt)); }
+        else if(lt.weight > 0 && !(st.weight > 0)){ st.weight = lt.weight; st.reps = lt.reps; }
+      });
+    });
+    if(ls.feedback && !ss.feedback) ss.feedback = ls.feedback;
+  });
+  const known = new Set(out.protocols.map(p=> p.id));
+  (local.protocols || []).forEach(p=>{ if(!known.has(p.id)){ out.protocols.push(clone(p)); known.add(p.id); } });
+  return out;
+}
 const syncBadge = () => document.getElementById('syncBadge');
 
 function loadLocal(){
@@ -452,32 +501,30 @@ async function loadRemote(){
     const res = await fetch(`/api/state/${sid}`, { headers: apiHeaders() });
     if(!res.ok) throw new Error('bad status');
     const data = await res.json();
-    if(hasPendingSave){
-      // Uma edição local está pendente (ex.: o usuário importou/criou algo
-      // antes do primeiro carregamento terminar). Descartar o que veio do
-      // servidor aqui apagaria o histórico real — em vez disso, funde: usa
-      // o servidor como base e acrescenta só o que é novo localmente (que
-      // ainda não existe nos dados do servidor).
-      if(data && Array.isArray(data.sessions)){
-        const knownIds = new Set(data.sessions.map(s=> s.id));
-        const extraSessions = state.sessions.filter(s=> !knownIds.has(s.id));
-        const serverProtocols = Array.isArray(data.protocols) ? data.protocols : [];
-        const knownProtoIds = new Set(serverProtocols.map(p=> p.id));
-        const extraProtocols = state.protocols.filter(p=> !knownProtoIds.has(p.id));
-        state = { sessions: [...data.sessions, ...extraSessions], protocols: [...serverProtocols, ...extraProtocols] };
+    if(!(data && Array.isArray(data.sessions))){ setSyncStatus('synced'); return; }
+    if(!Array.isArray(data.protocols)) data.protocols = [];
+
+    // Professor só olha: o servidor manda, e nada local é enviado.
+    if(!READONLY){
+      // Há edição que ainda não chegou no servidor (marca guardada no aparelho,
+      // não só em memória), ou o aparelho tem cargas que o servidor não tem?
+      // Nunca trocar a cópia do aparelho pela do servidor nesses casos: funde,
+      // guarda antes uma cópia de segurança e envia o resultado.
+      const unsynced = needsSync();
+      if(unsynced || countWeightedSets(state) > countWeightedSets(data)){
+        try{ localStorage.setItem(prevKey(), JSON.stringify({ at: Date.now(), state })); }catch(e){}
+        state = mergeStates(data, state, unsynced);
+        ensureProtocols();
         saveLocal();
         renderAll();
+        save();
+        return;
       }
-      setSyncStatus('synced');
-      return;
     }
-    if(data && Array.isArray(data.sessions)){
-      if(!Array.isArray(data.protocols)) data.protocols = [];
-      state = data;
-      if(ensureProtocols()) saveLocal();
-      saveLocal();
-      renderAll();
-    }
+    state = data;
+    ensureProtocols();
+    saveLocal();
+    renderAll();
     setSyncStatus('synced');
   }catch(e){
     setSyncStatus('offline');
@@ -486,12 +533,15 @@ async function loadRemote(){
 function save(){
   saveLocal();
   hasPendingSave = true;
+  saveSeq++;
+  markDirty();
   clearTimeout(syncTimer);
   syncTimer = setTimeout(syncRemote, 500);
 }
 async function syncRemote(){
   const sid = activeStudentId();
   if(!sid) return;
+  const seqAtSend = saveSeq;
   try{
     setSyncStatus('syncing');
     const res = await fetch(`/api/state/${sid}`, {
@@ -500,7 +550,8 @@ async function syncRemote(){
       body: JSON.stringify(state)
     });
     if(!res.ok) throw new Error('bad status');
-    hasPendingSave = false;
+    // Só considera enviado se não houve edição nova durante o envio.
+    if(seqAtSend === saveSeq){ hasPendingSave = false; clearDirty(); }
     setSyncStatus('synced');
   }catch(e){
     setSyncStatus('offline');
@@ -508,9 +559,9 @@ async function syncRemote(){
 }
 // Sem internet no meio do treino? A edição fica no aparelho (localStorage) e
 // sobe sozinha quando a conexão voltar, em vez de esperar a próxima edição.
-window.addEventListener('online', ()=>{ if(hasPendingSave) syncRemote(); });
-setInterval(()=>{ if(hasPendingSave && navigator.onLine!==false && !document.hidden) syncRemote(); }, 30000);
-document.addEventListener('visibilitychange', ()=>{ if(!document.hidden && hasPendingSave && navigator.onLine!==false) syncRemote(); });
+window.addEventListener('online', ()=>{ if(needsSync()) syncRemote(); });
+setInterval(()=>{ if(needsSync() && navigator.onLine!==false && !document.hidden) syncRemote(); }, 30000);
+document.addEventListener('visibilitychange', ()=>{ if(!document.hidden && needsSync() && navigator.onLine!==false) syncRemote(); });
 
 if('serviceWorker' in navigator){
   window.addEventListener('load', ()=>{ navigator.serviceWorker.register('/sw.js').catch(()=>{}); });
