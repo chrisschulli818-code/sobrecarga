@@ -318,12 +318,6 @@ footer{text-align:center;color:var(--text-faint);font-size:11px;margin-top:32px;
 }
 .builder-header h2{margin:0;font-family:'Archivo',sans-serif;font-weight:600;font-size:18px;text-transform:uppercase;letter-spacing:.02em;}
 .builder-body{flex:1;overflow:auto;display:grid;grid-template-columns:220px 1fr 260px;gap:0;}
-@media (max-width:820px){
-  .builder-body{grid-template-columns:1fr;overflow-y:auto;-webkit-overflow-scrolling:touch;}
-  .builder-list-col, .builder-selected-col{flex:none;}
-  .builder-exercise-list{flex:none;overflow:visible;min-height:0;}
-  .builder-selected-list{flex:none;overflow:visible;}
-}
 .builder-map{padding:14px;border-right:1px solid var(--border);flex-shrink:0;}
 @media (max-width:820px){.builder-map{border-right:none;border-bottom:1px solid var(--border);}}
 .body-map-tabs{display:flex;gap:8px;max-width:280px;margin:0 auto 12px;}
@@ -359,6 +353,14 @@ footer{text-align:center;color:var(--text-faint);font-size:11px;margin-top:32px;
 .sel-ex-row input{font-size:12px;padding:5px 6px;}
 .builder-finalize{border-top:1px solid var(--border);padding-top:10px;display:flex;flex-direction:column;gap:8px;}
 .builder-finalize input, .builder-finalize select{font-size:13px;}
+/* Mobile: uma coluna só, em bloco, e a rolagem fica toda no .builder-body.
+   Precisa vir DEPOIS das regras base acima — com a mesma especificidade, o que
+   vem antes perde, e as colunas voltavam a encolher e se sobrepor. */
+@media (max-width:820px){
+  .builder-body{display:block;overflow-y:auto;-webkit-overflow-scrolling:touch;}
+  .builder-list-col,.builder-selected-col{display:block;min-height:auto;}
+  .builder-exercise-list,.builder-selected-list{overflow:visible;min-height:0;}
+}
 
 /* ---------- Mobile app shell (telas estilo app, teclado numérico) ---------- */
 .mshell{display:none;}
