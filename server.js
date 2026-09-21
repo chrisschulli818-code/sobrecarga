@@ -169,37 +169,6 @@ ensureTable().catch(err => console.error('Falha ao preparar o banco:', err));
 /* ---------- Autenticação por código (sem senha/e-mail) ----------
    O professor tem um código fixo (env PROFESSOR_CODE ou gerado uma vez).
    Cada aluno tem um código próprio, criado/removido pelo professor. */
-// Retrieval único e autodestrutivo: deixa eu (Claude) pegar o código do
-// professor e o do aluno migrado logo após o primeiro deploy, sem precisar
-// de acesso aos logs do Render. Depois da primeira leitura, esse endpoint
-// nunca mais responde com nada.
-app.get('/api/bootstrap-code', async (req, res) => {
-  try {
-    const claimed = await pool.query(`SELECT value FROM meta WHERE key='bootstrap_claimed'`);
-    if (claimed.rows[0]) return res.status(410).json({ error: 'already_claimed' });
-    await pool.query(`INSERT INTO meta (key, value) VALUES ('bootstrap_claimed','1')`);
-    const students = await pool.query('SELECT name, code FROM students ORDER BY created_at ASC');
-    res.json({ professorCode: PROFESSOR_CODE, students: students.rows });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: 'db_error' });
-  }
-});
-
-// Mesma ideia do bootstrap-code acima, só que pro código do admin — criado
-// depois, então tem sua própria trava de "já foi lido uma vez" independente.
-app.get('/api/bootstrap-admin-code', async (req, res) => {
-  try {
-    const claimed = await pool.query(`SELECT value FROM meta WHERE key='admin_bootstrap_claimed'`);
-    if (claimed.rows[0]) return res.status(410).json({ error: 'already_claimed' });
-    await pool.query(`INSERT INTO meta (key, value) VALUES ('admin_bootstrap_claimed','1')`);
-    res.json({ adminCode: ADMIN_CODE });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: 'db_error' });
-  }
-});
-
 app.post('/api/auth', async (req, res) => {
   const code = String((req.body || {}).code || '').trim().toUpperCase();
   const deviceId = String((req.body || {}).deviceId || '').trim().slice(0, 100);
