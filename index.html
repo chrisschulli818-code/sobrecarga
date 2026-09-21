@@ -1,6 +1,13 @@
 <title>Sobrecarga</title>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#0b0f0c">
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="icon" type="image/png" href="/icons/icon-192.png">
+<link rel="apple-touch-icon" href="/icons/icon-180.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Sobrecarga">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700;800;900&display=swap">
@@ -498,6 +505,8 @@ footer{text-align:center;color:var(--text-faint);font-size:11px;margin-top:32px;
 }
 .student-row .sname{font-weight:700;font-size:14.5px;}
 .student-row .scode{font-family:'Archivo',sans-serif;color:var(--accent);font-size:15px;letter-spacing:.1em;margin-top:2px;}
+.student-row .sactivity{font-size:11.5px;color:var(--text-faint);margin-top:3px;}
+.student-row .sactivity.stale{color:var(--down);}
 .student-row-unclaimed{border-left-color:var(--text-faint);border-style:dashed;}
 .student-row-unclaimed .sname{color:var(--text-faint);font-style:italic;font-weight:600;}
 .student-actions{display:flex;gap:6px;align-items:center;}
@@ -519,6 +528,7 @@ footer{text-align:center;color:var(--text-faint);font-size:11px;margin-top:32px;
     <input type="text" id="gateCodeInput" class="gate-code-input" maxlength="10" data-i18n-placeholder="codePlaceholder" placeholder="CÓDIGO" autocomplete="off" autocapitalize="characters">
     <button class="primary" id="gateSubmitBtn" data-i18n="enter" style="width:100%;justify-content:center;">Entrar</button>
     <div class="gate-error" id="gateError"></div>
+    <button type="button" class="ghost-link" id="gateUnlockReqBtn" hidden>Pedir liberação ao professor</button>
     <button type="button" class="ghost-link" id="gateCoachHint" data-i18n="accessAsCoach">Acessar como professor</button>
   </div>
 </div>
@@ -541,7 +551,10 @@ footer{text-align:center;color:var(--text-faint);font-size:11px;margin-top:32px;
   <div class="card">
     <div class="card-head">
       <h2><span class="chip">🧑‍🏫</span>Professores</h2>
-      <button class="small primary" id="addProfessorBtn">+ novo professor</button>
+      <div style="display:flex;gap:8px;">
+        <button class="small ghost" id="backupBtn" title="Baixa todos os dados (professores, alunos e fichas) em um arquivo">⬇ backup</button>
+        <button class="small primary" id="addProfessorBtn">+ novo professor</button>
+      </div>
     </div>
     <div id="professorsList"></div>
   </div>
@@ -857,6 +870,7 @@ function getDeviceId(){
 const gateScreen = document.getElementById('gateScreen');
 const gateCodeInput = document.getElementById('gateCodeInput');
 const gateError = document.getElementById('gateError');
+const gateUnlockReqBtn = document.getElementById('gateUnlockReqBtn');
 const adminDashboard = document.getElementById('adminDashboard');
 const professorDashboard = document.getElementById('professorDashboard');
 const appWrap = document.getElementById('appWrap');
@@ -865,10 +879,16 @@ async function submitGateCode(){
   const code = gateCodeInput.value.trim().toUpperCase();
   if(!code) return;
   gateError.textContent = '';
+  gateUnlockReqBtn.hidden = true;
   try{
     const res = await fetch('/api/auth', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({code, deviceId: getDeviceId()}) });
     if(!res.ok){
-      if(res.status===409){ gateError.textContent = 'Esse código já está em uso em outro aparelho. Peça pro seu professor liberar o acesso.'; }
+      if(res.status===409){
+        gateError.textContent = 'Esse código já está em uso em outro aparelho. Peça pro seu professor liberar o acesso.';
+        gateUnlockReqBtn.hidden = false;
+      }
+      else if(res.status===429){ gateError.textContent = 'Muitas tentativas. Espere alguns minutos e tente de novo.'; }
+      else if(res.status>=500){ gateError.textContent = 'O servidor está acordando. Tente de novo em alguns segundos.'; }
       else{ gateError.textContent = 'Código inválido.'; }
       return;
     }
@@ -892,6 +912,19 @@ async function submitGateCode(){
     gateError.textContent = 'Não consegui conectar. Tente de novo.';
   }
 }
+gateUnlockReqBtn.addEventListener('click', async ()=>{
+  const code = gateCodeInput.value.trim().toUpperCase();
+  if(!code) return;
+  gateUnlockReqBtn.disabled = true;
+  try{
+    const res = await fetch('/api/unlock-request', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({code}) });
+    gateError.textContent = res.ok ? 'Pedido enviado! Avise seu professor pra liberar seu acesso.' : 'Não consegui enviar o pedido agora. Fale com seu professor.';
+    if(res.ok) gateUnlockReqBtn.hidden = true;
+  }catch(e){
+    gateError.textContent = 'Não consegui enviar o pedido agora. Fale com seu professor.';
+  }
+  gateUnlockReqBtn.disabled = false;
+});
 document.getElementById('gateSubmitBtn').addEventListener('click', submitGateCode);
 gateCodeInput.addEventListener('keydown', e=>{ if(e.key==='Enter') submitGateCode(); });
 
@@ -912,6 +945,7 @@ document.getElementById('professorLink').addEventListener('click', e=>{
 async function loadProfessors(){
   try{
     const res = await fetch('/api/admin/professors', { headers: apiHeaders() });
+    if(res.status===403){ logout(); return []; }
     if(!res.ok) throw new Error('bad status');
     return await res.json();
   }catch(e){ return []; }
@@ -932,6 +966,8 @@ async function renderAdminDashboard(){
       </div>
       <div class="student-actions">
         <button class="small" data-viewprofessor="${p.id}" data-code="${escapeAttr(p.code)}" data-name="${escapeAttr(p.name)}">Ver painel</button>
+        <button class="ghost small" data-copyprof="${escapeAttr(p.code)}" title="Copiar código">⧉</button>
+        <button class="ghost small" data-delprof="${p.id}" data-name="${escapeAttr(p.name)}" data-count="${p.studentCount}" title="Remover professor">✕</button>
       </div>
     </div>`).join('');
 }
@@ -944,17 +980,88 @@ document.getElementById('addProfessorBtn').addEventListener('click', async ()=>{
   await renderAdminDashboard();
   alert(`Professor "${prof.name}" criado!\n\nCódigo de acesso: ${prof.code}\n\nPasse esse código para ele entrar como professor.`);
 });
-document.getElementById('professorsList').addEventListener('click', e=>{
+// Escolher pra qual professor transferir os alunos de quem está sendo removido.
+function pickProfessorModal(title, options){
+  return new Promise(resolve=>{
+    const overlay = document.createElement('div');
+    overlay.className = 'confirm-overlay';
+    overlay.innerHTML = `
+      <div class="confirm-box" style="max-width:360px;">
+        <p style="margin-bottom:10px;"><strong>${escapeHtml(title)}</strong></p>
+        <select id="pickProfSel" style="width:100%;margin-bottom:6px;">
+          ${options.map(o=> `<option value="${escapeAttr(o.id)}">${escapeHtml(o.name)}</option>`).join('')}
+        </select>
+        <div class="confirm-actions">
+          <button class="ghost small" data-act="cancel">Cancelar</button>
+          <button class="primary small" data-act="ok">Transferir e remover</button>
+        </div>
+      </div>`;
+    document.body.appendChild(overlay);
+    overlay.addEventListener('click', e=>{
+      const act = e.target.dataset && e.target.dataset.act;
+      if(act==='ok'){ const v = overlay.querySelector('#pickProfSel').value; overlay.remove(); resolve(v); }
+      else if(act==='cancel' || e.target===overlay){ overlay.remove(); resolve(null); }
+    });
+  });
+}
+document.getElementById('professorsList').addEventListener('click', async e=>{
   const view = e.target.closest('[data-viewprofessor]');
   if(view){
     currentProfessorCode = view.dataset.code;
     currentProfessorName = view.dataset.name;
     boot();
+    return;
   }
+  const copy = e.target.closest('[data-copyprof]');
+  if(copy){
+    navigator.clipboard?.writeText(copy.dataset.copyprof).then(()=> showToast('Código copiado!')).catch(()=>{});
+    return;
+  }
+  const del = e.target.closest('[data-delprof]');
+  if(del){
+    const n = +del.dataset.count;
+    const id = del.dataset.delprof;
+    let url = `/api/admin/professors/${id}`;
+    if(n>0){
+      const others = (await loadProfessors()).filter(p=> p.id!==id);
+      if(!others.length){ alert('Esse professor tem alunos e não há outro professor pra receber. Cadastre outro antes.'); return; }
+      const to = await pickProfessorModal(`"${del.dataset.name}" tem ${n} aluno(s). Pra quem transferir?`, others);
+      if(!to) return;
+      url += `?transferTo=${encodeURIComponent(to)}`;
+    }else if(!(await confirmDialog(`Remover o professor "${del.dataset.name}"?`))) return;
+    const res = await fetch(url, { method:'DELETE', headers: apiHeaders() });
+    if(!res.ok) alert('Não consegui remover o professor.');
+    renderAdminDashboard();
+  }
+});
+document.getElementById('backupBtn').addEventListener('click', async ()=>{
+  try{
+    const res = await fetch('/api/admin/export', { headers: apiHeaders() });
+    if(!res.ok) throw new Error('bad status');
+    const blob = await res.blob();
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `sobrecarga-backup-${new Date().toISOString().slice(0,10)}.json`;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(()=> URL.revokeObjectURL(a.href), 2000);
+    showToast('Backup baixado!');
+  }catch(e){ alert('Não consegui gerar o backup agora.'); }
 });
 
 /* ---------- Painel do professor: gerenciar alunos ---------- */
 // Monta um link wa.me com o telefone (assume DDI 55/Brasil se vier só DDD+número).
+// "treinou há 3 dias" / "nunca treinou" a partir da data (YYYY-MM-DD) da última sessão com carga.
+function daysSince(iso){
+  const d = new Date(iso+'T00:00:00');
+  const t = new Date(); t.setHours(0,0,0,0);
+  return Math.round((t - d)/86400000);
+}
+function activityLabel(s){
+  if(!s.lastTrainedAt) return s.name ? 'ainda não treinou' : '';
+  const n = daysSince(s.lastTrainedAt);
+  const quando = n<=0 ? 'treinou hoje' : (n===1 ? 'treinou ontem' : `treinou há ${n} dias`);
+  return `${quando} · ${s.weekDone} nesta semana`;
+}
 function whatsappLink(phone, name){
   let digits = String(phone||'').replace(/\D/g,'');
   if(digits.length<=11) digits = '55'+digits;
@@ -965,6 +1072,7 @@ const studentsList = document.getElementById('studentsList');
 async function loadStudents(){
   try{
     const res = await fetch('/api/students', { headers: apiHeaders() });
+    if(res.status===403){ logout(); return []; }
     if(!res.ok) throw new Error('bad status');
     return await res.json();
   }catch(e){ return []; }
@@ -981,6 +1089,8 @@ async function renderProfessorDashboard(){
       <div>
         <div class="sname">${s.name ? escapeHtml(s.name) : '— aguardando aluno —'}${s.locked ? ' <span title="Aparelho travado" style="opacity:.7;">🔒</span>' : ''}</div>
         <div class="scode">${escapeHtml(s.code)}</div>
+        ${s.unlockRequested ? '<div class="sactivity" style="color:var(--accent);font-weight:700;">🔔 pediu liberação do aparelho</div>' : ''}
+        ${activityLabel(s) ? `<div class="sactivity${s.lastTrainedAt && daysSince(s.lastTrainedAt)>7 ? ' stale' : ''}">${activityLabel(s)}</div>` : ''}
       </div>
       <div class="student-actions">
         ${s.name ? `<button class="small" data-viewstudent="${s.id}">Ver treino</button>` : ''}
@@ -1158,6 +1268,16 @@ async function syncRemote(){
     setSyncStatus('offline');
   }
 }
+// Sem internet no meio do treino? A edição fica no aparelho (localStorage) e
+// sobe sozinha quando a conexão voltar, em vez de esperar a próxima edição.
+window.addEventListener('online', ()=>{ if(hasPendingSave) syncRemote(); });
+setInterval(()=>{ if(hasPendingSave && navigator.onLine!==false && !document.hidden) syncRemote(); }, 30000);
+document.addEventListener('visibilitychange', ()=>{ if(!document.hidden && hasPendingSave && navigator.onLine!==false) syncRemote(); });
+
+if('serviceWorker' in navigator){
+  window.addEventListener('load', ()=>{ navigator.serviceWorker.register('/sw.js').catch(()=>{}); });
+}
+
 function confirmDialog(message, opts={}){
   const okLabel = opts.okLabel || 'Excluir';
   const danger = opts.danger !== false;
@@ -1467,6 +1587,7 @@ function parseLines(lines){
   const setsSpaceRangeRe = /(\d{1,2})\s+(\d{1,3})\s*(?:a|à|-|–|até|ate)\s*(\d{1,3})\s*$/i;
   const repsRangeRe = /(\d{1,3})\s*(?:a|à|-|–|até|ate)\s*(\d{1,3})(?:\s*rep[a-zà-ú]*)?/i;
   const repsWordRe = /(\d{1,3})\s*rep[a-zà-ú]*/i;
+  const setsOnlyRe = /(\d{1,2})\s*s[ée]ries?\b/i;
   const maxRe = /\bm[aá]x(?:imo)?\b|at[ée]\s*(?:a\s*)?falha/i;
   const bareNumRe = /^\d{1,3}([.,]\d)?$/;
   const headerWordsRe = /^(exerc[ií]cio|s[ée]ries?|reps?|repeti[cç][oõ]es?|carga|peso|kg)$/i;
@@ -1517,6 +1638,12 @@ function parseLines(lines){
       }
     }
 
+    // "4 séries" sem repetições na mesma expressão (ex.: "4 séries até a falha")
+    if(sets===null){
+      const so = rest.match(setsOnlyRe);
+      if(so){ sets = parseInt(so[1],10); rest = rest.replace(setsOnlyRe,''); }
+    }
+
     // table-style rows: "Exercício  4  10" (sets e reps em colunas separadas, sem 'x')
     if(sets===null && reps===null){
       const twoTrailing = rest.match(/(\d{1,2})\s+(\d{1,3})\s*$/);
@@ -1533,12 +1660,15 @@ function parseLines(lines){
     }
 
     let usedMax = false;
-    if(sets===null && reps===null && weight===null && maxRe.test(rest)){
+    if(reps===null && weight===null && maxRe.test(rest)){
       target = 'Máx'; usedMax = true; rest = rest.replace(maxRe,'');
     }
 
     let name = rest
+      .replace(/^\s*\d{1,2}\s*(?:[).:]|[-–—])\s+/,'')      // numeração do item: "1) ", "2. ", "3 - "
       .replace(/[-–—:|@]+/g,' ')
+      .replace(/\(\s*\)/g,' ')                              // parênteses que ficaram vazios: "(carga 14kg)" → "()"
+      .replace(/\s+(?:reps?|repeti[cç][oõ]es|s[ée]ries?)\s*$/i,'') // "rep" / "séries" soltos no fim
       .replace(/\s{2,}/g,' ')
       .trim();
 
