@@ -204,6 +204,7 @@ async function renderAdminDashboard(){
       </div>
       <div class="student-actions">
         <button class="small" data-viewprofessor="${p.id}" data-code="${escapeAttr(p.code)}" data-name="${escapeAttr(p.name)}">Ver painel</button>
+        <button class="ghost small energy-toggle${p.energy?' on':''}" data-energyprof="${p.id}" data-on="${p.energy?1:0}" title="${p.energy?'Gráfico de kcal ligado para todos os alunos — clique para desligar':'Ligar gráfico de kcal para todos os alunos'}">🔥</button>
         <button class="ghost small" data-copyprof="${escapeAttr(p.code)}" title="Copiar código">⧉</button>
         <button class="ghost small" data-delprof="${p.id}" data-name="${escapeAttr(p.name)}" data-count="${p.studentCount}" title="Remover professor">✕</button>
       </div>
@@ -248,6 +249,15 @@ document.getElementById('professorsList').addEventListener('click', async e=>{
     currentProfessorCode = view.dataset.code;
     currentProfessorName = view.dataset.name;
     boot();
+    return;
+  }
+  const energy = e.target.closest('[data-energyprof]');
+  if(energy){
+    const enabled = energy.dataset.on!=='1';
+    const res = await fetch(`/api/admin/professors/${energy.dataset.energyprof}/energy`, { method:'PUT', headers: apiHeaders({'Content-Type':'application/json'}), body: JSON.stringify({enabled}) });
+    if(!res.ok){ alert('Não consegui mudar o gráfico de kcal.'); return; }
+    showToast(enabled ? 'Gráfico de kcal ligado para todos os alunos desse professor' : 'Gráfico de kcal desligado para esse professor');
+    renderAdminDashboard();
     return;
   }
   const copy = e.target.closest('[data-copyprof]');
@@ -332,6 +342,7 @@ async function renderProfessorDashboard(){
       </div>
       <div class="student-actions">
         ${s.name ? `<button class="small" data-viewstudent="${s.id}">Ver treino</button>` : ''}
+        ${auth.role==='admin' ? `<button class="ghost small energy-toggle${s.energy?' on':''}" data-energystudent="${s.id}" data-on="${s.energyOwn?1:0}" ${s.energy && !s.energyOwn ? 'disabled title="Ligado para todos os alunos deste professor"' : `title="${s.energy?'Gráfico de kcal ligado — clique para desligar':'Ligar gráfico de kcal para este aluno'}"`}>🔥</button>` : ''}
         ${s.phone ? `<a class="ghost small" href="${whatsappLink(s.phone, s.name)}" target="_blank" rel="noopener" title="Chamar no WhatsApp">💬</a>` : ''}
         ${s.locked ? `<button class="ghost small" data-unlockstudent="${s.id}" title="Liberar aparelho">🔓</button>` : ''}
         <button class="ghost small" data-editphone="${s.id}" data-phone="${escapeAttr(s.phone)}" title="Telefone (WhatsApp)">📱</button>
@@ -394,6 +405,16 @@ studentsList.addEventListener('click', async e=>{
   if(del){
     if(!(await confirmDialog(`Remover "${del.dataset.name}" e apagar todos os treinos dele? Isso não pode ser desfeito.`))) return;
     await fetch(`/api/students/${del.dataset.delstudent}`, { method:'DELETE', headers: apiHeaders() });
+    renderProfessorDashboard();
+    return;
+  }
+  const energy = e.target.closest('[data-energystudent]');
+  if(energy){
+    if(auth.role!=='admin') return;
+    const enabled = energy.dataset.on!=='1';
+    // As rotas de liberação são do admin: usa o código de admin mesmo navegando no painel de um professor.
+    const res = await fetch(`/api/admin/students/${energy.dataset.energystudent}/energy`, { method:'PUT', headers: {'Content-Type':'application/json','x-admin-code': auth.code}, body: JSON.stringify({enabled}) });
+    if(!res.ok){ alert('Não consegui mudar o gráfico de kcal.'); return; }
     renderProfessorDashboard();
     return;
   }
@@ -1866,6 +1887,7 @@ function refreshComputed(){
   renderStats();
   renderDashboard();
   renderVolumeChart();
+  renderEnergyChart();
 }
 
 function renderStats(){
@@ -1996,6 +2018,73 @@ function renderVolumeChart(){
     const lbl = fmtDayMonth(d.week);
     return `<div class="volume-bar" style="height:${h}px;" title="${Math.round(d.volume)}kg na semana de ${lbl}"><span class="vb-label">${lbl}</span></div>`;
   }).join('')}</div>`;
+}
+
+/* ---------- Gasto de energia (kcal) — só para quem o admin liberou ----------
+   Estimativa pelo trabalho mecânico: cada repetição desloca a carga ~0,5 m
+   (peso × g × 0,5 m, em joules) e o músculo converte só ~20% da energia em
+   movimento; 1 kcal = 4184 J. Dá ≈ 0,006 kcal por kg levantado por repetição. */
+let energyEnabled = false;
+function energyKcal(weight, reps){
+  const DISPLACEMENT_M = 0.5, MUSCLE_EFFICIENCY = 0.2, J_PER_KCAL = 4184;
+  const w = +weight, r = +reps;
+  if(!(w>0) || !(r>0)) return 0;
+  return w * r * 9.81 * DISPLACEMENT_M / MUSCLE_EFFICIENCY / J_PER_KCAL;
+}
+function computeSessionEnergy(sessions){
+  return (sessions||[])
+    .map(s=> ({ id: s.id, name: s.name, date: s.date,
+      kcal: (s.exercises||[]).reduce((n,e)=> n + (e.sets||[]).reduce((m,x)=> m + energyKcal(x && x.weight, x && x.reps), 0), 0) }))
+    .filter(x=> x.kcal>0 && x.date)
+    .sort((a,b)=> a.date.localeCompare(b.date));
+}
+function energyChartHtml(){
+  const all = computeSessionEnergy(state.sessions);
+  if(!all.length){
+    return `<div class="empty" style="padding:16px;"><strong>Sem gasto calculado ainda</strong>Registre peso e repetições nas séries para ver as kcal de cada treino.</div>`;
+  }
+  const data = all.slice(-12);
+  const max = Math.max(...data.map(d=> d.kcal));
+  const maxIdx = data.findIndex(d=> d.kcal===max);
+  const lastIdx = data.length-1;
+  const weekKey = getWeekKey(todayISO());
+  const week = all.filter(d=> getWeekKey(d.date)===weekKey).reduce((n,d)=> n+d.kcal, 0);
+  const total = all.reduce((n,d)=> n+d.kcal, 0);
+  const fmt = v=> Math.round(v).toLocaleString('pt-BR');
+  return `<div class="energy-summary">
+      <div><div class="es-num">${fmt(data[lastIdx].kcal)} kcal</div><div class="es-lbl">último treino</div></div>
+      <div><div class="es-num">${fmt(week)} kcal</div><div class="es-lbl">nesta semana</div></div>
+      <div><div class="es-num">${fmt(total)} kcal</div><div class="es-lbl">total (${all.length} treinos)</div></div>
+    </div>
+    <div class="energy-chart" role="img" aria-label="Kcal gastas nos últimos ${data.length} treinos">${data.map((d,i)=>{
+      const h = Math.max(2, (d.kcal/max)*100);
+      const tip = `${fmtDate(d.date)} · ${d.name||'Treino'}: ${fmt(d.kcal)} kcal`;
+      return `<div class="energy-col" tabindex="0" title="${escapeAttr(tip)}">
+        <div class="energy-bar" style="height:${h.toFixed(1)}%;">${i===maxIdx || i===lastIdx ? `<span class="energy-val">${fmt(d.kcal)}</span>` : ''}</div>
+      </div>`;
+    }).join('')}</div>
+    <div class="energy-axis">${data.map((d,i)=> `<span>${data.length<=6 || (lastIdx-i)%2===0 ? d.date.slice(8,10)+'/'+d.date.slice(5,7) : ''}</span>`).join('')}</div>
+    <div class="energy-note">Estimativa pelo trabalho de levantar a carga (≈0,006 kcal por kg × repetição). Não inclui o gasto do corpo em repouso nem o aeróbico.</div>`;
+}
+function renderEnergyChart(){
+  const card = document.getElementById('energyCard');
+  if(!card) return;
+  card.hidden = !energyEnabled;
+  if(energyEnabled) document.getElementById('energyWrap').innerHTML = energyChartHtml();
+}
+const energyFlagKey = () => 'sobrecarga_energy_' + (activeStudentId() || 'x');
+async function loadFeatures(){
+  const sid = activeStudentId();
+  if(!sid) return;
+  try{
+    const res = await fetch(`/api/features/${sid}`, { headers: apiHeaders() });
+    if(!res.ok) return;
+    const f = await res.json();
+    if(sid!==activeStudentId()) return;
+    const on = !!(f && f.energy);
+    try{ localStorage.setItem(energyFlagKey(), on ? '1' : '0'); }catch(e){}
+    if(on!==energyEnabled){ energyEnabled = on; renderAll(); }
+  }catch(e){}
 }
 
 function escapeHtml(s){ return String(s).replace(/[&<>"']/g, c=> ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
@@ -2833,7 +2922,12 @@ function mRenderProgresso(){
   mTitle.textContent = 'Progresso';
   mBack.hidden = true;
   const data = computeProgress();
-  let html = '<div style="padding:8px 16px 20px;">';
+  let html = '';
+  if(energyEnabled){
+    html += `<div class="msection-title">🔥 Gasto de energia</div><div class="energy-block">${energyChartHtml()}</div>`;
+    html += `<div class="msection-title">1RM por exercício</div>`;
+  }
+  html += '<div style="padding:8px 16px 20px;">';
   if(data.length===0){
     html += `<div class="mempty"><strong>Sem dados suficientes</strong>Registre sessões para ver a evolução.</div>`;
   }else{
@@ -3142,6 +3236,7 @@ function renderAll(){
   renderStats();
   renderDashboard();
   renderVolumeChart();
+  renderEnergyChart();
   mRender();
 }
 
@@ -3203,10 +3298,12 @@ function boot(){
   READONLY = (auth.role==='professor' || auth.role==='admin');
   STORE_KEY = 'sobrecarga_v1_' + activeStudentId();
   state = loadLocal();
+  try{ energyEnabled = localStorage.getItem(energyFlagKey())==='1'; }catch(e){ energyEnabled = false; }
   applyReadonlyUI();
   if(ensureProtocols()) save();
   renderAll();
   loadRemote();
+  loadFeatures();
   if(auth.role==='student' && !mShell.hidden){
     let seen = false;
     try{ seen = localStorage.getItem(tourStorageKey()) === '1'; }catch(e){}

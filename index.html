@@ -57,6 +57,7 @@
         <button class="small primary" id="addProfessorBtn">+ novo professor</button>
       </div>
     </div>
+    <div class="hint" style="margin:-6px 0 12px;">🔥 liga o gráfico de gasto de energia (kcal) para todos os alunos do professor. Para liberar só um aluno, entre em "Ver painel" e use o 🔥 na linha dele.</div>
     <div id="professorsList"></div>
   </div>
 </div>
@@ -185,6 +186,14 @@
       <span class="hint">Peso × repetições somados por semana</span>
     </div>
     <div id="volumeWrap"></div>
+  </div>
+
+  <div class="card" id="energyCard" hidden>
+    <div class="card-head">
+      <h2><span class="chip">🔥</span>Gasto de energia</h2>
+      <span class="hint">Estimativa em kcal a partir do peso e das repetições de cada treino</span>
+    </div>
+    <div id="energyWrap"></div>
   </div>
 
   <div class="card">

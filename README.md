@@ -18,6 +18,7 @@ Diário de treino: importe a ficha em PDF, registre peso e repetições de cada 
 | **Professor** | código próprio | só os alunos dele; pode ver a ficha, liberar aparelho, ligar no WhatsApp |
 | **Aluno** | código próprio | só a própria ficha |
 
+- **Gráfico de gasto de energia (kcal):** só aparece para quem o admin liberar. No painel do admin, o 🔥 na linha de um professor liga o gráfico para **todos os alunos dele** (inclusive os que forem cadastrados depois); dentro de "Ver painel", o 🔥 na linha de um aluno liga só para ele. A estimativa usa o peso e as repetições de cada série (trabalho de levantar a carga ~0,5 m com ~20% de eficiência muscular ≈ 0,006 kcal por kg × repetição). A liberação fica na tabela `energy_access`, criada sozinha na inicialização.
 - Código de aluno fica **travado no primeiro aparelho** que entrar. Se trocar de celular, o aluno toca em "Pedir liberação ao professor" e o professor libera (🔓) no painel.
 - 15 tentativas de código errado por IP em 10 min bloqueiam o login por um tempo.
 - Os códigos de admin e do professor original vêm das variáveis `ADMIN_CODE` e `PROFESSOR_CODE` (ou são gerados e guardados na tabela `meta`).

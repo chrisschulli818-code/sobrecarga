@@ -161,10 +161,20 @@ async function ensureTable() {
     student_id TEXT PRIMARY KEY,
     requested_at TIMESTAMPTZ NOT NULL DEFAULT now()
   )`);
+  // Gráfico de gasto de energia (kcal): só aparece pra quem o admin liberar.
+  // kind='professor' libera todos os alunos daquele professor; kind='student'
+  // libera um aluno só. Tabela nova (e não coluna nova) porque ALTER TABLE não
+  // tem permissão em produção.
+  await pool.query(`CREATE TABLE IF NOT EXISTS energy_access (
+    kind TEXT NOT NULL,
+    target_id TEXT NOT NULL,
+    enabled_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    PRIMARY KEY (kind, target_id)
+  )`);
   // Segurança em nível de linha, como defesa extra: o dono da tabela (o app)
   // continua acessando normalmente, mas qualquer outra role que ganhe acesso
   // por engano (ex.: a API pública do Supabase) enxerga zero linhas.
-  for (const t of ['professors', 'app_state_history', 'unlock_requests']) {
+  for (const t of ['professors', 'app_state_history', 'unlock_requests', 'energy_access']) {
     try { await pool.query(`ALTER TABLE ${t} ENABLE ROW LEVEL SECURITY`); }
     catch (err) { console.error(`Não consegui ativar RLS em ${t}:`, err.message); }
   }
@@ -495,7 +505,8 @@ app.get('/api/admin/professors', requireAdmin, async (req, res) => {
       GROUP BY p.id
       ORDER BY p.created_at ASC
     `)).rows;
-    res.json(rows.map(r => ({ id: r.id, name: r.name, code: r.code, studentCount: r.student_count })));
+    const energy = await energyEnabledSet('professor');
+    res.json(rows.map(r => ({ id: r.id, name: r.name, code: r.code, studentCount: r.student_count, energy: energy.has(r.id) })));
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'db_error' });
@@ -518,6 +529,64 @@ app.post('/api/admin/professors', requireAdmin, async (req, res) => {
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'db_error' });
+  }
+});
+
+// Liga/desliga o gráfico de kcal de um professor inteiro (todos os alunos dele)
+// ou de um aluno só. Só o admin.
+async function energyEnabledSet(kind) {
+  try {
+    const r = await pool.query('SELECT target_id FROM energy_access WHERE kind = $1', [kind]);
+    return new Set(r.rows.map(x => x.target_id));
+  } catch (err) {
+    console.error('Não consegui ler energy_access:', err.message);
+    return new Set();
+  }
+}
+async function setEnergyAccess(kind, id, enabled) {
+  if (enabled) {
+    await pool.query('INSERT INTO energy_access (kind, target_id) VALUES ($1,$2) ON CONFLICT DO NOTHING', [kind, id]);
+  } else {
+    await pool.query('DELETE FROM energy_access WHERE kind = $1 AND target_id = $2', [kind, id]);
+  }
+}
+app.put('/api/admin/professors/:id/energy', requireAdmin, async (req, res) => {
+  const enabled = (req.body || {}).enabled === true;
+  try {
+    const r = await pool.query('SELECT 1 FROM professors WHERE id = $1', [req.params.id]);
+    if (!r.rows[0]) return res.status(404).json({ error: 'not_found' });
+    await setEnergyAccess('professor', req.params.id, enabled);
+    res.json({ ok: true, enabled });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'db_error' });
+  }
+});
+app.put('/api/admin/students/:id/energy', requireAdmin, async (req, res) => {
+  const enabled = (req.body || {}).enabled === true;
+  try {
+    const r = await pool.query('SELECT 1 FROM students WHERE id = $1', [req.params.id]);
+    if (!r.rows[0]) return res.status(404).json({ error: 'not_found' });
+    await setEnergyAccess('student', req.params.id, enabled);
+    res.json({ ok: true, enabled });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'db_error' });
+  }
+});
+// O aluno (ou o professor olhando a ficha dele) pergunta quais extras estão liberados.
+app.get('/api/features/:studentId', requireStudentAccess, async (req, res) => {
+  try {
+    const r = await pool.query(
+      `SELECT EXISTS (SELECT 1 FROM energy_access WHERE kind = 'student' AND target_id = $1)
+           OR EXISTS (SELECT 1 FROM energy_access e JOIN students s ON s.professor_id = e.target_id
+                      WHERE e.kind = 'professor' AND s.id = $1) AS energy`,
+      [req.params.studentId]
+    );
+    res.json({ energy: !!(r.rows[0] && r.rows[0].energy) });
+  } catch (err) {
+    console.error(err);
+    res.json({ energy: false });
   }
 });
 
@@ -553,9 +622,12 @@ app.get('/api/students', requireProfessor, async (req, res) => {
     } catch (colErr) {
       rows = (await pool.query('SELECT id, name, code FROM students WHERE professor_id = $1 ORDER BY created_at ASC', [req.professorId])).rows;
     }
+    const energyStudents = await energyEnabledSet('student');
+    const energyAll = (await energyEnabledSet('professor')).has(req.professorId);
     const students = rows.map(s => ({
       id: s.id, name: s.name, code: s.code, locked: !!s.device_id, phone: s.phone || '',
       unlockRequested: !!s.unlock_requested,
+      energy: energyAll || energyStudents.has(s.id), energyOwn: energyStudents.has(s.id),
       ...summarizeActivity(s.data)
     }));
     res.json(students);
@@ -670,6 +742,7 @@ app.delete('/api/students/:id', requireProfessor, async (req, res) => {
       await pool.query('DELETE FROM app_state WHERE id = $1', [req.params.id]);
       await pool.query('DELETE FROM app_state_history WHERE student_id = $1', [req.params.id]);
       await pool.query('DELETE FROM unlock_requests WHERE student_id = $1', [req.params.id]);
+      await pool.query(`DELETE FROM energy_access WHERE kind = 'student' AND target_id = $1`, [req.params.id]).catch(() => {});
     }
     res.json({ ok: true });
   } catch (err) {
@@ -741,6 +814,7 @@ app.delete('/api/admin/professors/:id', requireAdmin, async (req, res) => {
       await pool.query('UPDATE students SET professor_id = $1 WHERE professor_id = $2', [to, req.params.id]);
     }
     await pool.query('DELETE FROM professors WHERE id = $1', [req.params.id]);
+    await pool.query(`DELETE FROM energy_access WHERE kind = 'professor' AND target_id = $1`, [req.params.id]).catch(() => {});
     res.json({ ok: true });
   } catch (err) {
     console.error(err);
@@ -754,9 +828,10 @@ app.get('/api/admin/export', requireAdmin, async (req, res) => {
     const professors = (await pool.query('SELECT id, name, code, created_at FROM professors ORDER BY created_at')).rows;
     const students = (await pool.query('SELECT id, name, code, professor_id, phone, created_at FROM students ORDER BY created_at')).rows;
     const states = (await pool.query('SELECT id, data, updated_at FROM app_state ORDER BY id')).rows;
+    const energyAccess = (await pool.query('SELECT kind, target_id, enabled_at FROM energy_access').catch(() => ({ rows: [] }))).rows;
     const stamp = new Date().toISOString().slice(0, 10);
     res.set('Content-Disposition', `attachment; filename="sobrecarga-backup-${stamp}.json"`);
-    res.json({ exportedAt: new Date().toISOString(), professors, students, states });
+    res.json({ exportedAt: new Date().toISOString(), professors, students, states, energyAccess });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'db_error' });
