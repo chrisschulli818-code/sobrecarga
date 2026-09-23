@@ -1,4 +1,6 @@
-pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+// Se o CDN do pdf.js não carregar (sem internet, rede bloqueando), o resto do
+// app tem que continuar funcionando — antes isso derrubava o app.js inteiro.
+if(window.pdfjsLib) pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
 
 /* ---------- Idioma da interface (PT/EN) ----------
    Traduz só o texto fixo do app (botões, títulos, rótulos). Nomes de
@@ -687,6 +689,7 @@ async function handleFile(file){
     const buf = await file.arrayBuffer();
     const head = new Uint8Array(buf, 0, Math.min(1024, buf.byteLength));
     if(!new TextDecoder('latin1').decode(head).includes('%PDF-')){ alert('Esse arquivo não parece ser um PDF de verdade.'); dropLabel.innerHTML = '<strong>Clique para escolher</strong> ou arraste um PDF de treino aqui'; return; }
+    if(!window.pdfjsLib){ alert('Não consegui carregar o leitor de PDF. Confira a internet e tente de novo.'); dropLabel.innerHTML = '<strong>Clique para escolher</strong> ou arraste um PDF de treino aqui'; return; }
     const pdf = await pdfjsLib.getDocument({data:buf}).promise;
     if(pdf.numPages > MAX_PDF_PAGES){ alert(`Esse PDF tem páginas demais (máximo ${MAX_PDF_PAGES}).`); dropLabel.innerHTML = '<strong>Clique para escolher</strong> ou arraste um PDF de treino aqui'; return; }
 
@@ -2944,6 +2947,7 @@ function mRenderProgresso(){
       </div>`;
     });
   }
+  if(state.sessions.length) html += `<button class="mprimarybtn" style="width:100%;margin-top:14px;" data-maction="exportpdf">⬇ Baixar relatório em PDF</button>`;
   html += '</div>';
   mContent.innerHTML = html;
 }
@@ -2990,6 +2994,7 @@ mContent.addEventListener('click', async e=>{
   if(action){
     const act = action.dataset.maction;
     if(act==='import'){ mobile.screen='import'; mRenderImportScreen(); return; }
+    if(act==='exportpdf'){ exportPdf(); return; }
     if(act==='togglemap'){ homeMapOpen = !homeMapOpen; mRenderSessionsList(); return; }
     if(act==='history'){ mobile.screen='history'; mRender(); return; }
     if(act==='gotonext'){
@@ -3315,8 +3320,38 @@ boot();
 /* ---------- Exportar PDF ---------- */
 function fmtW(w){ return w>0 ? (w+'kg') : '—'; }
 
-document.getElementById('exportPdfBtn').addEventListener('click', ()=>{
+// Antes o botão só existia na versão de computador — no celular (tela ≤ 640px)
+// não havia como exportar. Agora o mesmo relatório sai pelos dois lugares.
+document.getElementById('exportPdfBtn').addEventListener('click', exportPdf);
+function exportPdf(){
   if(state.sessions.length===0){ alert('Registre pelo menos uma sessão antes de exportar.'); return; }
+  if(!(window.jspdf && window.jspdf.jsPDF && window.jspdf.jsPDF.API && window.jspdf.jsPDF.API.autoTable)){
+    alert('Não consegui carregar o gerador de PDF. Confira a internet e tente de novo.');
+    return;
+  }
+  let doc;
+  try{ doc = buildPdfReport(); }
+  catch(e){ console.error(e); alert('Não consegui gerar o PDF agora. Tente de novo.'); return; }
+  deliverPdf(doc, `sobrecarga-relatorio-${todayISO()}.pdf`);
+}
+// No app instalado do iPhone (tela inicial) o download direto não faz nada;
+// no celular manda pelo compartilhar do sistema (salvar em Arquivos, WhatsApp…)
+// e, se não der, cai no download normal.
+function deliverPdf(doc, fileName){
+  const isPhone = window.matchMedia && window.matchMedia('(max-width:640px)').matches;
+  if(isPhone && navigator.share && navigator.canShare && typeof File==='function'){
+    try{
+      const file = new File([doc.output('blob')], fileName, { type:'application/pdf' });
+      if(navigator.canShare({ files:[file] })){
+        navigator.share({ files:[file], title:'Relatório Sobrecarga' })
+          .catch(err=>{ if(!err || err.name!=='AbortError') doc.save(fileName); });
+        return;
+      }
+    }catch(e){}
+  }
+  doc.save(fileName);
+}
+function buildPdfReport(){
   const { jsPDF } = window.jspdf;
   const doc = new jsPDF();
   const pageW = doc.internal.pageSize.getWidth();
@@ -3346,6 +3381,12 @@ document.getElementById('exportPdfBtn').addEventListener('click', ()=>{
     doc.text(`Período: ${fmtDate(sorted[0].date)} a ${fmtDate(sorted[sorted.length-1].date)}`, marginX, y+5);
   }
   y += 14;
+  if(energyEnabled){
+    const kcal = computeSessionEnergy(sorted).reduce((n,d)=> n+d.kcal, 0);
+    doc.setFontSize(9); doc.setTextColor(110);
+    doc.text(`Gasto de energia estimado (peso × repetições): ${Math.round(kcal).toLocaleString('pt-BR')} kcal no total`, marginX, y-4);
+    y += 4;
+  }
 
   // Rendimento
   const progress = computeProgress();
@@ -3410,5 +3451,5 @@ document.getElementById('exportPdfBtn').addEventListener('click', ()=>{
     y = doc.lastAutoTable.finalY + 10;
   });
 
-  doc.save(`sobrecarga-relatorio-${todayISO()}.pdf`);
-});
+  return doc;
+}
