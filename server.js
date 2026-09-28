@@ -4,6 +4,7 @@ const crypto = require('crypto');
 const { Pool } = require('pg');
 const { createLimiter } = require('./lib/ratelimit');
 const { initFromEnv: initFirebaseMirror } = require('./lib/firebase-mirror');
+const { youtubeId, exerciseKey, KEY_RE } = require('./lib/videos');
 
 const app = express();
 // O Render fica atrás de um proxy: sem isso req.ip seria sempre o do proxy e
@@ -29,10 +30,12 @@ const CSP = [
   "script-src 'self' https://cdnjs.cloudflare.com",
   "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
   "font-src https://fonts.gstatic.com",
-  "img-src 'self' data: blob:",
+  "img-src 'self' data: blob: https://i.ytimg.com",
   "connect-src 'self' https://cdnjs.cloudflare.com",
   "worker-src 'self' blob: https://cdnjs.cloudflare.com",
   "manifest-src 'self'",
+  // Só o player do YouTube em modo sem cookies (vídeos de execução).
+  "frame-src https://www.youtube-nocookie.com",
   "object-src 'none'",
   "base-uri 'self'",
   "form-action 'self'",
@@ -174,7 +177,20 @@ async function ensureTable() {
   // Segurança em nível de linha, como defesa extra: o dono da tabela (o app)
   // continua acessando normalmente, mas qualquer outra role que ganhe acesso
   // por engano (ex.: a API pública do Supabase) enxerga zero linhas.
-  for (const t of ['professors', 'app_state_history', 'unlock_requests', 'energy_access']) {
+  // Vídeos de execução (links do YouTube, guardados só pelo id). scope='global'
+  // é a biblioteca do admin (owner_id ''); scope='professor' são os vídeos de
+  // um professor (owner_id = id dele), que valem por cima da biblioteca para
+  // os alunos dele. exercise_key = nome normalizado (lib/videos.js).
+  await pool.query(`CREATE TABLE IF NOT EXISTS exercise_videos (
+    scope TEXT NOT NULL,
+    owner_id TEXT NOT NULL,
+    exercise_key TEXT NOT NULL,
+    name TEXT NOT NULL,
+    youtube_id TEXT NOT NULL,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    PRIMARY KEY (scope, owner_id, exercise_key)
+  )`);
+  for (const t of ['professors', 'app_state_history', 'unlock_requests', 'energy_access', 'exercise_videos']) {
     try { await pool.query(`ALTER TABLE ${t} ENABLE ROW LEVEL SECURITY`); }
     catch (err) { console.error(`Não consegui ativar RLS em ${t}:`, err.message); }
   }
@@ -590,6 +606,79 @@ app.get('/api/features/:studentId', requireStudentAccess, async (req, res) => {
   }
 });
 
+/* ---------- Vídeos de execução ---------- */
+const MAX_VIDEOS_PER_OWNER = 500;
+async function listVideos(scope, ownerId) {
+  const r = await pool.query(
+    'SELECT exercise_key, name, youtube_id FROM exercise_videos WHERE scope = $1 AND owner_id = $2 ORDER BY name',
+    [scope, ownerId]
+  );
+  return r.rows.map(v => ({ key: v.exercise_key, name: v.name, youtubeId: v.youtube_id }));
+}
+async function saveVideo(req, res, scope, ownerId) {
+  const name = cleanText((req.body || {}).name, 80);
+  const key = exerciseKey(name);
+  const id = youtubeId((req.body || {}).url);
+  if (!key) return res.status(400).json({ error: 'missing_name' });
+  if (!id) return res.status(400).json({ error: 'invalid_url' });
+  try {
+    const n = await pool.query('SELECT COUNT(*)::int AS n FROM exercise_videos WHERE scope = $1 AND owner_id = $2', [scope, ownerId]);
+    const exists = await pool.query('SELECT 1 FROM exercise_videos WHERE scope = $1 AND owner_id = $2 AND exercise_key = $3', [scope, ownerId, key]);
+    if (!exists.rows[0] && n.rows[0].n >= MAX_VIDEOS_PER_OWNER) return res.status(409).json({ error: 'too_many' });
+    await pool.query(
+      `INSERT INTO exercise_videos (scope, owner_id, exercise_key, name, youtube_id) VALUES ($1,$2,$3,$4,$5)
+       ON CONFLICT (scope, owner_id, exercise_key) DO UPDATE SET name = $4, youtube_id = $5, updated_at = now()`,
+      [scope, ownerId, key, name, id]
+    );
+    res.json({ ok: true, key, name, youtubeId: id });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'db_error' });
+  }
+}
+async function deleteVideo(req, res, scope, ownerId) {
+  const key = String(req.query.key || '');
+  if (!KEY_RE.test(key)) return res.status(400).json({ error: 'invalid_key' });
+  try {
+    await pool.query('DELETE FROM exercise_videos WHERE scope = $1 AND owner_id = $2 AND exercise_key = $3', [scope, ownerId, key]);
+    res.json({ ok: true });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'db_error' });
+  }
+}
+function sendVideoList(res, fn) {
+  fn().then(v => res.json(v)).catch(err => { console.error(err); res.status(500).json({ error: 'db_error' }); });
+}
+// Biblioteca geral (admin).
+app.get('/api/admin/videos', requireAdmin, (req, res) => sendVideoList(res, () => listVideos('global', '')));
+app.put('/api/admin/videos', requireAdmin, (req, res) => saveVideo(req, res, 'global', ''));
+app.delete('/api/admin/videos', requireAdmin, (req, res) => deleteVideo(req, res, 'global', ''));
+// Vídeos do professor (valem por cima da biblioteca para os alunos dele).
+app.get('/api/professor/videos', requireProfessor, (req, res) => sendVideoList(res, async () => ({
+  global: await listVideos('global', ''), own: await listVideos('professor', req.professorId)
+})));
+app.put('/api/professor/videos', requireProfessor, (req, res) => saveVideo(req, res, 'professor', req.professorId));
+app.delete('/api/professor/videos', requireProfessor, (req, res) => deleteVideo(req, res, 'professor', req.professorId));
+// O que o aluno enxerga: biblioteca + vídeos do professor dele (estes ganham).
+app.get('/api/videos/:studentId', requireStudentAccess, async (req, res) => {
+  try {
+    const r = await pool.query(
+      `SELECT v.scope, v.exercise_key, v.name, v.youtube_id FROM exercise_videos v
+       WHERE (v.scope = 'global' AND v.owner_id = '')
+          OR (v.scope = 'professor' AND v.owner_id = (SELECT professor_id FROM students WHERE id = $1))`,
+      [req.params.studentId]
+    );
+    const out = {};
+    r.rows.sort((a, b) => (a.scope === 'global' ? 0 : 1) - (b.scope === 'global' ? 0 : 1))
+      .forEach(v => { out[v.exercise_key] = { name: v.name, youtubeId: v.youtube_id }; });
+    res.json(out);
+  } catch (err) {
+    console.error(err);
+    res.json({});
+  }
+});
+
 // Resumo de atividade pro painel do professor: última vez que treinou (sessão
 // com alguma carga registrada) e quantos treinos fez nesta semana.
 function summarizeActivity(data) {
@@ -815,6 +904,7 @@ app.delete('/api/admin/professors/:id', requireAdmin, async (req, res) => {
     }
     await pool.query('DELETE FROM professors WHERE id = $1', [req.params.id]);
     await pool.query(`DELETE FROM energy_access WHERE kind = 'professor' AND target_id = $1`, [req.params.id]).catch(() => {});
+    await pool.query(`DELETE FROM exercise_videos WHERE scope = 'professor' AND owner_id = $1`, [req.params.id]).catch(() => {});
     res.json({ ok: true });
   } catch (err) {
     console.error(err);
@@ -829,9 +919,10 @@ app.get('/api/admin/export', requireAdmin, async (req, res) => {
     const students = (await pool.query('SELECT id, name, code, professor_id, phone, created_at FROM students ORDER BY created_at')).rows;
     const states = (await pool.query('SELECT id, data, updated_at FROM app_state ORDER BY id')).rows;
     const energyAccess = (await pool.query('SELECT kind, target_id, enabled_at FROM energy_access').catch(() => ({ rows: [] }))).rows;
+    const exerciseVideos = (await pool.query('SELECT scope, owner_id, exercise_key, name, youtube_id, updated_at FROM exercise_videos').catch(() => ({ rows: [] }))).rows;
     const stamp = new Date().toISOString().slice(0, 10);
     res.set('Content-Disposition', `attachment; filename="sobrecarga-backup-${stamp}.json"`);
-    res.json({ exportedAt: new Date().toISOString(), professors, students, states, energyAccess });
+    res.json({ exportedAt: new Date().toISOString(), professors, students, states, energyAccess, exerciseVideos });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'db_error' });

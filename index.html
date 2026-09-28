@@ -53,9 +53,13 @@
       <span class="admin-brand-name">Sobrecarga</span>
     </div>
     <nav class="admin-nav">
-      <button type="button" class="admin-nav-item active" aria-current="page">
+      <button type="button" class="admin-nav-item active" aria-current="page" data-adminview="profs">
         <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 4-6 8-6s8 2 8 6"/></svg>
         Professores
+      </button>
+      <button type="button" class="admin-nav-item" data-adminview="videos">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="3"/><path d="M10 9v6l5-3z"/></svg>
+        Vídeos de execução
       </button>
       <button type="button" class="admin-nav-item" id="backupBtn" title="Baixa todos os dados (professores, alunos e fichas) em um arquivo">
         <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></svg>
@@ -68,7 +72,7 @@
       Sair
     </button>
   </aside>
-  <main class="admin-main">
+  <main class="admin-main" id="adminViewProfs">
     <div class="admin-head">
       <div>
         <h1>Professores</h1>
@@ -91,6 +95,15 @@
       </div>
       <div id="professorsList"></div>
     </section>
+  </main>
+  <main class="admin-main" id="adminViewVideos" hidden>
+    <div class="admin-head">
+      <div>
+        <h1>Vídeos de execução</h1>
+        <p class="admin-lead">A biblioteca vale para todos os alunos. Cada professor pode trocar ou completar os vídeos para os alunos dele.</p>
+      </div>
+    </div>
+    <div id="adminVideos"></div>
   </main>
 </div>
 
@@ -119,6 +132,13 @@
       </div>
     </div>
     <div id="studentsList"></div>
+  </div>
+  <div class="card">
+    <div class="card-head">
+      <h2><span class="chip">▶</span>Vídeos de execução</h2>
+      <span class="hint">Aparecem pro aluno no botão "Ver execução" de cada exercício</span>
+    </div>
+    <div id="profVideos"></div>
   </div>
 </div>
 
@@ -315,4 +335,5 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+<datalist id="exerciseNameList"></datalist>
 <script src="/app.js"></script>

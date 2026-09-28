@@ -329,6 +329,115 @@ document.getElementById('backupBtn').addEventListener('click', async ()=>{
   }catch(e){ alert('Não consegui gerar o backup agora.'); }
 });
 
+/* ---------- Painel de vídeos de execução (admin e professor) ---------- */
+// mode 'admin': biblioteca geral. mode 'professor': vídeos do professor, que
+// valem por cima da biblioteca para os alunos dele (a biblioteca aparece junto).
+function videoApi(mode){
+  if(mode==='admin') return { url:'/api/admin/videos', headers: extra=> Object.assign({'x-admin-code': auth.code}, extra) };
+  return { url:'/api/professor/videos', headers: extra=> apiHeaders(extra) };
+}
+function fillExerciseDatalist(){
+  const dl = document.getElementById('exerciseNameList');
+  if(dl && !dl.children.length) dl.innerHTML = EXERCISE_DB.map(e=> `<option value="${escapeAttr(e.name)}">`).join('');
+}
+async function renderVideoManager(container, mode){
+  fillExerciseDatalist();
+  const api = videoApi(mode);
+  container.innerHTML = `<div class="empty">Carregando…</div>`;
+  let own = [], library = [];
+  try{
+    const res = await fetch(api.url, { headers: api.headers() });
+    if(!res.ok) throw new Error('bad status');
+    const data = await res.json();
+    if(mode==='admin') own = data; else { own = data.own || []; library = data.global || []; }
+  }catch(e){
+    container.innerHTML = `<div class="empty">Não consegui carregar os vídeos agora.</div>`;
+    return;
+  }
+  const ownKeys = new Set(own.map(v=> v.key));
+  const rows = own.map(v=> ({...v, source:'own'}))
+    .concat(library.filter(v=> !ownKeys.has(v.key)).map(v=> ({...v, source:'library'})))
+    .sort((a,b)=> a.name.localeCompare(b.name,'pt-BR'));
+  const ownLabel = mode==='admin' ? 'Biblioteca' : 'Seu vídeo';
+  container.innerHTML = `
+    <form class="video-form" novalidate>
+      <label class="vf-field"><span>Exercício</span><input type="text" name="name" list="exerciseNameList" placeholder="Ex.: Supino reto (barra)" maxlength="80" autocomplete="off" required></label>
+      <label class="vf-field"><span>Link do YouTube</span><input type="url" name="url" placeholder="https://youtu.be/…" autocomplete="off" required></label>
+      <button type="submit" class="primary">Salvar vídeo</button>
+    </form>
+    <p class="hint vf-hint">Pode ser vídeo "não listado". O vídeo aparece para o aluno em qualquer exercício com esse nome (acentos e maiúsculas não importam; "Supino reto (barra)" também vale para "Supino reto").${mode==='admin' ? '' : ' Um vídeo seu com o mesmo nome substitui o da biblioteca para os seus alunos.'}</p>
+    <div class="vf-msg" role="status"></div>
+    ${rows.length ? `<div class="video-grid">${rows.map(v=> `
+      <div class="video-card">
+        <button type="button" class="video-thumb" data-video="${escapeAttr(v.youtubeId)}" data-video-title="${escapeAttr(v.name)}" aria-label="Assistir ${escapeAttr(v.name)}">
+          <img src="https://i.ytimg.com/vi/${escapeAttr(v.youtubeId)}/mqdefault.jpg" alt="" loading="lazy">
+          <span class="video-play"><svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor" aria-hidden="true"><path d="M8 5.5v13l11-6.5z"/></svg></span>
+        </button>
+        <div class="video-card-body">
+          <div class="video-card-name" title="${escapeAttr(v.name)}">${escapeHtml(v.name)}</div>
+        </div>
+        <div class="video-card-actions">
+          <span class="badge ${v.source==='own'?'badge-ok':''}">${v.source==='own' ? ownLabel : 'Biblioteca'}</span>
+          <button type="button" class="ghost small" data-vedit="${escapeAttr(v.name)}" data-vurl="${v.source==='own' ? 'https://youtu.be/'+escapeAttr(v.youtubeId) : ''}">${v.source==='own' ? 'Trocar' : 'Usar outro vídeo'}</button>
+          ${v.source==='own' ? `<button type="button" class="ghost small" data-vdel="${escapeAttr(v.key)}" data-vname="${escapeAttr(v.name)}">Remover</button>` : ''}
+        </div>
+      </div>`).join('')}</div>`
+    : `<div class="empty"><strong>Nenhum vídeo ainda</strong>Cole o link do YouTube de um exercício acima.</div>`}`;
+
+  const form = container.querySelector('.video-form');
+  const msg = container.querySelector('.vf-msg');
+  form.addEventListener('submit', async e=>{
+    e.preventDefault();
+    const name = form.name.value.trim(), url = form.url.value.trim();
+    if(!name || !url){ msg.textContent = 'Preencha o exercício e o link.'; return; }
+    const btn = form.querySelector('button[type=submit]');
+    btn.disabled = true;
+    try{
+      const res = await fetch(api.url, { method:'PUT', headers: api.headers({'Content-Type':'application/json'}), body: JSON.stringify({name, url}) });
+      if(res.status===400){
+        const err = await res.json().catch(()=>({}));
+        msg.textContent = err.error==='invalid_url' ? 'Esse link não parece ser de um vídeo do YouTube.' : 'Confira o nome do exercício.';
+        btn.disabled = false;
+        return;
+      }
+      if(!res.ok) throw new Error('bad status');
+      showToast('Vídeo salvo!');
+      renderVideoManager(container, mode);
+    }catch(err){ msg.textContent = 'Não consegui salvar agora. Tente de novo.'; btn.disabled = false; }
+  });
+  container.onclick = async e=>{
+    const edit = e.target.closest('[data-vedit]');
+    if(edit){
+      form.name.value = edit.dataset.vedit;
+      form.url.value = edit.dataset.vurl;
+      form.url.focus();
+      form.scrollIntoView({behavior:'smooth', block:'center'});
+      return;
+    }
+    const del = e.target.closest('[data-vdel]');
+    if(del){
+      if(!(await confirmDialog(`Remover o vídeo de "${del.dataset.vname}"?`))) return;
+      const res = await fetch(`${api.url}?key=${encodeURIComponent(del.dataset.vdel)}`, { method:'DELETE', headers: api.headers() });
+      if(!res.ok){ alert('Não consegui remover o vídeo.'); return; }
+      renderVideoManager(container, mode);
+    }
+  };
+}
+document.querySelectorAll('[data-adminview]').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    const view = btn.dataset.adminview;
+    document.querySelectorAll('[data-adminview]').forEach(b=>{
+      const on = b===btn;
+      b.classList.toggle('active', on);
+      if(on) b.setAttribute('aria-current','page'); else b.removeAttribute('aria-current');
+    });
+    document.getElementById('adminViewProfs').hidden = view!=='profs';
+    document.getElementById('adminViewVideos').hidden = view!=='videos';
+    if(view==='videos') renderVideoManager(document.getElementById('adminVideos'), 'admin');
+    else renderAdminDashboard();
+  });
+});
+
 /* ---------- Painel do professor: gerenciar alunos ---------- */
 // Monta um link wa.me com o telefone (assume DDI 55/Brasil se vier só DDD+número).
 // "treinou há 3 dias" / "nunca treinou" a partir da data (YYYY-MM-DD) da última sessão com carga.
@@ -360,6 +469,7 @@ async function loadStudents(){
 }
 async function renderProfessorDashboard(){
   studentsList.innerHTML = `<div class="empty">Carregando…</div>`;
+  renderVideoManager(document.getElementById('profVideos'), 'professor');
   const students = await loadStudents();
   if(students.length===0){
     studentsList.innerHTML = `<div class="empty"><strong>Nenhum aluno ainda</strong>Adicione o primeiro aluno para gerar o código dele.</div>`;
@@ -1672,6 +1782,7 @@ function renderSessionBody(container, session){
           <input type="text" class="ex-name-input" value="${escapeAttr(ex.name)}" ${roAttr}>
           <span class="ex-target hint">${targetLabel ? 'alvo '+escapeHtml(targetLabel)+' reps' : ''}</span>
           ${record ? `<span class="pr-badge">🏆 ${record.weight}kg × ${record.reps}</span>` : ''}
+          ${videoButtonHtml(ex.name, 'small')}
           ${ro?'':`<button class="ghost small" data-delex="${ex.id}">✕</button>`}
         </div>
         <div class="set-rows"></div>
@@ -2120,6 +2231,81 @@ async function loadFeatures(){
     if(on!==energyEnabled){ energyEnabled = on; renderAll(); }
   }catch(e){}
 }
+
+/* ---------- Vídeos de execução (links do YouTube) ----------
+   A biblioteca do admin vale para todos; o professor pode trocar ou completar
+   para os alunos dele. O vídeo é achado pelo nome do exercício normalizado —
+   mesma regra de exerciseKey() em lib/videos.js. */
+let exerciseVideos = {};
+function exerciseKey(name){
+  return String(name == null ? '' : name)
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim().slice(0, 80);
+}
+// Nome sem o que está entre parênteses: "Supino reto (barra)" também acha "Supino reto".
+function baseExerciseKey(name){ return exerciseKey(String(name||'').replace(/\([^)]*\)/g, ' ')); }
+function findVideo(map, name){
+  const k = exerciseKey(name);
+  if(!k) return null;
+  if(map[k]) return map[k];
+  const base = baseExerciseKey(name);
+  if(map[base]) return map[base];
+  // A chave salva não tem mais os parênteses; compara pelo nome original.
+  const hit = Object.values(map).find(v=> v && baseExerciseKey(v.name)===base);
+  return hit || null;
+}
+function videoFor(name){ return findVideo(exerciseVideos, name); }
+const videosCacheKey = () => 'sobrecarga_videos_' + (activeStudentId() || 'x');
+function loadVideosFromCache(){
+  try{ exerciseVideos = JSON.parse(localStorage.getItem(videosCacheKey())) || {}; }catch(e){ exerciseVideos = {}; }
+}
+async function loadVideos(){
+  const sid = activeStudentId();
+  if(!sid) return;
+  try{
+    const res = await fetch(`/api/videos/${sid}`, { headers: apiHeaders() });
+    if(!res.ok) return;
+    const v = await res.json();
+    if(sid!==activeStudentId() || !v || typeof v!=='object') return;
+    const changed = JSON.stringify(v)!==JSON.stringify(exerciseVideos);
+    exerciseVideos = v;
+    try{ localStorage.setItem(videosCacheKey(), JSON.stringify(v)); }catch(e){}
+    if(changed) renderAll();
+  }catch(e){}
+}
+function videoButtonHtml(name, cls){
+  const v = videoFor(name);
+  if(!v) return '';
+  return `<button type="button" class="video-btn ${cls||''}" data-video="${escapeAttr(v.youtubeId)}" data-video-title="${escapeAttr(name)}" aria-label="Ver execução de ${escapeAttr(name)}">
+    <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden="true"><path d="M8 5.5v13l11-6.5z"/></svg><span>Ver execução</span></button>`;
+}
+// Player embutido (youtube-nocookie, liberado na CSP como frame-src).
+function openVideo(youtubeId, title){
+  if(!/^[A-Za-z0-9_-]{11}$/.test(youtubeId||'')) return;
+  const overlay = document.createElement('div');
+  overlay.className = 'video-overlay';
+  overlay.innerHTML = `
+    <div class="video-box" role="dialog" aria-modal="true" aria-label="Vídeo de execução">
+      <div class="video-head">
+        <div class="video-title">${escapeHtml(title||'Execução')}</div>
+        <button type="button" class="video-close" aria-label="Fechar vídeo">✕</button>
+      </div>
+      <div class="video-frame">
+        <iframe src="https://www.youtube-nocookie.com/embed/${youtubeId}?rel=0&amp;modestbranding=1&amp;playsinline=1&amp;autoplay=1" title="${escapeAttr(title||'Vídeo de execução')}" allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowfullscreen referrerpolicy="strict-origin-when-cross-origin"></iframe>
+      </div>
+      <a class="video-ext" href="https://www.youtube.com/watch?v=${youtubeId}" target="_blank" rel="noopener">Abrir no YouTube</a>
+    </div>`;
+  const close = ()=>{ overlay.remove(); document.removeEventListener('keydown', onKey); };
+  const onKey = e=>{ if(e.key==='Escape') close(); };
+  overlay.addEventListener('click', e=>{ if(e.target===overlay || e.target.closest('.video-close')) close(); });
+  document.addEventListener('keydown', onKey);
+  document.body.appendChild(overlay);
+  overlay.querySelector('.video-close').focus();
+}
+document.addEventListener('click', e=>{
+  const v = e.target.closest('[data-video]');
+  if(v){ e.preventDefault(); openVideo(v.dataset.video, v.dataset.videoTitle); }
+});
 
 function escapeHtml(s){ return String(s).replace(/[&<>"']/g, c=> ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 function escapeAttr(s){ return escapeHtml(s); }
@@ -2791,6 +2977,7 @@ function mRenderSessionScreen(){
         <div class="mrow-title">${escapeHtml(ex.name)} ${record?`<span class="pr-badge">🏆 ${record.weight}kg</span>`:''}</div>
         <div class="mrow-sub mmono">${meta}</div>
       </div>
+      ${videoFor(ex.name) ? `<button type="button" class="video-dot" data-video="${escapeAttr(videoFor(ex.name).youtubeId)}" data-video-title="${escapeAttr(ex.name)}" aria-label="Ver execução de ${escapeAttr(ex.name)}"><svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor" aria-hidden="true"><path d="M8 5.5v13l11-6.5z"/></svg></button>` : ''}
       ${ro?'':`<button class="micon-btn" data-mdel-ex="${ex.id}">✕</button>`}
     </div>`;
   });
@@ -3098,7 +3285,7 @@ function mRenderEntryScreen(){
   html += '<div class="mpage">';
   html += renderRestTimerBar();
   html += `<section>
-    <h1 class="mex-name">${escapeHtml(ex.name)}</h1>
+    <div class="mex-head"><h1 class="mex-name">${escapeHtml(ex.name)}</h1>${videoButtonHtml(ex.name)}</div>
     <div class="mchips">
       <span class="mchip-pill strong">${editing ? `Série ${mobile.setIdx+1}` : 'Nova série'}${curTarget ? ' · alvo '+escapeHtml(curTarget)+' reps' : ''}</span>
       <span class="mchip-pill">${lastLoad ? `Última vez: ${lastLoad.weight}kg × ${lastLoad.reps}` : 'Sem histórico anterior'}</span>
@@ -3579,11 +3766,13 @@ function boot(){
   STORE_KEY = 'sobrecarga_v1_' + activeStudentId();
   state = loadLocal();
   try{ energyEnabled = localStorage.getItem(energyFlagKey())==='1'; }catch(e){ energyEnabled = false; }
+  loadVideosFromCache();
   applyReadonlyUI();
   if(ensureProtocols()) save();
   renderAll();
   loadRemote();
   loadFeatures();
+  loadVideos();
   if(auth.role==='student' && !mShell.hidden){
     let seen = false;
     try{ seen = localStorage.getItem(tourStorageKey()) === '1'; }catch(e){}
