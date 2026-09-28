@@ -10,6 +10,8 @@ Diário de treino: importe a ficha em PDF, registre peso e repetições de cada 
 - `tests/` — testes (`npm test`) e verificação pós-deploy (`npm run smoke`).
 - `tools/make-icons.js` — gera os ícones (`node tools/make-icons.js`).
 
+No celular o app tem quatro abas: **Início** (semana, treino de hoje, estatísticas e recordes), **Treinos** (importar ficha, montar treino, semana atual e histórico), **Progresso** (resumo, força e energia) e **Perfil** (relatório em PDF, idioma, tour e sair). O visual segue a proposta do canvas de design "Sobrecarga — telas do app": verde `#3b703d` como cor principal, com texto branco em cima dele e `--accent-text` quando o verde é cor de texto.
+
 ## Acesso (sem e-mail/senha, só códigos)
 
 | Quem | Como entra | O que vê |
@@ -18,7 +20,7 @@ Diário de treino: importe a ficha em PDF, registre peso e repetições de cada 
 | **Professor** | código próprio | só os alunos dele; pode ver a ficha, liberar aparelho, ligar no WhatsApp |
 | **Aluno** | código próprio | só a própria ficha |
 
-- **Gráfico de gasto de energia (kcal):** só aparece para quem o admin liberar. No painel do admin, o 🔥 na linha de um professor liga o gráfico para **todos os alunos dele** (inclusive os que forem cadastrados depois); dentro de "Ver painel", o 🔥 na linha de um aluno liga só para ele. A estimativa usa o peso e as repetições de cada série (trabalho de levantar a carga ~0,5 m com ~20% de eficiência muscular ≈ 0,006 kcal por kg × repetição). A liberação fica na tabela `energy_access`, criada sozinha na inicialização.
+- **Gráfico de gasto de energia (kcal):** só aparece para quem o admin liberar. No painel do admin, o interruptor "Gráfico de kcal" na linha de um professor liga o gráfico para **todos os alunos dele** (inclusive os que forem cadastrados depois); dentro de "Ver painel", o 🔥 na linha de um aluno liga só para ele. A estimativa usa o peso e as repetições de cada série (trabalho de levantar a carga ~0,5 m com ~20% de eficiência muscular ≈ 0,006 kcal por kg × repetição). A liberação fica na tabela `energy_access`, criada sozinha na inicialização.
 - Código de aluno fica **travado no primeiro aparelho** que entrar. Se trocar de celular, o aluno toca em "Pedir liberação ao professor" e o professor libera (🔓) no painel.
 - 15 tentativas de código errado por IP em 10 min bloqueiam o login por um tempo.
 - Os códigos de admin e do professor original vêm das variáveis `ADMIN_CODE` e `PROFESSOR_CODE` (ou são gerados e guardados na tabela `meta`).
