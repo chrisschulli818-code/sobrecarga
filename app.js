@@ -9,8 +9,11 @@ if(window.pdfjsLib) pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.clou
    sentido aqui. */
 const I18N = {
   pt: {
-    appName:'Sobrecarga', gateSubhead:'Entre com o código que o seu professor te passou.',
-    codePlaceholder:'CÓDIGO', enter:'Entrar', accessAsCoach:'Acessar como professor',
+    appName:'Sobrecarga', gateSubhead:'Seu professor te passa esse código.',
+    gateTagline:'Seu diário de treino. Registre cargas, acompanhe recordes e veja sua evolução.',
+    codeLabel:'Código de acesso', gateFoot:'Professor ou admin? Use o mesmo campo com o seu código.',
+    homeTab:'Início', profileTab:'Perfil',
+    codePlaceholder:'Ex.: K7M2QX', enter:'Entrar', accessAsCoach:'Acessar como professor',
     coachHintToast:'Digite seu código de professor no campo acima.',
     nextWorkout:'Próximo treino', startWorkout:'Ir para o treino',
     weeksLabel:'semanas', sessionsLabel:'Sessões', exercisesLabel:'Exercícios',
@@ -23,8 +26,11 @@ const I18N = {
     logout:'sair', tourBtnTitle:'Tour do app',
   },
   en: {
-    appName:'Sobrecarga', gateSubhead:'Enter the code your coach gave you.',
-    codePlaceholder:'CODE', enter:'Sign in', accessAsCoach:'Continue as coach',
+    appName:'Sobrecarga', gateSubhead:'Your coach gives you this code.',
+    gateTagline:'Your training diary. Log your loads, track records and see your progress.',
+    codeLabel:'Access code', gateFoot:'Coach or admin? Use the same field with your code.',
+    homeTab:'Home', profileTab:'Profile',
+    codePlaceholder:'e.g. K7M2QX', enter:'Sign in', accessAsCoach:'Continue as coach',
     coachHintToast:'Enter your coach code in the field above.',
     nextWorkout:'Next workout', startWorkout:'Start workout',
     weeksLabel:'weeks', sessionsLabel:'Sessions', exercisesLabel:'Exercises',
@@ -190,28 +196,53 @@ async function loadProfessors(){
     return await res.json();
   }catch(e){ return []; }
 }
+let adminProfessors = [];
 async function renderAdminDashboard(){
   const list = document.getElementById('professorsList');
   list.innerHTML = `<div class="empty">Carregando…</div>`;
-  const professors = await loadProfessors();
-  if(professors.length===0){
+  adminProfessors = await loadProfessors();
+  const students = adminProfessors.reduce((n,p)=> n + p.studentCount, 0);
+  const withEnergy = adminProfessors.filter(p=> p.energy).reduce((n,p)=> n + p.studentCount, 0);
+  document.getElementById('adminKpis').innerHTML = [
+    ['Professores', adminProfessors.length],
+    ['Alunos', students],
+    ['Alunos com gráfico de kcal', withEnergy]
+  ].map(([l,v])=> `<div class="kpi"><div class="kpi-l">${l}</div><div class="kpi-v">${v}</div></div>`).join('');
+  renderProfessorRows();
+}
+function renderProfessorRows(){
+  const list = document.getElementById('professorsList');
+  if(adminProfessors.length===0){
     list.innerHTML = `<div class="empty"><strong>Nenhum professor ainda</strong>Cadastre o primeiro professor para gerar o código dele.</div>`;
     return;
   }
-  list.innerHTML = professors.map(p=> `
-    <div class="student-row">
-      <div>
-        <div class="sname">${escapeHtml(p.name)}</div>
-        <div class="scode">${escapeHtml(p.code)} · ${p.studentCount} ${p.studentCount===1?'aluno':'alunos'}</div>
-      </div>
-      <div class="student-actions">
+  const q = (document.getElementById('profSearch').value||'').trim().toLowerCase();
+  const rows = adminProfessors.filter(p=> !q || p.name.toLowerCase().includes(q) || p.code.toLowerCase().includes(q));
+  if(rows.length===0){
+    list.innerHTML = `<div class="empty">Nenhum professor encontrado.</div>`;
+    return;
+  }
+  list.innerHTML = rows.map(p=> `
+    <div class="prof-row">
+      <div class="prof-name"><span class="avatar-sm">${escapeHtml((p.name||'?').trim().charAt(0).toUpperCase())}</span><span>${escapeHtml(p.name)}</span></div>
+      <span class="prof-code">${escapeHtml(p.code)}</span>
+      <span class="prof-count">${p.studentCount} ${p.studentCount===1?'aluno':'alunos'}</span>
+      <button type="button" class="switch${p.energy?' on':''}" role="switch" aria-checked="${p.energy?'true':'false'}" data-energyprof="${p.id}" data-on="${p.energy?1:0}" aria-label="Gráfico de kcal para os alunos de ${escapeAttr(p.name)}">
+        <span class="switch-track"><span class="switch-knob"></span></span>
+        <span class="switch-label">${p.energy?'Ligado':'Desligado'}</span>
+      </button>
+      <div class="prof-actions">
         <button class="small" data-viewprofessor="${p.id}" data-code="${escapeAttr(p.code)}" data-name="${escapeAttr(p.name)}">Ver painel</button>
-        <button class="ghost small energy-toggle${p.energy?' on':''}" data-energyprof="${p.id}" data-on="${p.energy?1:0}" title="${p.energy?'Gráfico de kcal ligado para todos os alunos — clique para desligar':'Ligar gráfico de kcal para todos os alunos'}">🔥</button>
-        <button class="ghost small" data-copyprof="${escapeAttr(p.code)}" title="Copiar código">⧉</button>
-        <button class="ghost small" data-delprof="${p.id}" data-name="${escapeAttr(p.name)}" data-count="${p.studentCount}" title="Remover professor">✕</button>
+        <button class="ghost small icon-btn" data-copyprof="${escapeAttr(p.code)}" title="Copiar código" aria-label="Copiar código">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V5a1 1 0 0 0-1-1H5a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h3"/></svg>
+        </button>
+        <button class="ghost small icon-btn" data-delprof="${p.id}" data-name="${escapeAttr(p.name)}" data-count="${p.studentCount}" title="Remover professor" aria-label="Remover professor">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 7h14M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></svg>
+        </button>
       </div>
     </div>`).join('');
 }
+document.getElementById('profSearch').addEventListener('input', renderProfessorRows);
 document.getElementById('addProfessorBtn').addEventListener('click', async ()=>{
   const name = prompt('Nome do novo professor:');
   if(!name || !name.trim()) return;
@@ -339,7 +370,7 @@ async function renderProfessorDashboard(){
       <div>
         <div class="sname">${s.name ? escapeHtml(s.name) : '— aguardando aluno —'}${s.locked ? ' <span title="Aparelho travado" style="opacity:.7;">🔒</span>' : ''}</div>
         <div class="scode">${escapeHtml(s.code)}</div>
-        ${s.unlockRequested ? '<div class="sactivity" style="color:var(--accent);font-weight:700;">🔔 pediu liberação do aparelho</div>' : ''}
+        ${s.unlockRequested ? '<div class="sactivity" style="color:var(--accent-text);font-weight:700;">🔔 pediu liberação do aparelho</div>' : ''}
         ${activityLabel(s) ? `<div class="sactivity${s.lastTrainedAt && daysSince(s.lastTrainedAt)>7 ? ' stale' : ''}">${activityLabel(s)}</div>` : ''}
       </div>
       <div class="student-actions">
@@ -360,7 +391,7 @@ function showCodesModal(title, codes){
     <div class="confirm-box" style="max-width:360px;">
       <p style="margin-bottom:10px;"><strong>${escapeHtml(title)}</strong></p>
       <div style="background:var(--surface-2);border:1px solid var(--border);padding:10px;max-height:260px;overflow:auto;font-family:'Archivo',sans-serif;">
-        ${codes.map(c=> `<div style="padding:5px 2px;letter-spacing:.08em;font-weight:700;color:var(--accent);">${escapeHtml(c)}</div>`).join('')}
+        ${codes.map(c=> `<div style="padding:5px 2px;letter-spacing:.08em;font-weight:700;color:var(--accent-text);">${escapeHtml(c)}</div>`).join('')}
       </div>
       <div class="confirm-actions">
         <button class="ghost small" data-act="copy">Copiar tudo</button>
@@ -2392,8 +2423,9 @@ document.getElementById('builderSaveBtn').addEventListener('click', ()=>{
 
 /* ---------- Mobile app shell (telas estilo app: abas embaixo, teclado numérico) ---------- */
 const mobile = {
-  tab: 'treinos',
-  screen: 'list',   // treinos: list|session|entry|import ; progresso: list|detail
+  tab: 'inicio',     // inicio | treinos | progresso | perfil
+  screen: 'list',   // treinos: list|history|week|session|entry|import ; progresso: list|detail
+  progView: 'resumo', // aba interna do Progresso: resumo | forca | energia
   protKey: null,     // protocolo aberto
   weekKey: null,     // semana aberta dentro do protocolo
   sessionId: null,
@@ -2437,9 +2469,10 @@ function renderRestTimerBar(){
   if(!mobile.timerActive) return '';
   const remaining = Math.max(0, Math.ceil((mobile.timerEnd - Date.now())/1000));
   return `<div id="mRestTimer" class="rest-timer">
-    <button class="rt-btn" data-rt="-15">-15s</button>
+    ${ICONS.clock}
+    <span class="rt-label">Descanso</span>
     <span class="rt-time">${fmtSecs(remaining)}</span>
-    <button class="rt-btn" data-rt="+15">+15s</button>
+    <button class="rt-btn" data-rt="+15" aria-label="Mais 15 segundos">+15s</button>
     <button class="rt-btn rt-skip" data-rt="skip">Pular</button>
   </div>`;
 }
@@ -2449,24 +2482,55 @@ const mContent = document.getElementById('mContent');
 const mTitle = document.getElementById('mTitle');
 const mBack = document.getElementById('mBack');
 const mProfessorBar = document.getElementById('mProfessorBar');
-const mTourBtn = document.getElementById('mTourBtn');
+const mSub = document.getElementById('mSub');
+const mAvatar = document.getElementById('mAvatar');
+// Cabeçalho do celular: título grande, linha menor opcional acima dele,
+// botão de voltar nas telas internas e o avatar (atalho pro Perfil) no Início.
+function mHeader(title, opts){
+  const o = opts || {};
+  mTitle.textContent = title;
+  mBack.hidden = !o.back;
+  mSub.hidden = !o.sub;
+  mSub.textContent = o.sub || '';
+  mAvatar.hidden = !o.avatar;
+  if(o.avatar) mAvatar.textContent = userInitial();
+}
+function userInitial(){
+  const n = (auth && auth.role==='student' && auth.name) ? auth.name.trim() : '';
+  return (n.charAt(0) || '·').toUpperCase();
+}
+mAvatar.addEventListener('click', ()=>{ mobile.tab = 'perfil'; mobile.screen = 'list'; mRender(); });
+// Ícones de traço usados nas telas do celular (mesmos da proposta de design).
+const ICONS = {
+  chevron: '<svg class="ico" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg>',
+  clock: '<svg class="ico" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l3 2M9 3h6"/></svg>',
+  trophy: '<svg class="ico" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 4h8v5a4 4 0 0 1-8 0zM8 6H5a3 3 0 0 0 3 4M16 6h3a3 3 0 0 1-3 4M12 13v4M9 20h6"/></svg>',
+  file: '<svg class="ico" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M6 3h8l4 4v14H6zM14 3v4h4M12 11v6M9 14h6"/></svg>',
+  target: '<svg class="ico" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3"/></svg>',
+  download: '<svg class="ico" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></svg>',
+  flame: '<svg class="ico" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M12 3c1 4 5 6 5 11a5 5 0 0 1-10 0c0-3 2-4 2-7 2 1 3 2 3 4"/></svg>',
+  globe: '<svg class="ico" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c3 3 3 15 0 18c-3-3-3-15 0-18"/></svg>',
+  help: '<svg class="ico" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .9-1 1.6M12 17h.01"/></svg>',
+  logout: '<svg class="ico" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 4h4v16h-4M10 8l-4 4 4 4M6 12h10"/></svg>',
+  check: '<svg class="ico" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5 9-10"/></svg>',
+  back: '<svg class="ico" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 6l-6 6 6 6"/></svg>'
+};
 if(new URLSearchParams(location.search).get('tab')==='progresso') mobile.tab = 'progresso';
 
 /* ---------- Tour guiado (primeiro acesso do aluno) ---------- */
 // TOUR_VERSION sobe sempre que o tour ganha passos novos sobre funcionalidades
 // recém-lançadas — isso faz o tour reaparecer uma vez até pra quem já tinha
 // visto uma versão anterior, sem precisar de um fluxo de "novidades" à parte.
-const TOUR_VERSION = 3;
+const TOUR_VERSION = 4;
 const TOUR_STEPS = [
-  { target: null, title: 'Bem-vindo ao Sobrecarga 👋', text: 'Vamos fazer um tour rápido pelas principais áreas do app. Leva menos de um minuto.' },
-  { target: '.mdash-cta', title: 'Próximo treino', text: 'Aqui você sempre vê qual é o próximo treino da sua ficha, com um botão pra ir direto pra ele.' },
-  { target: '.mdash-stats', title: 'Suas estatísticas', text: 'Semanas seguidas treinando, total de sessões e quantos exercícios já têm progresso registrado.' },
-  { target: '[data-maction="openbuilder"]', title: 'Montar treino', text: 'Toque em qualquer músculo — frente ou costas — pra montar um treino na hora, já filtrado por aquele grupo.' },
-  { target: '[data-maction="import"]', title: 'Importar ficha em PDF', text: 'Tem uma ficha de treino em PDF? Importe aqui que o app organiza as sessões automaticamente.' },
-  { target: '.mrow, .mempty', title: 'Suas sessões', text: 'Toque numa semana pra ver os treinos dela, e em cada treino pra registrar peso e repetições de cada série.' },
-  { target: null, title: 'Últimas cargas na tela ✨', text: 'Ao abrir um exercício pra preencher uma série, o app já mostra a carga da última vez e sugere o mesmo peso e reps nos campos — é só ajustar se for progredir.' },
-  { target: null, title: 'Teclado do seu celular ✨', text: 'Peso e repetições agora usam o teclado numérico nativo do celular, em vez de um teclado dentro do app — mais rápido e familiar.' },
-  { target: '[data-mtab="progresso"]', title: 'Aba Progresso', text: 'Aqui você acompanha o volume levantado por semana e a evolução do seu 1RM estimado em cada exercício.' },
+  { target: null, title: 'Bem-vindo ao Sobrecarga 👋', text: 'O app foi reorganizado em quatro abas. Vamos dar uma volta rápida — leva menos de um minuto.' },
+  { target: '.mweek', title: 'Sua semana', text: 'Os dias em que você treinou ficam preenchidos; hoje aparece com contorno.' },
+  { target: '.mtoday', title: 'Treino de hoje', text: 'O próximo treino da sua ficha, com os primeiros exercícios e um botão pra começar direto.' },
+  { target: '.mstat-grid', title: 'Suas estatísticas', text: 'Semanas seguidas treinando, treinos no mês e recordes novos dos últimos 30 dias.' },
+  { target: '[data-mtab="treinos"]', title: 'Aba Treinos', text: 'Importe a ficha em PDF, monte um treino pelo mapa muscular e veja cada semana do protocolo.' },
+  { target: null, title: 'Botões − e + ✨', text: 'Ao registrar uma série, ajuste peso e repetições com um toque. O app já sugere a carga da última vez.' },
+  { target: '[data-mtab="progresso"]', title: 'Aba Progresso', text: 'Volume por semana, evolução do 1RM estimado em cada exercício e, se liberado, o gasto de energia.' },
+  { target: '[data-mtab="perfil"]', title: 'Aba Perfil', text: 'Relatório em PDF, idioma, o tour de novo e o botão de sair ficam aqui.' },
 ];
 let tourIndex = -1;
 let tourOverlayEl = null, tourSpotlightEl = null, tourTooltipEl = null;
@@ -2475,7 +2539,7 @@ function tourStorageKey(){ return 'sobrecarga_tour_seen_v' + TOUR_VERSION + '_' 
 function startTour(){
   if(mShell.hidden) return; // tour cobre só a versão mobile por enquanto
   endTour(false);
-  mobile.tab = 'treinos'; mobile.screen = 'list'; mRender();
+  mobile.tab = 'inicio'; mobile.screen = 'list'; mRender();
   tourIndex = 0;
   buildTourDOM();
   renderTourStep();
@@ -2502,7 +2566,7 @@ function buildTourDOM(){
 function renderTourStep(){
   const step = TOUR_STEPS[tourIndex];
   const last = tourIndex === TOUR_STEPS.length - 1;
-  const targetEl = step.target ? mContent.querySelector(step.target) : null;
+  const targetEl = step.target ? mShell.querySelector(step.target) : null;
   if(targetEl){
     targetEl.scrollIntoView({block:'center', behavior:'auto'});
   }
@@ -2547,13 +2611,11 @@ function renderTourStep(){
     });
   }, 60);
 }
-mTourBtn.addEventListener('click', startTour);
-const mLogoutBtn = document.getElementById('mLogoutBtn');
-mLogoutBtn.addEventListener('click', async ()=>{
+async function confirmLogout(){
   if(await confirmDialog('Sair da sua conta? Você pode entrar de novo como aluno ou como professor.', {okLabel:'Sair', danger:false})){
     logout();
   }
-});
+}
 
 document.querySelectorAll('.mtab').forEach(btn=>{
   btn.addEventListener('click', ()=>{
@@ -2572,7 +2634,6 @@ mBack.addEventListener('click', ()=>{
       mobile.screen = mobile.weekKey ? 'week' : 'list';
     }
     else if(mobile.screen==='week'){ mobile.screen='history'; mobile.weekKey=null; mobile.protKey=null; }
-    else if(mobile.screen==='history'){ mobile.screen='list'; }
     else{ mobile.screen='list'; mobile.sessionId=null; }
   }else if(mobile.tab==='progresso'){
     mobile.screen='list'; mobile.progKey=null;
@@ -2586,7 +2647,10 @@ function mSetActiveTabUI(){
 
 function mRender(){
   mSetActiveTabUI();
-  if(mobile.tab==='progresso') mRenderProgresso();
+  mContent.scrollTop = 0;
+  if(mobile.tab==='inicio') mRenderInicio();
+  else if(mobile.tab==='progresso') mRenderProgresso();
+  else if(mobile.tab==='perfil') mRenderPerfil();
   else mRenderTreinos();
 }
 
@@ -2614,55 +2678,12 @@ function mThisWeekSessions(){
   return state.sessions.filter(s=> getWeekKey(s.date)===wk).sort((a,b)=> a.date.localeCompare(b.date));
 }
 
-function mRenderSessionsList(){
-  mTitle.textContent = 'Sobrecarga';
-  mBack.hidden = true;
-  let html = '';
-  const next = findNextSession();
-  const nextSub = next ? `${next.exercises.length} ${next.exercises.length===1?'exercício':'exercícios'} · ${next.exercises.reduce((a,e)=>a+e.sets.length,0)} séries` : '';
-  html += `<div class="mdash-cta">
-    <div class="k">${t('nextWorkout')}</div>
-    <div class="v">${next ? escapeHtml(next.name) : (state.sessions.length ? 'Tudo em dia 🎉' : t('importPdfCta'))}</div>
-    ${next ? `<div class="mrow-sub" style="margin:-6px 0 10px;">${nextSub}</div>` : ''}
-    ${next ? `<button class="mprimarybtn" data-maction="gotonext" data-session="${next.id}" style="width:100%;">${t('startWorkout')}</button>` : ''}
-  </div>
-  <div class="mdash-stats">
-    <div class="mdash-stat"><div class="n">${computeStreak()}</div><div class="l">🔥 ${t('weeksLabel')}</div></div>
-    <div class="mdash-stat"><div class="n">${state.sessions.length}</div><div class="l">${t('sessionsLabel')}</div></div>
-    <div class="mdash-stat"><div class="n">${computeProgress().length}</div><div class="l">${t('exercisesLabel')}</div></div>
-  </div>`;
-  html += `<div class="msection-title" style="margin-top:20px;"><span class="mchip">✎</span>Esta semana</div>`;
-  const thisWeek = mThisWeekSessions();
-  if(thisWeek.length===0){
-    html += `<div class="mempty"><strong>${t('noSessionsYet')}</strong>${t('importHint')}</div>`;
-  }else{
-    thisWeek.forEach(s=>{
-      const feito = s.exercises.some(e=> e.sets.some(x=> x.weight>0));
-      html += `<div class="mrow" data-mopen-session="${s.id}" data-fromhome="1">
-        <div class="mrow-main">
-          <div class="mrow-title">${escapeHtml(s.name)}</div>
-          <div class="mrow-sub">${fmtDayMonth(s.date)}${feito?' · iniciado':''}</div>
-        </div>
-        <span class="mchev">›</span>
-      </div>`;
-    });
-  }
-  html += `<div class="mseeall" data-maction="history">Ver histórico completo<span class="mchev">›</span></div>`;
-  if(!READONLY){
-    html += `<div class="msticky-actions">
-      <button class="mprimarybtn" data-maction="openbuilder">${t('buildWorkout')}</button>
-      <button class="mghostbtn" data-maction="import">${t('importPdf')}</button>
-    </div>`;
-  }
-  mContent.innerHTML = html;
-}
 
 function mRenderHistoryScreen(){
-  mTitle.textContent = 'Histórico';
-  mBack.hidden = false;
-  let html = '';
+  mHeader('Treinos');
+  let html = '<div class="mpage mpage-flush">' + mSegmented([['list','Esta semana'],['history','Histórico']], 'history', 'treinosview') + '</div>';
   if(!READONLY){
-    html += `<div style="padding:16px 16px 4px;display:flex;gap:8px;flex-wrap:wrap;">
+    html += `<div style="padding:0 20px 4px;display:flex;gap:8px;flex-wrap:wrap;">
       <button class="mghostbtn" data-maction="addsession">${t('newSession')}</button>
     </div>`;
   }
@@ -2709,8 +2730,7 @@ function mRenderWeekScreen(){
   if(sessions.length===0){ mobile.screen='history'; return mRenderHistoryScreen(); }
   const end = addDaysISO(mobile.weekKey, 6);
   const n = mobile.protKey ? protocolWeekKeys(mobile.protKey).indexOf(mobile.weekKey)+1 : 0;
-  mTitle.textContent = n>0 ? `Semana ${n}` : `${fmtDayMonth(mobile.weekKey)} – ${fmtDayMonth(end)}`;
-  mBack.hidden = false;
+  mHeader(n>0 ? `Semana ${n}` : `${fmtDayMonth(mobile.weekKey)} – ${fmtDayMonth(end)}`, {back: true});
   const prot = state.protocols.find(p=> p.id===mobile.protKey);
   let html = `<div class="mgrouplabel" style="margin-top:14px;">${prot?escapeHtml(prot.name)+' · ':''}${fmtDayMonth(mobile.weekKey)} – ${fmtDayMonth(end)}</div>`;
   html += `<div class="msection-title" style="margin-top:6px;">Divisão de treino</div>`;
@@ -2746,18 +2766,16 @@ function mFeedbackBlockHtml(session){
 function mRenderSessionScreen(){
   const session = state.sessions.find(s=> s.id===mobile.sessionId);
   if(!session){ mobile.screen='list'; return mRenderSessionsList(); }
-  mTitle.textContent = 'Sessão';
-  mBack.hidden = false;
+  mHeader('Sessão', {back: true, sub: fmtDate(session.date)});
   const ro = READONLY;
-  let html = `<div style="padding:14px 16px 6px;">
+  let html = `<div style="padding:4px 20px 6px;">
     <input type="text" class="minput" data-msessname value="${escapeAttr(session.name)}" ${ro?'disabled':''}>
-    <div class="mrow-sub" style="margin-top:6px;">${fmtDate(session.date)}</div>
     ${ro?'':`<div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;">
       <button class="mghostbtn" data-maction="repeatsession">⟳ repetir (+7 dias)</button>
       <button class="mghostbtn mdanger" data-mdel-session="${session.id}">✕ excluir sessão</button>
     </div>`}
   </div>
-  <div style="padding:0 16px;">${mFeedbackBlockHtml(session)}</div>
+  <div style="padding:0 20px;">${mFeedbackBlockHtml(session)}</div>
   <div class="msection-title">Exercícios</div>`;
   session.exercises.forEach(ex=>{
     const setCount = ex.sets.length;
@@ -2776,7 +2794,7 @@ function mRenderSessionScreen(){
       ${ro?'':`<button class="micon-btn" data-mdel-ex="${ex.id}">✕</button>`}
     </div>`;
   });
-  if(!ro) html += `<div style="padding:4px 16px 20px;"><button class="mghostbtn" data-maction="addexercise">+ exercício</button></div>`;
+  if(!ro) html += `<div style="padding:4px 20px 20px;"><button class="mghostbtn" data-maction="addexercise">+ exercício</button></div>`;
   mContent.innerHTML = html;
 }
 
@@ -2803,54 +2821,6 @@ function lastLoadFor(exName, currentSessionId, idx){
   return done[idx] || done[done.length-1];
 }
 
-function mRenderEntryScreen(){
-  const session = state.sessions.find(s=> s.id===mobile.sessionId);
-  const ex = session && session.exercises.find(x=> x.id===mobile.exId);
-  if(!ex){ mobile.screen='session'; return mRenderSessionScreen(); }
-  mTitle.textContent = ex.name;
-  mBack.hidden = false;
-  const ro = READONLY;
-  const editing = mobile.setIdx!==null && ex.sets[mobile.setIdx];
-  // O alvo mostrado é o da série que está sendo preenchida (a ficha prescreve
-  // faixas diferentes para aquecimento, preparatória e séries válidas).
-  const curTarget = editing ? (ex.sets[mobile.setIdx].target||'')
-                            : ((ex.sets[ex.sets.length-1]||{}).target||'');
-  const lastLoad = lastLoadFor(ex.name, session.id, editing ? mobile.setIdx : ex.sets.length);
-  let html = renderRestTimerBar();
-  html += `<div style="padding:14px 16px 20px;">
-    <div class="mtarget-bar">
-      <span>${editing ? `Série ${mobile.setIdx+1}` : 'Nova série'}</span>
-      <strong>${curTarget ? 'alvo '+escapeHtml(curTarget)+' reps' : 'sem alvo definido'}</strong>
-    </div>
-    <div class="mlast-load">${lastLoad ? `Última vez: <strong>${lastLoad.weight}kg × ${lastLoad.reps}</strong>` : 'Sem histórico anterior deste exercício'}</div>
-    <div style="display:flex;gap:10px;margin-bottom:14px;">
-      <div class="mpad-box">
-        <div class="mpad-label">Peso (kg)</div>
-        <input class="mpad-input" data-mweightinput type="number" inputmode="decimal" step="0.5" min="0" placeholder="0" value="${escapeAttr(mobile.padWeight)}" ${ro?'disabled':''}>
-      </div>
-      <div class="mpad-box">
-        <div class="mpad-label">Reps</div>
-        <input class="mpad-input" data-mrepsinput type="number" inputmode="numeric" step="1" min="0" placeholder="0" value="${escapeAttr(mobile.padReps)}" ${ro?'disabled':''}>
-      </div>
-    </div>
-    ${ro?'':`<button class="mprimarybtn" data-msaveset style="width:100%;">${editing ? `Salvar série ${mobile.setIdx+1}` : 'Adicionar série'}</button>`}
-    <div class="msection-title" style="margin:16px 0 10px;">Séries do exercício</div>`;
-  if(ex.sets.length===0){
-    html += `<div class="mempty">Nenhuma série ainda</div>`;
-  }else{
-    ex.sets.forEach((s,i)=>{
-      const sel = mobile.setIdx===i;
-      const feito = s.weight>0;
-      html += `<div class="mrow mset-row ${sel?'sel':''}" data-mselset="${i}" style="padding:8px 12px;">
-        <span class="mmono">${i+1}. ${feito ? `${s.weight}kg × ${s.reps}` : `<span style="color:var(--text-faint);">a fazer${s.target?' · alvo '+escapeHtml(s.target):''}</span>`}</span>
-        ${ro?'':`<button class="micon-btn" data-mdelset="${i}">✕</button>`}
-      </div>`;
-    });
-  }
-  if(!ro) html += `<div style="margin-top:10px;"><button class="mghostbtn" data-maction="newset" style="width:100%;">+ série extra</button></div>`;
-  html += `<div style="margin-top:10px;"><button class="mghostbtn" data-maction="backtosession" style="width:100%;">Concluir exercício</button></div></div>`;
-  mContent.innerHTML = html;
-}
 
 // Seleciona uma série para preencher. Se ainda não tem carga anotada,
 // sugere a carga da última vez que o exercício foi feito.
@@ -2876,8 +2846,7 @@ function mFirstPendingSet(ex, from){
 }
 
 function mRenderImportScreen(){
-  mTitle.textContent = 'Importar';
-  mBack.hidden = false;
+  mHeader('Importar', {back: true});
   if(!stageGroups.length){
     mContent.innerHTML = `<div style="padding:24px 16px;text-align:center;">
       <div style="border:2px dashed var(--border);border-radius:var(--radius-lg);padding:34px 18px;margin-bottom:18px;">
@@ -2920,37 +2889,6 @@ function mRenderImportScreen(){
 }
 
 /* --- Progresso --- */
-function mRenderProgresso(){
-  if(mobile.screen==='detail') return mRenderProgressDetail();
-  mTitle.textContent = 'Progresso';
-  mBack.hidden = true;
-  const data = computeProgress();
-  let html = '';
-  if(energyEnabled){
-    html += `<div class="msection-title">🔥 Gasto de energia</div><div class="energy-block">${energyChartHtml()}</div>`;
-    html += `<div class="msection-title">1RM por exercício</div>`;
-  }
-  html += '<div style="padding:8px 16px 20px;">';
-  if(data.length===0){
-    html += `<div class="mempty"><strong>Sem dados suficientes</strong>Registre sessões para ver a evolução.</div>`;
-  }else{
-    data.forEach(e=>{
-      const {cur, deltaHtml} = trendDelta(e.points);
-      const spark = e.points.length>1 ? sparkline(e.points.slice(-8)) : '';
-      html += `<div class="mrow" data-mopen-prog="${escapeAttr(e.label.toLowerCase())}">
-        <div class="mrow-main">
-          <div class="mrow-title">${escapeHtml(e.label)}</div>
-          <div class="mrow-sub mmono">${e.points[e.points.length-1].rm.toFixed(1)}kg 1RM</div>
-          <div class="mrow-sub">${deltaHtml}</div>
-        </div>
-        ${spark}
-      </div>`;
-    });
-  }
-  if(state.sessions.length) html += `<button class="mprimarybtn" style="width:100%;margin-top:14px;" data-maction="exportpdf">⬇ Baixar relatório em PDF</button>`;
-  html += '</div>';
-  mContent.innerHTML = html;
-}
 
 function mBigSparkPath(points){
   const w=280,h=110,pad=8;
@@ -2965,8 +2903,7 @@ function mRenderProgressDetail(){
   const data = computeProgress();
   const e = data.find(x=> x.label.toLowerCase()===mobile.progKey);
   if(!e){ mobile.screen='list'; return mRenderProgresso(); }
-  mTitle.textContent = e.label;
-  mBack.hidden = false;
+  mHeader(e.label, {back: true});
   const { deltaHtml } = trendDelta(e.points);
   const cur = e.points[e.points.length-1];
   const path = mBigSparkPath(e.points);
@@ -2981,10 +2918,321 @@ function mRenderProgressDetail(){
     html += `<div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--surface-2);">
       <span class="mrow-sub">${fmtDate(p.date)}</span>
       <span class="mmono" style="font-size:12.5px;">${p.weight}kg × ${p.reps}</span>
-      <span class="mmono" style="font-size:12.5px;color:var(--accent);">${p.rm.toFixed(1)}kg</span>
+      <span class="mmono" style="font-size:12.5px;color:var(--accent-text);">${p.rm.toFixed(1)}kg</span>
     </div>`;
   });
   html += '</div>';
+  mContent.innerHTML = html;
+}
+
+/* --- Peças comuns das telas do celular --- */
+// Situação de uma sessão pela quantidade de séries com carga anotada.
+function sessionStatus(s){
+  const sets = s.exercises.flatMap(e=> e.sets);
+  const done = sets.filter(x=> x.weight>0).length;
+  if(sets.length && done>=sets.length) return 'done';
+  return done>0 ? 'going' : 'todo';
+}
+function statusBadge(st){
+  if(st==='done') return '<span class="badge badge-ok">Feito</span>';
+  if(st==='going') return '<span class="badge badge-warn">Em andamento</span>';
+  return '<span class="badge">A fazer</span>';
+}
+function mSegmented(items, active, action){
+  return `<div class="seg" role="tablist">${items.map(([key,label])=>
+    `<button type="button" role="tab" aria-selected="${key===active}" class="${key===active?'active':''}" data-maction="${action}" data-val="${key}">${label}</button>`
+  ).join('')}</div>`;
+}
+const DOW_SHORT = ['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'];
+function dowOf(iso){ return new Date(iso+'T00:00:00').getDay(); }
+function plural(n, one, many){ return `${n} ${n===1?one:many}`; }
+// Recordes (1RM estimado acima de todas as sessões anteriores) dos últimos 30 dias.
+function recentRecords(){
+  const out = [];
+  computeProgress().forEach(e=>{
+    if(e.points.length<2) return;
+    const last = e.points[e.points.length-1];
+    const prevBest = Math.max(...e.points.slice(0,-1).map(p=> p.rm));
+    if(last.rm > prevBest && daysSince(last.date) <= 30){
+      out.push({ label: e.label, weight: last.weight, reps: last.reps, date: last.date, pct: ((last.rm-prevBest)/prevBest)*100 });
+    }
+  });
+  return out.sort((a,b)=> b.date.localeCompare(a.date));
+}
+function fmtPct(v){ return (v>0?'▲ ':v<0?'▼ ':'▬ ') + Math.abs(v).toFixed(1).replace('.',',') + '%'; }
+function weekVolume(weekKey){
+  let v = 0;
+  state.sessions.forEach(s=>{
+    if(getWeekKey(s.date)!==weekKey) return;
+    s.exercises.forEach(e=> e.sets.forEach(x=>{ if(x.weight>0 && x.reps>0) v += x.weight*x.reps; }));
+  });
+  return v;
+}
+
+/* --- Início --- */
+function mRenderInicio(){
+  const first = (auth && auth.role==='student' && auth.name) ? auth.name.trim().split(/\s+/)[0] : '';
+  const dateLabel = new Date().toLocaleDateString(lang==='en'?'en-US':'pt-BR', {weekday:'long', day:'numeric', month:'long'});
+  mHeader(READONLY ? 'Resumo do aluno' : (first ? `Olá, ${first}` : 'Sobrecarga'), { sub: dateLabel.charAt(0).toUpperCase()+dateLabel.slice(1), avatar: !READONLY });
+  const today = todayISO();
+  const monday = getWeekKey(today);
+  const trained = new Set(state.sessions.filter(s=> s.exercises.some(e=> e.sets.some(x=> x.weight>0))).map(s=> s.date));
+  let html = '<div class="mpage">';
+  html += '<div class="mweek">';
+  for(let i=0;i<7;i++){
+    const d = addDaysISO(monday, i);
+    const cls = trained.has(d) ? 'done' : (d===today ? 'today' : '');
+    html += `<div class="mweek-day"><span class="mweek-l">${DOW_SHORT[dowOf(d)].charAt(0)}</span><span class="mweek-n ${cls}">${+d.slice(8,10)}</span></div>`;
+  }
+  html += '</div>';
+
+  const next = findNextSession();
+  if(next){
+    const nSets = next.exercises.reduce((a,e)=> a+e.sets.length, 0);
+    html += `<section class="mtoday">
+      <div class="mtoday-top"><span class="overline accent">${next.date<=today ? 'Treino de hoje' : 'Próximo treino'}</span><span class="mmeta">${plural(next.exercises.length,'exercício','exercícios')} · ${plural(nSets,'série','séries')}</span></div>
+      <div class="mtoday-name">${escapeHtml(next.name)}</div>
+      <div class="mtoday-list">
+        ${next.exercises.slice(0,3).map(ex=> `<div><span>${escapeHtml(ex.name)}</span><span class="dim">${ex.sets.length}${exerciseTarget(ex) ? ' × '+escapeHtml(exerciseTarget(ex)) : ' séries'}</span></div>`).join('')}
+        ${next.exercises.length>3 ? `<div class="faint">+ ${plural(next.exercises.length-3,'exercício','exercícios')}</div>` : ''}
+      </div>
+      <button class="mprimarybtn big" data-maction="gotonext" data-session="${next.id}">${READONLY ? 'Ver treino' : 'Começar treino'} ${ICONS.chevron}</button>
+    </section>`;
+  }else{
+    html += `<section class="mtoday">
+      <div class="mtoday-name">${state.sessions.length ? 'Tudo em dia 🎉' : 'Importe sua ficha para começar'}</div>
+      <div class="mmeta">${state.sessions.length ? 'Nenhuma série pendente na sua ficha.' : 'Traga o PDF do seu professor ou monte um treino pelo mapa muscular.'}</div>
+      ${READONLY ? '' : `<button class="mprimarybtn big" data-maction="gotab" data-val="treinos">Ir para Treinos ${ICONS.chevron}</button>`}
+    </section>`;
+  }
+
+  const month = today.slice(0,7);
+  const monthCount = state.sessions.filter(s=> s.date.slice(0,7)===month && s.exercises.some(e=> e.sets.some(x=> x.weight>0))).length;
+  const records = recentRecords();
+  html += `<div class="mstat-grid">
+    <div class="mstat"><div class="n">${computeStreak()}</div><div class="l">semanas seguidas</div></div>
+    <div class="mstat"><div class="n">${monthCount}</div><div class="l">treinos no mês</div></div>
+    <div class="mstat"><div class="n">${records.length}</div><div class="l">recordes novos</div></div>
+  </div>`;
+
+  if(records.length){
+    html += `<section class="mstack">
+      <div class="msec-head"><h2 class="overline">Recordes recentes</h2><button class="mlink" data-maction="gotab" data-val="progresso">Ver progresso</button></div>
+      ${records.slice(0,2).map(r=> `<div class="mitem">
+        <span class="micon-tile">${ICONS.trophy}</span>
+        <div class="mitem-main"><div class="mitem-title">${escapeHtml(r.label)}</div><div class="mitem-sub">${r.weight}kg × ${r.reps} · ${fmtDayMonth(r.date)}</div></div>
+        <span class="trend up">${fmtPct(r.pct)}</span>
+      </div>`).join('')}
+    </section>`;
+  }
+  html += '</div>';
+  mContent.innerHTML = html;
+}
+
+/* --- Treinos --- */
+function mRenderSessionsList(){
+  mHeader('Treinos');
+  let html = '<div class="mpage">';
+  if(!READONLY){
+    html += `<div class="mtiles">
+      <button class="mtile" data-maction="import"><span class="micon-tile">${ICONS.file}</span><span class="mtile-title">Importar ficha</span><span class="mtile-sub">PDF do professor</span></button>
+      <button class="mtile" data-maction="openbuilder"><span class="micon-tile">${ICONS.target}</span><span class="mtile-title">Montar treino</span><span class="mtile-sub">pelo mapa muscular</span></button>
+    </div>`;
+  }
+  html += mSegmented([['list','Esta semana'],['history','Histórico']], 'list', 'treinosview');
+
+  const next = findNextSession();
+  const protId = (next && next.protocolId) || newestProtocolId();
+  const prot = state.protocols.find(p=> p.id===protId);
+  const weeks = protId ? protocolWeekKeys(protId) : [];
+  if(prot && weeks.length){
+    const idx = weeks.indexOf(getWeekKey(todayISO()));
+    const pct = idx>=0 ? Math.round(((idx+1)/weeks.length)*100) : (todayISO() > weeks[weeks.length-1] ? 100 : 0);
+    html += `<section class="mprot">
+      <div class="mprot-top">
+        <div><div class="overline">Protocolo</div><div class="mprot-name">${escapeHtml(prot.name)}</div></div>
+        <span class="mmeta">${idx>=0 ? `semana ${idx+1} de ${weeks.length}` : plural(weeks.length,'semana','semanas')}</span>
+      </div>
+      <div class="mbar"><div style="width:${pct}%;"></div></div>
+    </section>`;
+  }
+
+  const thisWeek = mThisWeekSessions();
+  if(thisWeek.length===0){
+    html += `<div class="mempty"><strong>${t('noSessionsYet')} nesta semana</strong>${state.sessions.length ? 'Veja as outras semanas em Histórico.' : t('importHint')}</div>`;
+  }else{
+    html += '<div class="mstack">';
+    thisWeek.forEach(s=>{
+      const st = sessionStatus(s);
+      const nSets = s.exercises.reduce((a,e)=> a+e.sets.length, 0);
+      const exDone = s.exercises.filter(e=> e.sets.some(x=> x.weight>0)).length;
+      const meta = st==='going' ? `${exDone} de ${plural(s.exercises.length,'exercício','exercícios')}` : `${plural(s.exercises.length,'exercício','exercícios')} · ${plural(nSets,'série','séries')}`;
+      html += `<button class="mday" data-mopen-session="${s.id}" data-fromhome="1">
+        <span class="mday-date"><span class="mday-dow">${DOW_SHORT[dowOf(s.date)]}</span><span class="mday-n">${+s.date.slice(8,10)}</span></span>
+        <span class="mitem-main"><span class="mitem-title">${escapeHtml(s.name)}${s.feedback?' <span class="feedback-flag">💬</span>':''}</span><span class="mitem-sub">${meta}</span></span>
+        ${statusBadge(st)}
+      </button>`;
+    });
+    html += '</div>';
+  }
+  html += '</div>';
+  mContent.innerHTML = html;
+}
+
+/* --- Registrar série --- */
+function mRenderEntryScreen(){
+  const session = state.sessions.find(s=> s.id===mobile.sessionId);
+  const ex = session && session.exercises.find(x=> x.id===mobile.exId);
+  if(!ex){ mobile.screen='session'; return mRenderSessionScreen(); }
+  const exIdx = session.exercises.indexOf(ex);
+  mHeader(`Exercício ${exIdx+1} de ${session.exercises.length}`, {back: true, sub: session.name});
+  const ro = READONLY;
+  const editing = mobile.setIdx!==null && ex.sets[mobile.setIdx];
+  // O alvo mostrado é o da série que está sendo preenchida (a ficha prescreve
+  // faixas diferentes para aquecimento, preparatória e séries válidas).
+  const curTarget = editing ? (ex.sets[mobile.setIdx].target||'')
+                            : ((ex.sets[ex.sets.length-1]||{}).target||'');
+  const lastLoad = lastLoadFor(ex.name, session.id, editing ? mobile.setIdx : ex.sets.length);
+  let html = `<div class="mexprog">${session.exercises.map((e,i)=>
+    `<span class="${i<exIdx || e.sets.every(x=> x.weight>0) ? 'done' : (i===exIdx ? 'cur' : '')}"></span>`).join('')}</div>`;
+  html += '<div class="mpage">';
+  html += renderRestTimerBar();
+  html += `<section>
+    <h1 class="mex-name">${escapeHtml(ex.name)}</h1>
+    <div class="mchips">
+      <span class="mchip-pill strong">${editing ? `Série ${mobile.setIdx+1}` : 'Nova série'}${curTarget ? ' · alvo '+escapeHtml(curTarget)+' reps' : ''}</span>
+      <span class="mchip-pill">${lastLoad ? `Última vez: ${lastLoad.weight}kg × ${lastLoad.reps}` : 'Sem histórico anterior'}</span>
+    </div>
+  </section>
+  <div class="msteppers">
+    <div class="mstepper">
+      <label for="mPadWeight">Peso (kg)</label>
+      <input id="mPadWeight" class="mpad-input" data-mweightinput type="number" inputmode="decimal" step="0.5" min="0" placeholder="0" value="${escapeAttr(mobile.padWeight)}" ${ro?'disabled':''}>
+      ${ro?'':`<div class="mstep-btns"><button type="button" data-mstep="weight:-2.5" aria-label="Menos 2,5 kg">−</button><button type="button" data-mstep="weight:2.5" aria-label="Mais 2,5 kg">+</button></div>`}
+    </div>
+    <div class="mstepper">
+      <label for="mPadReps">Repetições</label>
+      <input id="mPadReps" class="mpad-input" data-mrepsinput type="number" inputmode="numeric" step="1" min="0" placeholder="0" value="${escapeAttr(mobile.padReps)}" ${ro?'disabled':''}>
+      ${ro?'':`<div class="mstep-btns"><button type="button" data-mstep="reps:-1" aria-label="Menos uma repetição">−</button><button type="button" data-mstep="reps:1" aria-label="Mais uma repetição">+</button></div>`}
+    </div>
+  </div>
+  <section class="mstack">
+    <h2 class="overline">Séries</h2>`;
+  if(ex.sets.length===0){
+    html += `<div class="mempty">Nenhuma série ainda</div>`;
+  }else{
+    ex.sets.forEach((s,i)=>{
+      const sel = mobile.setIdx===i;
+      const feito = s.weight>0;
+      html += `<div class="mset ${sel?'sel':''}" data-mselset="${i}">
+        <span class="mset-dot ${feito?'done':(sel?'cur':'')}">${feito ? ICONS.check : i+1}</span>
+        <span class="mset-name">Série ${i+1}</span>
+        <span class="mset-val">${feito ? `${s.weight}kg × ${s.reps}` : (sel ? 'agora' : (s.target ? 'alvo '+escapeHtml(s.target) : '—'))}</span>
+        ${ro?'':`<button class="micon-btn" data-mdelset="${i}" aria-label="Remover série ${i+1}">✕</button>`}
+      </div>`;
+    });
+  }
+  html += `</section>
+  <div class="mrow-actions">
+    ${ro?'':`<button class="mghostbtn" data-maction="newset">+ Série extra</button>`}
+    <button class="mghostbtn" data-maction="backtosession">Concluir exercício</button>
+  </div>
+  </div>`;
+  if(!ro){
+    html += `<div class="msticky-actions">
+      <button class="mghostbtn" data-maction="skipset">Pular série</button>
+      <button class="mprimarybtn" data-msaveset>${editing ? `Salvar série ${mobile.setIdx+1}` : 'Adicionar série'}</button>
+    </div>`;
+  }
+  mContent.innerHTML = html;
+}
+
+/* --- Progresso --- */
+function mRenderProgresso(){
+  if(mobile.screen==='detail') return mRenderProgressDetail();
+  mHeader('Progresso');
+  const views = [['resumo','Resumo'],['forca','Força']];
+  if(energyEnabled) views.push(['energia','Energia']);
+  if(!views.some(v=> v[0]===mobile.progView)) mobile.progView = 'resumo';
+  let html = '<div class="mpage">' + mSegmented(views, mobile.progView, 'progview');
+  const data = computeProgress();
+
+  if(mobile.progView==='resumo'){
+    const wk = getWeekKey(todayISO());
+    const cur = weekVolume(wk), prev = weekVolume(addDaysISO(wk,-7));
+    const weekSessions = state.sessions.filter(s=> getWeekKey(s.date)===wk && s.exercises.some(e=> e.sets.some(x=> x.weight>0)));
+    const fmtN = v=> Math.round(v).toLocaleString('pt-BR');
+    const second = energyEnabled
+      ? `<div class="kpi"><div class="kpi-l">Energia na semana</div><div class="kpi-v">${fmtN(computeSessionEnergy(weekSessions).reduce((n,d)=> n+d.kcal,0))} kcal</div><div class="kpi-s">${plural(weekSessions.length,'treino','treinos')}</div></div>`
+      : `<div class="kpi"><div class="kpi-l">Treinos na semana</div><div class="kpi-v">${weekSessions.length}</div><div class="kpi-s">${computeStreak()} semanas seguidas</div></div>`;
+    html += `<div class="kpi-grid two">
+      <div class="kpi"><div class="kpi-l">Volume na semana</div><div class="kpi-v">${fmtN(cur)} kg</div>
+        ${prev>0 && cur>0 ? `<div class="kpi-s trend ${cur>=prev?'up':'down'}">${fmtPct(((cur-prev)/prev)*100)} vs. anterior</div>` : `<div class="kpi-s">${prev>0 ? 'semana anterior: '+fmtN(prev)+' kg' : 'peso × repetições'}</div>`}</div>
+      ${second}
+    </div>`;
+    const vol = computeWeeklyVolume();
+    html += `<section class="mcard-lg"><div class="msec-head"><h2>Volume por semana</h2><span class="mmeta">kg</span></div>`;
+    if(vol.length===0){
+      html += `<div class="mempty">Registre cargas para ver o total levantado por semana.</div>`;
+    }else{
+      const max = Math.max(...vol.map(d=> d.volume));
+      html += `<div class="energy-chart">${vol.map((d,i)=> `<div class="energy-col" tabindex="0" title="${fmtN(d.volume)} kg na semana de ${fmtDayMonth(d.week)}"><div class="energy-bar" style="height:${Math.max(2,(d.volume/max)*100).toFixed(1)}%;">${i===vol.length-1 ? `<span class="energy-val">${fmtN(d.volume)}</span>` : ''}</div></div>`).join('')}</div>
+      <div class="energy-axis">${vol.map(d=> `<span>${d.week.slice(8,10)}/${d.week.slice(5,7)}</span>`).join('')}</div>`;
+    }
+    html += `</section>`;
+  }else if(mobile.progView==='forca'){
+    if(data.length===0){
+      html += `<div class="mempty"><strong>Sem dados suficientes</strong>Registre sessões para ver a evolução.</div>`;
+    }else{
+      html += '<h2 class="overline">1RM estimado</h2><div class="mstack">';
+      data.forEach(e=>{
+        const pts = e.points, cur = pts[pts.length-1], prev = pts.length>1 ? pts[pts.length-2] : null;
+        const pct = prev ? ((cur.rm-prev.rm)/prev.rm)*100 : null;
+        html += `<button class="mitem" data-mopen-prog="${escapeAttr(e.label.toLowerCase())}">
+          <span class="mitem-main"><span class="mitem-title">${escapeHtml(e.label)}</span><span class="mitem-sub">${cur.rm.toFixed(1).replace('.',',')} kg</span></span>
+          ${pct===null ? '<span class="trend">—</span>' : `<span class="trend ${pct>0?'up':pct<0?'down':''}">${fmtPct(pct)}</span>`}
+          <span class="faint">${ICONS.chevron}</span>
+        </button>`;
+      });
+      html += '</div>';
+    }
+  }else{
+    html += `<section class="mcard-lg"><div class="msec-head"><h2>Gasto de energia por treino</h2><span class="mmeta">kcal</span></div>${energyChartHtml()}</section>`;
+  }
+  html += '</div>';
+  mContent.innerHTML = html;
+}
+
+/* --- Perfil --- */
+function mRenderPerfil(){
+  mHeader('Perfil');
+  const isStudent = auth && auth.role==='student';
+  const name = isStudent ? (auth.name || 'Aluno') : 'Visualizando como professor';
+  let html = `<div class="mpage">
+    <section class="mprofile">
+      <span class="mavatar lg">${isStudent ? userInitial() : '👁'}</span>
+      <div><div class="mprofile-name">${escapeHtml(name)}</div><div class="mitem-sub">${isStudent ? 'Código '+escapeHtml(auth.code||'') : 'Somente leitura'}</div></div>
+    </section>
+    <section class="mstack">
+      <h2 class="overline">Meus dados</h2>
+      <div class="mlist">
+        <button class="mlist-row" data-maction="exportpdf"><span class="accent">${ICONS.download}</span><span class="mlist-label">Baixar relatório em PDF</span><span class="faint">${ICONS.chevron}</span></button>
+        ${energyEnabled ? `<div class="mlist-row"><span class="accent">${ICONS.flame}</span><span class="mlist-label">Gasto de energia</span><span class="badge badge-ok">Liberado</span></div>` : ''}
+      </div>
+    </section>
+    <section class="mstack">
+      <h2 class="overline">Preferências</h2>
+      <div class="mlist">
+        <div class="mlist-row"><span class="accent">${ICONS.globe}</span><span class="mlist-label">Idioma</span>
+          <div class="seg seg-sm">${['pt','en'].map(l=> `<button type="button" class="${lang===l?'active':''}" data-maction="lang" data-val="${l}">${l.toUpperCase()}</button>`).join('')}</div>
+        </div>
+        ${isStudent ? `<button class="mlist-row" data-maction="tour"><span class="accent">${ICONS.help}</span><span class="mlist-label">Ver o tour do app</span><span class="faint">${ICONS.chevron}</span></button>` : ''}
+      </div>
+    </section>
+    ${READONLY
+      ? `<button class="mghostbtn big" data-maction="backtostudents">${ICONS.back} Voltar aos alunos</button>`
+      : `<button class="mdangerbtn" data-maction="logout">${ICONS.logout} Sair</button>`}
+  </div>`;
   mContent.innerHTML = html;
 }
 
@@ -2994,6 +3242,21 @@ mContent.addEventListener('click', async e=>{
   if(action){
     const act = action.dataset.maction;
     if(act==='import'){ mobile.screen='import'; mRenderImportScreen(); return; }
+    if(act==='treinosview'){ mobile.screen = action.dataset.val==='history' ? 'history' : 'list'; mRender(); return; }
+    if(act==='progview'){ mobile.progView = action.dataset.val; mRenderProgresso(); return; }
+    if(act==='gotab'){ mobile.tab = action.dataset.val; mobile.screen = 'list'; mRender(); return; }
+    if(act==='lang'){ setLang(action.dataset.val); return; }
+    if(act==='tour'){ startTour(); return; }
+    if(act==='logout'){ confirmLogout(); return; }
+    if(act==='backtostudents'){ currentStudentId = null; boot(); return; }
+    if(act==='skipset'){
+      const session = state.sessions.find(s=> s.id===mobile.sessionId);
+      const ex = session && session.exercises.find(x=> x.id===mobile.exId);
+      const next = ex ? mFirstPendingSet(ex, (mobile.setIdx===null ? 0 : mobile.setIdx+1)) : null;
+      if(next!==null && next!==mobile.setIdx){ mSelectSet(next); mRenderEntryScreen(); }
+      else showToast('Não há outra série pendente neste exercício.');
+      return;
+    }
     if(act==='exportpdf'){ exportPdf(); return; }
     if(act==='togglemap'){ homeMapOpen = !homeMapOpen; mRenderSessionsList(); return; }
     if(act==='history'){ mobile.screen='history'; mRender(); return; }
@@ -3003,6 +3266,7 @@ mContent.addEventListener('click', async e=>{
         mobile.protKey = session.protocolId;
         mobile.weekKey = getWeekKey(session.date);
         mobile.sessionId = session.id;
+        mobile.tab = 'treinos';
         mobile.screen = 'session';
         mRender();
       }
@@ -3114,6 +3378,17 @@ mContent.addEventListener('click', async e=>{
   if(delEx){
     const session = state.sessions.find(s=> s.id===mobile.sessionId);
     if(session){ session.exercises = session.exercises.filter(x=> x.id!==delEx.dataset.mdelEx); save(); renderAll(); }
+    return;
+  }
+  const stepBtn = e.target.closest('[data-mstep]');
+  if(stepBtn){
+    const [field, delta] = stepBtn.dataset.mstep.split(':');
+    const key = field==='weight' ? 'padWeight' : 'padReps';
+    const cur = parseFloat(String(mobile[key]).replace(',','.')) || 0;
+    const val = Math.max(0, Math.round((cur + parseFloat(delta))*100)/100);
+    mobile[key] = String(val);
+    const input = mContent.querySelector(field==='weight' ? '[data-mweightinput]' : '[data-mrepsinput]');
+    if(input) input.value = mobile[key];
     return;
   }
   const rtBtn = e.target.closest('[data-rt]');
@@ -3414,7 +3689,7 @@ function buildPdfReport(){
       head: [['Exercício','Atual','Anterior','1RM est.','Variação']],
       body: rows,
       styles:{fontSize:8.5, cellPadding:2.5},
-      headStyles:{fillColor:[255,92,40], textColor:255},
+      headStyles:{fillColor:[59,112,61], textColor:255},
       alternateRowStyles:{fillColor:[245,243,250]}
     });
     y = doc.lastAutoTable.finalY + 12;
@@ -3445,7 +3720,7 @@ function buildPdfReport(){
       head: [['Exercício','Série','Alvo','Reps','Carga']],
       body: rows,
       styles:{fontSize:8.5, cellPadding:2.2},
-      headStyles:{fillColor:[255,92,40], textColor:255},
+      headStyles:{fillColor:[59,112,61], textColor:255},
       columnStyles:{1:{cellWidth:16},2:{cellWidth:24},3:{cellWidth:18},4:{cellWidth:22}}
     });
     y = doc.lastAutoTable.finalY + 10;

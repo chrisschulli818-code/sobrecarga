@@ -1,11 +1,11 @@
-// Gera os ícones do app (PNG) sem dependências: laranja com um halter escuro.
+// Gera os ícones do app (PNG) sem dependências: verde com um halter branco.
 // Uso: node tools/make-icons.js   (saída em ./icons/)
 const fs = require('fs');
 const zlib = require('zlib');
 const path = require('path');
 
-const BG = [0xd9, 0x7b, 0x3f];
-const FG = [0x0b, 0x0f, 0x0c];
+const BG = [0x3b, 0x70, 0x3d];
+const FG = [0xff, 0xff, 0xff];
 
 // Retângulos do halter em coordenadas 0..1 (bem dentro da zona segura de ícone "maskable").
 const RECTS = [

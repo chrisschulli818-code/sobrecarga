@@ -14,52 +14,84 @@
 <link rel="stylesheet" href="/styles.css">
 
 <div id="gateScreen" class="gate">
-  <div class="lang-toggle" id="langToggle">
-    <button type="button" class="lang-pill" data-lang="pt">PT</button>
-    <button type="button" class="lang-pill" data-lang="en">EN</button>
+  <div class="gate-top">
+    <div class="seg seg-sm" id="langToggle">
+      <button type="button" class="lang-pill" data-lang="pt">PT</button>
+      <button type="button" class="lang-pill" data-lang="en">EN</button>
+    </div>
   </div>
   <div class="gate-box">
-    <span class="mark" style="width:56px;height:56px;">
-      <svg viewBox="0 0 24 24" fill="none" style="width:30px;height:30px;">
-        <path d="M4 12h2M18 12h2M7 9v6M17 9v6M7 12h10" stroke="#fff" stroke-width="2" stroke-linecap="round"/>
-      </svg>
-    </span>
-    <h1 data-i18n="appName">Sobrecarga</h1>
-    <div class="tagline" data-i18n="gateSubhead">Entre com o código que o seu professor te passou.</div>
-    <input type="text" id="gateCodeInput" class="gate-code-input" maxlength="10" data-i18n-placeholder="codePlaceholder" placeholder="CÓDIGO" autocomplete="off" autocapitalize="characters">
-    <button class="primary" id="gateSubmitBtn" data-i18n="enter" style="width:100%;justify-content:center;">Entrar</button>
-    <div class="gate-error" id="gateError"></div>
-    <button type="button" class="ghost-link" id="gateUnlockReqBtn" hidden>Pedir liberação ao professor</button>
-    <button type="button" class="ghost-link" id="gateCoachHint" data-i18n="accessAsCoach">Acessar como professor</button>
+    <div class="gate-brand">
+      <span class="mark mark-lg">
+        <svg viewBox="0 0 24 24" fill="none">
+          <path d="M4 12h2M18 12h2M7 9v6M17 9v6M7 12h10" stroke="#fff" stroke-width="2" stroke-linecap="round"/>
+        </svg>
+      </span>
+      <h1 data-i18n="appName">Sobrecarga</h1>
+      <p class="gate-tagline" data-i18n="gateTagline">Seu diário de treino. Registre cargas, acompanhe recordes e veja sua evolução.</p>
+    </div>
+    <div class="gate-form">
+      <label for="gateCodeInput" class="gate-label" data-i18n="codeLabel">Código de acesso</label>
+      <input type="text" id="gateCodeInput" class="gate-code-input" maxlength="10" data-i18n-placeholder="codePlaceholder" placeholder="Ex.: K7M2QX" autocomplete="off" autocapitalize="characters">
+      <p class="gate-help" data-i18n="gateSubhead">Seu professor te passa esse código.</p>
+      <button class="primary big" id="gateSubmitBtn" data-i18n="enter">Entrar</button>
+      <div class="gate-error" id="gateError" role="alert"></div>
+      <button type="button" class="ghost-link" id="gateUnlockReqBtn" hidden>Pedir liberação ao professor</button>
+    </div>
   </div>
+  <p class="gate-foot" data-i18n="gateFoot">Professor ou admin? Use o mesmo campo com o seu código.</p>
 </div>
 
-<div id="adminDashboard" class="prof-wrap" hidden>
-  <div class="hero">
-    <div class="brand">
+<div id="adminDashboard" class="admin-shell" hidden>
+  <aside class="admin-side">
+    <div class="admin-brand">
       <span class="mark">
         <svg viewBox="0 0 24 24" fill="none">
           <path d="M4 12h2M18 12h2M7 9v6M17 9v6M7 12h10" stroke="#fff" stroke-width="2" stroke-linecap="round"/>
         </svg>
       </span>
+      <span class="admin-brand-name">Sobrecarga</span>
+    </div>
+    <nav class="admin-nav">
+      <button type="button" class="admin-nav-item active" aria-current="page">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 4-6 8-6s8 2 8 6"/></svg>
+        Professores
+      </button>
+      <button type="button" class="admin-nav-item" id="backupBtn" title="Baixa todos os dados (professores, alunos e fichas) em um arquivo">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></svg>
+        Baixar backup
+      </button>
+    </nav>
+    <div class="admin-side-spacer"></div>
+    <button type="button" class="admin-nav-item" id="logoutBtnAdmin">
+      <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 4h4v16h-4M10 8l-4 4 4 4M6 12h10"/></svg>
+      Sair
+    </button>
+  </aside>
+  <main class="admin-main">
+    <div class="admin-head">
       <div>
-        <h1>Sobrecarga</h1>
-        <div class="tagline">Área do admin — cadastre professores e navegue pelo painel de cada um.</div>
+        <h1>Professores</h1>
+        <p class="admin-lead">Cadastre professores, abra o painel de cada um e libere recursos.</p>
       </div>
+      <button class="primary" id="addProfessorBtn">+ Novo professor</button>
     </div>
-    <button class="ghost small" id="logoutBtnAdmin" data-i18n="logout">sair</button>
-  </div>
-  <div class="card">
-    <div class="card-head">
-      <h2><span class="chip">🧑‍🏫</span>Professores</h2>
-      <div style="display:flex;gap:8px;">
-        <button class="small ghost" id="backupBtn" title="Baixa todos os dados (professores, alunos e fichas) em um arquivo">⬇ backup</button>
-        <button class="small primary" id="addProfessorBtn">+ novo professor</button>
+    <div class="kpi-grid" id="adminKpis"></div>
+    <section class="table-card">
+      <div class="table-toolbar">
+        <label class="search-box">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="6"/><path d="M20 20l-4-4"/></svg>
+          <span class="sr-only">Buscar professor</span>
+          <input type="search" id="profSearch" placeholder="Buscar professor" autocomplete="off">
+        </label>
+        <span class="hint">O interruptor liga o gráfico de gasto de energia (kcal) para todos os alunos do professor. Para liberar só um aluno, use o 🔥 dentro de "Ver painel".</span>
       </div>
-    </div>
-    <div class="hint" style="margin:-6px 0 12px;">🔥 liga o gráfico de gasto de energia (kcal) para todos os alunos do professor. Para liberar só um aluno, entre em "Ver painel" e use o 🔥 na linha dele.</div>
-    <div id="professorsList"></div>
-  </div>
+      <div class="prof-table-head" aria-hidden="true">
+        <span>Nome</span><span>Código</span><span>Alunos</span><span>Gráfico de kcal</span><span class="ta-r">Ações</span>
+      </div>
+      <div id="professorsList"></div>
+    </section>
+  </main>
 </div>
 
 <div id="professorDashboard" class="prof-wrap" hidden>
@@ -248,22 +280,36 @@
 <div id="mShell" class="mshell">
   <div class="mheader">
     <div class="mheader-top">
-      <button id="mBack" class="mback" hidden>‹</button>
-      <div class="mtitle" id="mTitle">Sobrecarga</div>
-      <div class="lang-toggle" id="mLangToggle" style="position:static;flex:none;">
-        <button type="button" class="lang-pill" data-lang="pt">PT</button>
-        <button type="button" class="lang-pill" data-lang="en">EN</button>
+      <button id="mBack" class="mback" hidden aria-label="Voltar">
+        <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 6l-6 6 6 6"/></svg>
+      </button>
+      <div class="mtitle-wrap">
+        <div class="msub" id="mSub" hidden></div>
+        <div class="mtitle" id="mTitle">Sobrecarga</div>
       </div>
-      <button id="mTourBtn" class="mtourbtn" data-i18n-title="tourBtnTitle" title="Tour do app">?</button>
-      <button id="mLogoutBtn" class="mtourbtn" data-i18n-title="logout" title="sair">⎋</button>
+      <button id="mAvatar" class="mavatar" hidden aria-label="Perfil"></button>
     </div>
-    <div id="mProfessorBar" class="mprofessor-bar" hidden>👁 Área do professor — somente leitura</div>
+    <div id="mProfessorBar" class="mprofessor-bar" hidden>Área do professor — somente leitura</div>
   </div>
   <div class="mcontent" id="mContent"></div>
-  <div class="mtabbar">
-    <button class="mtab" data-mtab="treinos"><span class="micon">🏋</span><span data-i18n="workoutsTab">Treinos</span></button>
-    <button class="mtab" data-mtab="progresso"><span class="micon">Δ</span><span data-i18n="progressTab">Progresso</span></button>
-  </div>
+  <nav class="mtabbar">
+    <button class="mtab" data-mtab="inicio">
+      <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M3 11l9-7 9 7v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/></svg>
+      <span data-i18n="homeTab">Início</span>
+    </button>
+    <button class="mtab" data-mtab="treinos">
+      <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 12h2M18 12h2M7 9v6M17 9v6M7 12h10"/></svg>
+      <span data-i18n="workoutsTab">Treinos</span>
+    </button>
+    <button class="mtab" data-mtab="progresso">
+      <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M5 20V11M12 20V5M19 20v-6"/></svg>
+      <span data-i18n="progressTab">Progresso</span>
+    </button>
+    <button class="mtab" data-mtab="perfil">
+      <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 4-6 8-6s8 2 8 6"/></svg>
+      <span data-i18n="profileTab">Perfil</span>
+    </button>
+  </nav>
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
