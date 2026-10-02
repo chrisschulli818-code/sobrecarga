@@ -76,6 +76,13 @@ let currentStudentId = null;    // aluno que o professor (ou o admin) está vend
 let currentProfessorCode = null; // quando o admin entra no painel de um professor, o código real dele
 let currentProfessorName = null;
 let READONLY = false;           // true quando o professor/admin está vendo a ficha de alguém
+// Professor/admin pode ligar "Editar ficha": aí os controles de edição voltam
+// (LOCKED() = false). O feedback continua dependendo só de READONLY. O
+// servidor protege contra sobrescrever o que o aluno gravou nesse meio-tempo
+// (x-if-version / 409).
+let EDIT_MODE = false;
+let stateVersion = null;
+const LOCKED = () => READONLY && !EDIT_MODE;
 
 function loadAuth(){
   try{ return JSON.parse(localStorage.getItem(AUTH_KEY)); }catch(e){ return null; }
@@ -467,24 +474,73 @@ async function loadStudents(){
     return await res.json();
   }catch(e){ return []; }
 }
-async function renderProfessorDashboard(){
-  studentsList.innerHTML = `<div class="empty">Carregando…</div>`;
-  renderVideoManager(document.getElementById('profVideos'), 'professor');
-  const students = await loadStudents();
-  if(students.length===0){
+/* ---------- Painel do professor: acompanhamento da turma ---------- */
+let coachStudents = [];
+const coachView = { filter: 'all', sort: 'name', q: '' };
+const isStale = s=> !!s.name && (!s.lastTrainedAt || daysSince(s.lastTrainedAt) > 7);
+
+function coachFilters(){
+  const named = coachStudents.filter(s=> s.name);
+  return [
+    ['all', 'Todos', coachStudents.length],
+    ['stale', 'Parados há +7 dias', named.filter(isStale).length],
+    ['drops', 'Carga caindo', named.filter(s=> (s.loadDrops||[]).length).length],
+    ['records', 'Bateram recorde', named.filter(s=> (s.records30||[]).length).length]
+  ];
+}
+function renderCoachSummary(){
+  const named = coachStudents.filter(s=> s.name);
+  const kpis = [
+    ['Alunos', named.length, coachStudents.length>named.length ? `${coachStudents.length-named.length} código(s) ainda sem nome` : ''],
+    ['Treinaram nesta semana', named.filter(s=> s.weekDone>0).length, `de ${named.length}`],
+    ['Parados há +7 dias', named.filter(isStale).length, 'precisam de contato'],
+    ['Recordes nos últimos 30 dias', named.reduce((n,s)=> n+(s.records30||[]).length, 0), `${named.filter(s=> (s.records30||[]).length).length} aluno(s)`]
+  ];
+  document.getElementById('coachKpis').innerHTML = kpis.map(([l,v,sub])=> `<div class="kpi"><div class="kpi-l">${l}</div><div class="kpi-v">${v}</div>${sub?`<div class="kpi-s">${sub}</div>`:''}</div>`).join('');
+  document.getElementById('coachTools').innerHTML = `
+    <div class="coach-chips" role="tablist">${coachFilters().map(([k,l,n])=> `<button type="button" role="tab" aria-selected="${coachView.filter===k}" class="chip-btn${coachView.filter===k?' active':''}" data-cfilter="${k}">${l} <span class="chip-n">${n}</span></button>`).join('')}</div>
+    <div class="coach-tools-row">
+      <label class="search-box"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="6"/><path d="M20 20l-4-4"/></svg><span class="sr-only">Buscar aluno</span><input type="search" id="coachSearch" placeholder="Buscar aluno" value="${escapeAttr(coachView.q)}" autocomplete="off"></label>
+      <label class="coach-sort"><span class="sr-only">Ordenar</span><select id="coachSort">
+        ${[['name','Nome (A–Z)'],['stale','Parados primeiro'],['active','Mais ativos primeiro']].map(([k,l])=> `<option value="${k}" ${coachView.sort===k?'selected':''}>${l}</option>`).join('')}
+      </select></label>
+    </div>`;
+}
+function renderStudentRows(){
+  if(coachStudents.length===0){
     studentsList.innerHTML = `<div class="empty"><strong>Nenhum aluno ainda</strong>Adicione o primeiro aluno para gerar o código dele.</div>`;
     return;
   }
-  studentsList.innerHTML = students.map(s=> `
-    <div class="student-row${s.name?'':' student-row-unclaimed'}">
-      <div>
+  const q = coachView.q.trim().toLowerCase();
+  let rows = coachStudents.filter(s=>{
+    if(q && !(s.name||'').toLowerCase().includes(q) && !s.code.toLowerCase().includes(q)) return false;
+    if(coachView.filter==='stale') return isStale(s);
+    if(coachView.filter==='drops') return s.name && (s.loadDrops||[]).length;
+    if(coachView.filter==='records') return s.name && (s.records30||[]).length;
+    return true;
+  });
+  const lastKey = s=> s.lastTrainedAt || '0000-00-00';
+  if(coachView.sort==='stale') rows.sort((a,b)=> lastKey(a).localeCompare(lastKey(b)) || (a.name||'').localeCompare(b.name||'','pt-BR'));
+  else if(coachView.sort==='active') rows.sort((a,b)=> (b.done28||0)-(a.done28||0) || (a.name||'').localeCompare(b.name||'','pt-BR'));
+  else rows.sort((a,b)=> (a.name?0:1)-(b.name?0:1) || (a.name||'').localeCompare(b.name||'','pt-BR'));
+  if(rows.length===0){ studentsList.innerHTML = `<div class="empty">Nenhum aluno neste filtro.</div>`; return; }
+  studentsList.innerHTML = rows.map(s=>{
+    const stale = isStale(s);
+    const badges = [];
+    if(s.name && stale) badges.push(`<span class="badge badge-warn">${s.lastTrainedAt ? `Parado há ${daysSince(s.lastTrainedAt)} dias` : 'Ainda não treinou'}</span>`);
+    if((s.records30||[]).length) badges.push(`<span class="badge badge-ok" title="${escapeAttr(s.records30.join(', '))}">🏆 ${s.records30.length} ${s.records30.length===1?'recorde':'recordes'}</span>`);
+    if((s.loadDrops||[]).length) badges.push(`<span class="badge badge-bad" title="${escapeAttr(s.loadDrops.join(', '))}">▼ Carga caindo: ${escapeHtml(s.loadDrops.slice(0,2).join(', '))}${s.loadDrops.length>2?'…':''}</span>`);
+    const freq = s.name ? `${s.weekDone}${s.weekPlanned?'/'+s.weekPlanned:''} ${s.weekPlanned? 'treinos na semana' : (s.weekDone===1?'treino nesta semana':'treinos nesta semana')} · ${s.done28} nos últimos 28 dias` : '';
+    return `<div class="student-row${s.name?'':' student-row-unclaimed'}">
+      <div class="srow-main">
         <div class="sname">${s.name ? escapeHtml(s.name) : '— aguardando aluno —'}${s.locked ? ' <span title="Aparelho travado" style="opacity:.7;">🔒</span>' : ''}</div>
         <div class="scode">${escapeHtml(s.code)}</div>
         ${s.unlockRequested ? '<div class="sactivity" style="color:var(--accent-text);font-weight:700;">🔔 pediu liberação do aparelho</div>' : ''}
-        ${activityLabel(s) ? `<div class="sactivity${s.lastTrainedAt && daysSince(s.lastTrainedAt)>7 ? ' stale' : ''}">${activityLabel(s)}</div>` : ''}
+        ${s.name ? `<div class="sactivity">${s.lastTrainedAt ? activityLabel(s).split(' · ')[0] : ''}${freq ? (s.lastTrainedAt?' · ':'')+freq : ''}</div>` : ''}
+        ${badges.length ? `<div class="sbadges">${badges.join('')}</div>` : ''}
       </div>
       <div class="student-actions">
-        ${s.name ? `<button class="small" data-viewstudent="${s.id}">Ver treino</button>` : ''}
+        ${s.name ? `<button class="small" data-viewstudent="${s.id}">Ver treino</button><button class="ghost small" data-assess="${s.id}" title="Avaliação física">📏 Avaliação</button>` : ''}
         ${auth.role==='admin' ? `<button class="ghost small energy-toggle${s.energy?' on':''}" data-energystudent="${s.id}" data-on="${s.energyOwn?1:0}" ${s.energy && !s.energyOwn ? 'disabled title="Ligado para todos os alunos deste professor"' : `title="${s.energy?'Gráfico de kcal ligado — clique para desligar':'Ligar gráfico de kcal para este aluno'}"`}>🔥</button>` : ''}
         ${s.phone ? `<a class="ghost small" href="${whatsappLink(s.phone, s.name)}" target="_blank" rel="noopener" title="Chamar no WhatsApp">💬</a>` : ''}
         ${s.locked ? `<button class="ghost small" data-unlockstudent="${s.id}" title="Liberar aparelho">🔓</button>` : ''}
@@ -492,8 +548,294 @@ async function renderProfessorDashboard(){
         <button class="ghost small" data-renamestudent="${s.id}" data-name="${escapeAttr(s.name)}" title="Renomear">✎</button>
         <button class="ghost small" data-delstudent="${s.id}" data-name="${escapeAttr(s.name)}" title="Remover aluno">✕</button>
       </div>
-    </div>`).join('');
+    </div>`;
+  }).join('');
 }
+async function renderProfessorDashboard(){
+  studentsList.innerHTML = `<div class="empty">Carregando…</div>`;
+  renderVideoManager(document.getElementById('profVideos'), 'professor');
+  renderAnnouncementManager(document.getElementById('profAnnouncements'));
+  renderTemplateManager(document.getElementById('profTemplates'));
+  coachStudents = await loadStudents();
+  renderCoachSummary();
+  renderStudentRows();
+}
+document.getElementById('coachTools').addEventListener('click', e=>{
+  const f = e.target.closest('[data-cfilter]');
+  if(f){ coachView.filter = f.dataset.cfilter; renderCoachSummary(); renderStudentRows(); }
+});
+document.getElementById('coachTools').addEventListener('input', e=>{
+  if(e.target.id==='coachSearch'){ coachView.q = e.target.value; renderStudentRows(); }
+});
+document.getElementById('coachTools').addEventListener('change', e=>{
+  if(e.target.id==='coachSort'){ coachView.sort = e.target.value; renderStudentRows(); }
+});
+
+/* ---------- Avisos do professor ---------- */
+const fmtWhen = iso=>{ const d = new Date(iso); return isNaN(d) ? '' : d.toLocaleDateString('pt-BR', {day:'2-digit', month:'2-digit'}); };
+async function renderAnnouncementManager(container){
+  container.innerHTML = `<div class="empty">Carregando…</div>`;
+  let list = [];
+  try{
+    const res = await fetch('/api/professor/announcements', { headers: apiHeaders() });
+    if(!res.ok) throw new Error('bad status');
+    list = await res.json();
+  }catch(e){ container.innerHTML = `<div class="empty">Não consegui carregar os avisos agora.</div>`; return; }
+  const named = coachStudents.filter(s=> s.name);
+  container.innerHTML = `
+    <form class="ann-form" novalidate>
+      <label class="vf-field"><span>Título</span><input name="title" maxlength="80" placeholder="Ex.: Academia fechada na segunda" autocomplete="off"></label>
+      <label class="vf-field"><span>Mensagem</span><textarea name="body" rows="3" maxlength="1000" placeholder="Escreva o recado para os alunos"></textarea></label>
+      <fieldset class="ann-aud"><legend>Para quem?</legend>
+        <label class="af-check"><input type="radio" name="aud" value="all" checked> Todos os meus alunos</label>
+        <label class="af-check"><input type="radio" name="aud" value="some" ${named.length?'':'disabled'}> Só alguns alunos</label>
+        <div class="ann-pick" hidden>${named.map(s=> `<label class="af-check"><input type="checkbox" name="stu" value="${escapeAttr(s.id)}"> ${escapeHtml(s.name)}</label>`).join('')}</div>
+      </fieldset>
+      <div class="vf-msg" role="alert"></div>
+      <button type="submit" class="primary">Publicar aviso</button>
+    </form>
+    <p class="hint vf-hint">O aviso aparece na tela Início do aluno por 45 dias. O aluno pode dispensar.</p>
+    ${list.length ? `<div class="ann-list">${list.map(a=> `<div class="ann-item">
+      <div class="ann-main"><div class="ann-title">${escapeHtml(a.title)}</div><div class="ann-body">${escapeHtml(a.body)}</div>
+        <div class="mitem-sub">${fmtWhen(a.createdAt)} · ${a.studentIds ? `${a.studentIds.length} ${a.studentIds.length===1?'aluno':'alunos'}` : 'todos os alunos'}</div></div>
+      <button type="button" class="ghost small" data-annrm="${escapeAttr(a.id)}">Remover</button></div>`).join('')}</div>` : ''}`;
+  const form = container.querySelector('form'), pick = container.querySelector('.ann-pick'), msg = container.querySelector('.vf-msg');
+  form.addEventListener('change', e=>{ if(e.target.name==='aud') pick.hidden = e.target.value!=='some'; });
+  form.addEventListener('submit', async e=>{
+    e.preventDefault();
+    const title = form.title.value.trim(), body = form.body.value.trim();
+    if(!title || !body){ msg.textContent = 'Preencha o título e a mensagem.'; return; }
+    const payload = { title, body };
+    if(form.aud.value==='some'){
+      payload.studentIds = [...form.querySelectorAll('[name=stu]:checked')].map(i=> i.value);
+      if(!payload.studentIds.length){ msg.textContent = 'Marque pelo menos um aluno.'; return; }
+    }
+    try{
+      const res = await fetch('/api/professor/announcements', { method:'POST', headers: apiHeaders({'Content-Type':'application/json'}), body: JSON.stringify(payload) });
+      if(!res.ok) throw new Error(res.status);
+      showToast('Aviso publicado!');
+      renderAnnouncementManager(container);
+    }catch(err){ msg.textContent = 'Não consegui publicar agora. Tente de novo.'; }
+  });
+  container.onclick = async e=>{
+    const rm = e.target.closest('[data-annrm]');
+    if(!rm) return;
+    if(!(await confirmDialog('Remover este aviso? Os alunos deixam de vê-lo.'))) return;
+    const res = await fetch(`/api/professor/announcements/${rm.dataset.annrm}`, { method:'DELETE', headers: apiHeaders() });
+    if(!res.ok){ alert('Não consegui remover o aviso.'); return; }
+    renderAnnouncementManager(container);
+  };
+}
+
+/* Avisos no lado do aluno (Início). Dispensar guarda o id neste aparelho. */
+let annList = [];
+const annKey = ()=> 'sobrecarga_ann_dismissed_' + (activeStudentId() || 'x');
+function dismissedAnn(){ try{ return JSON.parse(localStorage.getItem(annKey())) || []; }catch(e){ return []; } }
+function visibleAnnouncements(){ const d = new Set(dismissedAnn()); return annList.filter(a=> !d.has(a.id)); }
+function announcementsHtml(){
+  const v = visibleAnnouncements();
+  if(!v.length) return '';
+  return `<section class="ann-student" aria-label="Avisos do professor">${v.map(a=> `<div class="ann-card">
+    <span class="micon-tile">${ICONS.bell}</span>
+    <div class="ann-main"><div class="ann-title">${escapeHtml(a.title)}</div><div class="ann-body">${escapeHtml(a.body)}</div><div class="mitem-sub">Aviso do professor · ${fmtWhen(a.createdAt)}</div></div>
+    <button type="button" class="ann-x" data-anndismiss="${escapeAttr(a.id)}" aria-label="Dispensar aviso">✕</button></div>`).join('')}</section>`;
+}
+function renderAnnouncements(){
+  const el = document.getElementById('studentAnnouncements');
+  if(el) el.innerHTML = READONLY ? '' : announcementsHtml();
+}
+async function loadAnnouncements(){
+  const sid = activeStudentId();
+  if(!sid || READONLY) return;
+  try{
+    const res = await fetch(`/api/announcements/${sid}`, { headers: apiHeaders() });
+    if(!res.ok) return;
+    const list = await res.json();
+    if(sid!==activeStudentId() || !Array.isArray(list)) return;
+    annList = list;
+    renderAll();
+  }catch(e){}
+}
+document.addEventListener('click', e=>{
+  const x = e.target.closest('[data-anndismiss]');
+  if(!x) return;
+  const d = dismissedAnn(); d.push(x.dataset.anndismiss);
+  try{ localStorage.setItem(annKey(), JSON.stringify(d.slice(-100))); }catch(err){}
+  renderAll();
+});
+
+/* ---------- Modelos de treino (montar a ficha e enviar pra vários alunos) ---------- */
+const WEEKDAYS = ['Segunda','Terça','Quarta','Quinta','Sexta','Sábado','Domingo'];
+const tplCounts = t=> ({ days: t.days.length, ex: t.days.reduce((n,d)=> n+d.exercises.length, 0) });
+async function renderTemplateManager(container){
+  container.innerHTML = `<div class="empty">Carregando…</div>`;
+  let list = [];
+  try{
+    const res = await fetch('/api/professor/templates', { headers: apiHeaders() });
+    if(!res.ok) throw new Error('bad status');
+    list = await res.json();
+  }catch(e){ container.innerHTML = `<div class="empty">Não consegui carregar os modelos agora.</div>`; return; }
+  container.innerHTML = `
+    <div class="tpl-top"><p class="hint" style="margin:0;">Monte a divisão de treino uma vez e envie para quantos alunos quiser. Cada aluno recebe um protocolo novo, com as semanas já criadas.</p>
+      <button type="button" class="primary" data-tpl="new">+ Novo modelo</button></div>
+    ${list.length ? `<div class="tpl-grid">${list.map(t=>{ const c = tplCounts(t); return `<div class="tpl-card">
+      <div class="tpl-name">${escapeHtml(t.name)}</div>
+      <div class="mitem-sub">${plural(c.days,'treino','treinos')} por semana · ${plural(c.ex,'exercício','exercícios')} · ${plural(t.weeks,'semana','semanas')}</div>
+      <div class="tpl-actions"><button type="button" class="small primary" data-tpl="send" data-id="${escapeAttr(t.id)}">Enviar para alunos</button>
+        <button type="button" class="small ghost" data-tpl="edit" data-id="${escapeAttr(t.id)}">Editar</button>
+        <button type="button" class="small ghost" data-tpl="del" data-id="${escapeAttr(t.id)}" data-name="${escapeAttr(t.name)}">Excluir</button></div></div>`; }).join('')}</div>`
+    : `<div class="empty"><strong>Nenhum modelo ainda</strong>Crie o primeiro: dias da semana, exercícios, séries e alvo de repetições.</div>`}`;
+  container.onclick = async e=>{
+    const b = e.target.closest('[data-tpl]');
+    if(!b) return;
+    const t = list.find(x=> x.id===b.dataset.id);
+    if(b.dataset.tpl==='new') openTemplateEditor(null, ()=> renderTemplateManager(container));
+    else if(b.dataset.tpl==='edit' && t) openTemplateEditor(t, ()=> renderTemplateManager(container));
+    else if(b.dataset.tpl==='send' && t) openSendTemplate(t);
+    else if(b.dataset.tpl==='del'){
+      if(!(await confirmDialog(`Excluir o modelo "${b.dataset.name}"? As fichas que já foram enviadas não mudam.`))) return;
+      const res = await fetch(`/api/professor/templates/${b.dataset.id}`, { method:'DELETE', headers: apiHeaders() });
+      if(!res.ok){ alert('Não consegui excluir o modelo.'); return; }
+      renderTemplateManager(container);
+    }
+  };
+}
+// O modelo guardado tem a lista de séries; no editor cada exercício é "N séries · alvo · carga".
+function tplToEditor(t){
+  return { id: t ? t.id : null, name: t ? t.name : '', weeks: t ? t.weeks : 4,
+    days: t ? t.days.map(d=> ({ name: d.name, offset: d.offset, exercises: d.exercises.map(e=> ({ name: e.name, sets: e.sets.length, target: (e.sets[0]||{}).target || '', weight: (e.sets[0]||{}).weight || '' })) }))
+            : [{ name: 'Treino A', offset: 0, exercises: [{ name: '', sets: 3, target: '8 a 12', weight: '' }] }] };
+}
+function editorToTpl(ed){
+  const firstInt = s=>{ const m = String(s).match(/\d+/); return m ? Math.min(100, +m[0]) : 10; };
+  return { name: ed.name, weeks: ed.weeks, days: ed.days.map(d=> ({ name: d.name, offset: d.offset,
+    exercises: d.exercises.filter(e=> e.name.trim()).map(e=> ({ name: e.name,
+      sets: Array.from({length: Math.max(1, Math.min(12, parseInt(e.sets,10)||1))}, ()=> ({ reps: firstInt(e.target), target: e.target, weight: e.weight })) })) })) };
+}
+function openTemplateEditor(tpl, onSaved){
+  fillExerciseDatalist();
+  const ed = tplToEditor(tpl);
+  const overlay = document.createElement('div');
+  overlay.className = 'af-overlay';
+  overlay.innerHTML = `<div class="af-box" role="dialog" aria-modal="true" aria-label="Modelo de treino">
+    <div class="af-head"><div><div class="overline">Modelo de treino</div><h2 class="af-title">${tpl ? 'Editar modelo' : 'Novo modelo'}</h2></div><button type="button" class="af-close" aria-label="Fechar">✕</button></div>
+    <div class="af-body"></div></div>`;
+  document.body.appendChild(overlay);
+  const body = overlay.querySelector('.af-body');
+  const close = ()=>{ overlay.remove(); document.removeEventListener('keydown', onKey); };
+  const onKey = e=>{ if(e.key==='Escape') close(); };
+  document.addEventListener('keydown', onKey);
+  overlay.addEventListener('click', e=>{ if(e.target===overlay || e.target.closest('.af-close')) close(); });
+  function draw(){
+    body.innerHTML = `<form class="af-form" novalidate>
+      <section class="af-section"><div class="af-row3">
+        <label class="vf-field"><span>Nome do modelo</span><input data-p="name" value="${escapeAttr(ed.name)}" maxlength="60" placeholder="Ex.: Hipertrofia ABC" autocomplete="off"></label>
+        <label class="vf-field"><span>Duração (semanas)</span><input data-p="weeks" type="number" min="1" max="52" value="${ed.weeks}" inputmode="numeric"></label>
+      </div></section>
+      ${ed.days.map((d,di)=> `<section class="af-section tpl-day">
+        <div class="tpl-day-head">
+          <label class="vf-field"><span>Treino</span><input data-p="days.${di}.name" value="${escapeAttr(d.name)}" maxlength="60" autocomplete="off"></label>
+          <label class="vf-field"><span>Dia da semana</span><select data-p="days.${di}.offset">${WEEKDAYS.map((w,i)=> `<option value="${i}" ${d.offset===i?'selected':''}>${w}</option>`).join('')}</select></label>
+          ${ed.days.length>1 ? `<button type="button" class="ghost small" data-ted="rmday" data-di="${di}">Remover treino</button>` : ''}
+        </div>
+        <div class="tpl-ex-head" aria-hidden="true"><span>Exercício</span><span>Séries</span><span>Alvo de reps</span><span>Carga (kg)</span><span></span></div>
+        ${d.exercises.map((e,ei)=> `<div class="tpl-ex">
+          <input data-p="days.${di}.exercises.${ei}.name" list="exerciseNameList" value="${escapeAttr(e.name)}" placeholder="Exercício" maxlength="80" aria-label="Exercício" autocomplete="off">
+          <input data-p="days.${di}.exercises.${ei}.sets" type="number" min="1" max="12" value="${escapeAttr(e.sets)}" inputmode="numeric" aria-label="Séries">
+          <input data-p="days.${di}.exercises.${ei}.target" value="${escapeAttr(e.target)}" maxlength="20" placeholder="8 a 12" aria-label="Alvo de repetições" autocomplete="off">
+          <input data-p="days.${di}.exercises.${ei}.weight" value="${escapeAttr(e.weight)}" inputmode="decimal" placeholder="opcional" aria-label="Carga sugerida" autocomplete="off">
+          <button type="button" class="micon-btn" data-ted="rmex" data-di="${di}" data-ei="${ei}" aria-label="Remover exercício">✕</button></div>`).join('')}
+        <button type="button" class="ghost small" data-ted="addex" data-di="${di}">+ exercício</button>
+      </section>`).join('')}
+      <div class="af-actions"><button type="button" class="ghost" data-ted="addday">+ Outro treino</button></div>
+      <div class="vf-msg" role="alert"></div>
+      <div class="af-actions"><button type="submit" class="primary">Salvar modelo</button><button type="button" class="ghost" data-ted="cancel">Cancelar</button></div>
+    </form>`;
+  }
+  draw();
+  const setPath = (path, val)=>{
+    const parts = path.split('.'); let o = ed;
+    for(let i=0;i<parts.length-1;i++) o = o[parts[i]];
+    const k = parts[parts.length-1];
+    o[k] = (k==='offset' || k==='weeks') ? (parseInt(val,10) || 0) : val;
+  };
+  body.addEventListener('input', e=>{ if(e.target.dataset.p) setPath(e.target.dataset.p, e.target.value); });
+  body.addEventListener('change', e=>{ if(e.target.dataset.p) setPath(e.target.dataset.p, e.target.value); });
+  body.addEventListener('click', e=>{
+    const b = e.target.closest('[data-ted]');
+    if(!b) return;
+    const a = b.dataset.ted, di = +b.dataset.di, ei = +b.dataset.ei;
+    if(a==='addday'){ ed.days.push({ name: 'Treino '+String.fromCharCode(65+Math.min(25, ed.days.length)), offset: Math.min(6, ed.days.length*2), exercises: [{ name:'', sets:3, target:'8 a 12', weight:'' }] }); draw(); }
+    else if(a==='rmday'){ ed.days.splice(di,1); draw(); }
+    else if(a==='addex'){ const prev = ed.days[di].exercises.slice(-1)[0]; ed.days[di].exercises.push({ name:'', sets: prev?prev.sets:3, target: prev?prev.target:'8 a 12', weight:'' }); draw(); const ins = body.querySelectorAll('.tpl-day')[di].querySelectorAll('.tpl-ex'); ins[ins.length-1].querySelector('input').focus(); }
+    else if(a==='rmex'){ ed.days[di].exercises.splice(ei,1); draw(); }
+    else if(a==='cancel'){ close(); }
+  });
+  body.addEventListener('submit', async e=>{
+    e.preventDefault();
+    const msg = body.querySelector('.vf-msg');
+    if(!ed.name.trim()){ msg.textContent = 'Dê um nome ao modelo.'; return; }
+    const payload = editorToTpl(ed);
+    if(!payload.days.some(d=> d.exercises.length)){ msg.textContent = 'Adicione pelo menos um exercício com nome.'; return; }
+    try{
+      const res = await fetch(`/api/professor/templates${ed.id ? '/'+ed.id : ''}`, { method: ed.id ? 'PUT' : 'POST', headers: apiHeaders({'Content-Type':'application/json'}), body: JSON.stringify(payload) });
+      if(!res.ok) throw new Error(res.status);
+      showToast('Modelo salvo!');
+      close(); onSaved && onSaved();
+    }catch(err){ msg.textContent = 'Não consegui salvar agora. Tente de novo.'; }
+  });
+}
+function nextMondayISO(){
+  const d = new Date(todayISO()+'T00:00:00');
+  const dow = d.getDay();
+  d.setDate(d.getDate() + (dow===1 ? 0 : (8-dow)%7 || 7));
+  return d.toISOString().slice(0,10);
+}
+async function openSendTemplate(tpl){
+  const students = (coachStudents.length ? coachStudents : await loadStudents()).filter(s=> s.name);
+  const overlay = document.createElement('div');
+  overlay.className = 'af-overlay';
+  overlay.innerHTML = `<div class="af-box af-box-sm" role="dialog" aria-modal="true" aria-label="Enviar modelo">
+    <div class="af-head"><div><div class="overline">Enviar modelo</div><h2 class="af-title">${escapeHtml(tpl.name)}</h2></div><button type="button" class="af-close" aria-label="Fechar">✕</button></div>
+    <div class="af-body"><form class="af-form" novalidate>
+      ${students.length ? `
+      <section class="af-section"><div class="af-row3">
+        <label class="vf-field"><span>Semana de início</span><input type="date" name="start" value="${nextMondayISO()}"></label>
+        <label class="vf-field"><span>Duração (semanas)</span><input type="number" name="weeks" min="1" max="52" value="${tpl.weeks}" inputmode="numeric"></label>
+      </div><p class="dim af-help">Os treinos caem nos dias da semana do modelo, a partir da semana da data escolhida.</p></section>
+      <section class="af-section"><div class="msec-head"><h3 style="margin:0;">Alunos</h3><button type="button" class="mlink" data-send="all">Marcar todos</button></div>
+        <div class="send-list">${students.map(s=> `<label class="af-check"><input type="checkbox" name="stu" value="${escapeAttr(s.id)}"> ${escapeHtml(s.name)}</label>`).join('')}</div></section>
+      <div class="vf-msg" role="alert"></div>
+      <div class="af-actions"><button type="submit" class="primary">Enviar modelo</button><button type="button" class="ghost" data-send="cancel">Cancelar</button></div>`
+      : '<div class="empty"><strong>Nenhum aluno com nome ainda</strong>Cadastre alunos antes de enviar o modelo.</div>'}
+    </form></div></div>`;
+  document.body.appendChild(overlay);
+  const close = ()=>{ overlay.remove(); document.removeEventListener('keydown', onKey); };
+  const onKey = e=>{ if(e.key==='Escape') close(); };
+  document.addEventListener('keydown', onKey);
+  overlay.addEventListener('click', async e=>{
+    if(e.target===overlay || e.target.closest('.af-close') || e.target.closest('[data-send=cancel]')) return close();
+    if(e.target.closest('[data-send=all]')){ const boxes = [...overlay.querySelectorAll('[name=stu]')]; const all = boxes.every(b=> b.checked); boxes.forEach(b=> b.checked = !all); }
+  });
+  const form = overlay.querySelector('form');
+  form.addEventListener('submit', async e=>{
+    e.preventDefault();
+    const msg = form.querySelector('.vf-msg');
+    const ids = [...form.querySelectorAll('[name=stu]:checked')].map(i=> i.value);
+    if(!ids.length){ msg.textContent = 'Marque pelo menos um aluno.'; return; }
+    if(!form.start.value){ msg.textContent = 'Escolha a semana de início.'; return; }
+    const btn = form.querySelector('button[type=submit]'); btn.disabled = true;
+    try{
+      const res = await fetch(`/api/professor/templates/${tpl.id}/send`, { method:'POST', headers: apiHeaders({'Content-Type':'application/json'}), body: JSON.stringify({ studentIds: ids, startDate: form.start.value, weeks: parseInt(form.weeks.value,10) || tpl.weeks }) });
+      if(!res.ok) throw new Error(res.status);
+      const r = await res.json();
+      close();
+      showToast(`Modelo enviado para ${plural(r.sent.length,'aluno','alunos')}${r.skipped.length ? ` (${r.skipped.length} sem espaço na ficha)` : ''}.`);
+      renderProfessorDashboard();
+    }catch(err){ msg.textContent = 'Não consegui enviar agora. Tente de novo.'; btn.disabled = false; }
+  });
+}
+
 function showCodesModal(title, codes){
   const overlay = document.createElement('div');
   overlay.className = 'confirm-overlay';
@@ -536,6 +878,8 @@ document.getElementById('addStudentBtn').addEventListener('click', async ()=>{
 studentsList.addEventListener('click', async e=>{
   const view = e.target.closest('[data-viewstudent]');
   if(view){ currentStudentId = view.dataset.viewstudent; boot(); return; }
+  const assess = e.target.closest('[data-assess]');
+  if(assess){ openAssessment(assess.dataset.assess, true); return; }
   const rename = e.target.closest('[data-renamestudent]');
   if(rename){
     const novo = prompt('Novo nome do aluno:', rename.dataset.name);
@@ -665,6 +1009,7 @@ async function loadRemote(){
     const res = await fetch(`/api/state/${sid}`, { headers: apiHeaders() });
     if(!res.ok) throw new Error('bad status');
     const data = await res.json();
+    if(READONLY) stateVersion = res.headers.get('x-state-version');
     if(!(data && Array.isArray(data.sessions))){ setSyncStatus('synced'); return; }
     if(!Array.isArray(data.protocols)) data.protocols = [];
 
@@ -708,12 +1053,22 @@ async function syncRemote(){
   const seqAtSend = saveSeq;
   try{
     setSyncStatus('syncing');
+    // Professor/admin só grava se o aluno não mexeu na ficha desde que ela foi carregada.
+    const extra = {'Content-Type':'application/json'};
+    if(READONLY && stateVersion) extra['x-if-version'] = stateVersion;
     const res = await fetch(`/api/state/${sid}`, {
       method: 'PUT',
-      headers: apiHeaders({'Content-Type':'application/json'}),
+      headers: apiHeaders(extra),
       body: JSON.stringify(state)
     });
+    if(res.status===409 && READONLY){
+      hasPendingSave = false; clearDirty();
+      alert('O aluno acabou de salvar o treino dele, então recarreguei a ficha para não apagar nada. Refaça a sua alteração.');
+      await loadRemote();
+      return;
+    }
     if(!res.ok) throw new Error('bad status');
+    if(READONLY){ try{ const j = await res.json(); if(j && j.version) stateVersion = j.version; }catch(e){} }
     // Só considera enviado se não houve edição nova durante o envio.
     if(seqAtSend === saveSeq){ hasPendingSave = false; clearDirty(); }
     setSyncStatus('synced');
@@ -1614,11 +1969,11 @@ function renderSessions(){
     protEl.innerHTML = `
       <div class="protocol-head" data-protocol="${block.key}">
         <span class="chev">›</span>
-        ${READONLY
+        ${LOCKED()
           ? `<span class="protocol-name">${escapeHtml(block.name)}</span>`
           : `<input class="protocol-name" data-protname="${block.key}" value="${escapeAttr(block.name)}">`}
         <span class="group-meta">${meta}</span>
-        ${READONLY ? '' : `<button class="ghost small repeat" data-addweek="${block.key}" title="Repetir a divisão de treino em mais uma semana">+ semana</button>`}
+        ${LOCKED() ? '' : `<button class="ghost small repeat" data-addweek="${block.key}" title="Repetir a divisão de treino em mais uma semana">+ semana</button>`}
       </div>
       <div class="protocol-body"></div>`;
     sessionsList.appendChild(protEl);
@@ -1689,8 +2044,8 @@ function renderWeekGroups(container, weeks, weekNumber){
         <div class="session-head" data-open="${session.id}">
           <span class="session-name">${escapeHtml(session.name)} ${session.feedback?'<span class="feedback-flag" title="Tem feedback do professor">💬</span>':''}</span>
           <div style="display:flex;align-items:center;gap:4px;">
-            ${READONLY ? '' : `<button class="ghost small repeat" data-repeatsession="${session.id}" title="Repetir esta sessão daqui a 7 dias">⟳</button>`}
-            ${READONLY ? '' : `<button class="ghost small" data-quickdel="${session.id}" title="Excluir sessão">✕</button>`}
+            ${LOCKED() ? '' : `<button class="ghost small repeat" data-repeatsession="${session.id}" title="Repetir esta sessão daqui a 7 dias">⟳</button>`}
+            ${LOCKED() ? '' : `<button class="ghost small" data-quickdel="${session.id}" title="Excluir sessão">✕</button>`}
             <span class="chev">›</span>
           </div>
         </div>
@@ -1727,7 +2082,7 @@ function wireFeedbackBlock(container, session){
 }
 
 function renderSessionBody(container, session){
-  const ro = READONLY;
+  const ro = LOCKED();
   const roAttr = ro ? 'disabled' : '';
   container.innerHTML = `
     <div class="row-fields" style="grid-template-columns:1fr 160px 90px;">
@@ -2232,6 +2587,257 @@ async function loadFeatures(){
   }catch(e){}
 }
 
+/* ---------- Avaliação física ----------
+   Anamnese + avaliações datadas (medidas, dobras, fotos por link). O professor
+   cadastra; o aluno vê a própria evolução. As contas (IMC e % de gordura por
+   Pollock 7 dobras + Siri) vêm de lib/assessment.js — a mesma que o servidor
+   usa para recalcular o que fica salvo. */
+const AF = window.Assessment;
+const fmtN = (v, d)=> v==null ? '—' : Number(v).toLocaleString('pt-BR', {minimumFractionDigits:0, maximumFractionDigits: d==null ? 1 : d});
+const imcBadge = c=> c ? `<span class="badge ${c==='Peso normal'?'badge-ok':(c==='Abaixo do peso'||c==='Sobrepeso')?'badge-warn':'badge-bad'}">${escapeHtml(c)}</span>` : '';
+
+// Gráfico de linha em SVG (sem biblioteca); usa as cores do tema.
+function lineChartHtml(title, unit, points){
+  if(points.length<2) return '';
+  const W=400,H=170,PX=38,PT=14,PB=26;
+  const vals = points.map(p=> p.value);
+  const min = Math.min(...vals), max = Math.max(...vals);
+  const pad = (max-min || 1)*0.2, lo = min-pad, hi = max+pad;
+  const x = i=> PX + (i*(W-PX-12))/(points.length-1);
+  const y = v=> PT + ((hi-v)/(hi-lo))*(H-PT-PB);
+  const path = points.map((p,i)=> `${i?'L':'M'}${x(i).toFixed(1)},${y(p.value).toFixed(1)}`).join(' ');
+  const ticks = [lo+pad, (min+max)/2, hi-pad];
+  const alt = `${title}: ${points.map(p=> `${p.label} ${fmtN(p.value)}${unit}`).join(', ')}`;
+  return `<figure class="af-chart"><figcaption>${escapeHtml(title)} <span class="dim">(${escapeHtml(unit)})</span></figcaption>
+    <svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${escapeAttr(alt)}">
+      ${ticks.map(t=> `<line x1="${PX}" x2="${W-12}" y1="${y(t).toFixed(1)}" y2="${y(t).toFixed(1)}" class="af-grid"/><text x="${PX-6}" y="${(y(t)+4).toFixed(1)}" text-anchor="end" class="af-tick">${fmtN(t)}</text>`).join('')}
+      <path d="${path}" fill="none" class="af-line"/>
+      ${points.map((p,i)=> `<circle cx="${x(i).toFixed(1)}" cy="${y(p.value).toFixed(1)}" r="4" class="af-dot"/><text x="${x(i).toFixed(1)}" y="${H-8}" text-anchor="${i===0?'start':i===points.length-1?'end':'middle'}" class="af-tick">${escapeHtml(p.label)}</text>`).join('')}
+    </svg></figure>`;
+}
+const shortBR = iso=> `${iso.slice(8,10)}/${iso.slice(5,7)}`;
+
+function assessmentDetailsHtml(a){
+  const rows = [];
+  const add = (label, v, unit)=>{ if(v!=null) rows.push(`<div><dt>${escapeHtml(label)}</dt><dd>${fmtN(v,2)}${unit?' '+unit:''}</dd></div>`); };
+  add('Altura', a.altura, 'm'); add('Massa gorda', a.massaGorda, 'kg'); add('Massa magra', a.massaMagra, 'kg');
+  const c = a.circunferencias || {};
+  AF.CIRC.forEach(([k,l])=> add(l, c[k], 'cm'));
+  AF.CIRC_LR.forEach(([k,l])=>{ const v = c[k] || {}; if(v.esquerdo!=null || v.direito!=null) rows.push(`<div><dt>${escapeHtml(l)} (esq. / dir.)</dt><dd>${fmtN(v.esquerdo,2)} / ${fmtN(v.direito,2)} cm</dd></div>`); });
+  AF.DOBRAS.forEach(([k,l])=> add('Dobra '+l.toLowerCase(), (a.dobras||{})[k], 'mm'));
+  // Fotos são só links (a CSP do app não carrega imagem de outro site).
+  const photos = AF.FOTOS.filter(([k])=> (a.fotos||{})[k]).map(([k,l])=> `<a href="${escapeAttr(a.fotos[k])}" target="_blank" rel="noopener noreferrer">${escapeHtml(l)}</a>`);
+  return `${rows.length ? `<dl class="af-dl">${rows.join('')}</dl>` : ''}
+    ${photos.length ? `<div class="af-photos"><span class="dim">Fotos:</span> ${photos.join(' · ')}</div>` : ''}
+    ${a.observacoes ? `<p class="af-obs">${escapeHtml(a.observacoes)}</p>` : ''}`;
+}
+
+function anamneseHtml(p){
+  if(!p) return '<div class="empty">Anamnese ainda não preenchida.</div>';
+  const yn = (v, d)=> v ? `Sim${d ? ' — '+escapeHtml(d) : ''}` : 'Não';
+  const items = [];
+  items.push(['Idade', p.idade!=null ? p.idade+' anos' : '—'], ['Sexo', p.sexo ? (p.sexo==='masculino'?'Masculino':'Feminino') : '—']);
+  AF.TEXT_FIELDS.forEach(([k,l])=> items.push([l.replace('?',''), p[k] ? escapeHtml(p[k]) : '—']));
+  items.push(['Frequência semanal', p.frequenciaSemanal ? p.frequenciaSemanal+'x' : '—']);
+  AF.YES_NO.forEach(([k,l])=> items.push([l.replace('?',''), yn(p[k])]));
+  AF.YES_NO_DETAIL.forEach(([k,d,l])=> items.push([l.replace('?',''), yn(p[k], p[d])]));
+  return `<dl class="af-dl af-anam">${items.map(([q,a])=> `<div><dt>${escapeHtml(q)}</dt><dd>${a}</dd></div>`).join('')}</dl>`;
+}
+
+async function openAssessment(studentId, canEdit){
+  if(!studentId || !AF){ showToast('Não consegui abrir a avaliação agora.'); return; }
+  const overlay = document.createElement('div');
+  overlay.className = 'af-overlay';
+  overlay.innerHTML = `<div class="af-box" role="dialog" aria-modal="true" aria-label="Avaliação física">
+    <div class="af-head"><div><div class="overline">Avaliação física</div><h2 class="af-title">Carregando…</h2></div>
+    <button type="button" class="af-close" aria-label="Fechar">✕</button></div>
+    <div class="af-body"><div class="empty">Carregando…</div></div></div>`;
+  document.body.appendChild(overlay);
+  const body = overlay.querySelector('.af-body'), titleEl = overlay.querySelector('.af-title');
+  let data = null, view = {name:'summary'};
+  const close = ()=>{ overlay.remove(); document.removeEventListener('keydown', onKey); };
+  const onKey = e=>{ if(e.key==='Escape') close(); };
+  document.addEventListener('keydown', onKey);
+  overlay.addEventListener('click', e=>{ if(e.target===overlay || e.target.closest('.af-close')) close(); });
+
+  async function load(){
+    try{
+      const res = await fetch(`/api/assessment/${studentId}`, { headers: apiHeaders() });
+      if(!res.ok) throw new Error('bad status');
+      data = await res.json();
+      titleEl.textContent = data.name || 'Aluno';
+      render();
+    }catch(e){ body.innerHTML = '<div class="empty">Não consegui carregar a avaliação agora.</div>'; }
+  }
+  function render(){
+    body.scrollTop = 0;
+    if(view.name==='profile') return renderProfile();
+    if(view.name==='form') return renderForm();
+    renderSummary();
+  }
+
+  function renderSummary(){
+    const list = data.assessments;             // mais recente primeiro
+    const last = list[0], first = list[list.length-1];
+    const chrono = list.slice().reverse();
+    const delta = (a,b,d)=> (a!=null && b!=null && list.length>1) ? `${a-b>0?'+':''}${fmtN(a-b,d==null?1:d)} desde a 1ª avaliação` : '';
+    const stat = (label, v, unit, dl, extra)=> `<div class="kpi"><div class="kpi-l">${label}</div><div class="kpi-v">${v==null?'—':fmtN(v,2)}<span class="kpi-u"> ${unit}</span></div>${extra||''}${dl?`<div class="kpi-s">${dl}</div>`:''}</div>`;
+    const series = pick=> chrono.flatMap(a=>{ const v = pick(a); return v==null ? [] : [{label: shortBR(a.date), value: v}]; });
+    const needsProfile = !data.profile || !data.profile.sexo || !data.profile.idade;
+    let html = '';
+    if(canEdit){
+      html += `<div class="af-actions"><button type="button" class="primary" data-af="new">+ Nova avaliação</button>
+        <button type="button" class="ghost" data-af="profile">${data.profile ? 'Editar anamnese' : 'Preencher anamnese'}</button></div>`;
+      if(needsProfile) html += `<p class="af-note">Preencha <strong>idade e sexo</strong> na anamnese para o app calcular o % de gordura (Pollock 7 dobras).</p>`;
+    }
+    html += `<div class="kpi-grid">
+      ${stat('Peso', last&&last.peso, 'kg', last ? delta(last.peso, first.peso) : '')}
+      ${stat('IMC', last&&last.imc, '', last ? delta(last.imc, first.imc) : '', last ? imcBadge(last.classificacaoImc) : '')}
+      ${stat('% de gordura', last&&last.percentualGordura, '%', last ? delta(last.percentualGordura, first.percentualGordura) : '')}
+      ${stat('Massa magra', last&&last.massaMagra, 'kg', last ? delta(last.massaMagra, first.massaMagra) : '')}
+    </div>`;
+    const charts = lineChartHtml('Peso','kg',series(a=> a.peso)) + lineChartHtml('% de gordura','%',series(a=> a.percentualGordura)) + lineChartHtml('Cintura','cm',series(a=> (a.circunferencias||{}).cintura));
+    if(charts) html += `<div class="af-charts">${charts}</div>`;
+    html += `<section class="af-section"><h3>Histórico de avaliações</h3>`;
+    if(!list.length){
+      html += `<div class="empty"><strong>Nenhuma avaliação ainda</strong>${canEdit ? 'Toque em "Nova avaliação" para registrar a primeira.' : 'Seu professor ainda não registrou uma avaliação.'}</div>`;
+    }else{
+      html += list.map(a=> `<details class="af-item"><summary>
+          <span class="af-item-date">${fmtDate(a.date)}</span>
+          <span class="af-item-vals">${a.peso!=null?fmtN(a.peso,2)+' kg':'—'} · IMC ${fmtN(a.imc,2)} · ${a.percentualGordura!=null?fmtN(a.percentualGordura,1)+'% gordura':'sem % de gordura'}</span>
+        </summary><div class="af-item-body">
+          ${imcBadge(a.classificacaoImc)}
+          ${assessmentDetailsHtml(a)}
+          ${canEdit ? `<div class="af-item-actions"><button type="button" class="ghost small" data-af="edit" data-id="${escapeAttr(a.id)}">Editar</button><button type="button" class="ghost small" data-af="del" data-id="${escapeAttr(a.id)}">Excluir</button></div>` : ''}
+        </div></details>`).join('');
+    }
+    html += `</section><section class="af-section"><h3>Anamnese</h3>${anamneseHtml(data.profile)}</section>`;
+    body.innerHTML = html;
+  }
+
+  const field = (label, name, val, attrs)=> `<label class="vf-field"><span>${label}</span><input name="${name}" value="${escapeAttr(val==null?'':val)}" ${attrs||'inputmode="decimal" autocomplete="off"'}></label>`;
+
+  function renderForm(){
+    const a = view.id ? data.assessments.find(x=> x.id===view.id) : null;
+    const c = (a && a.circunferencias) || {}, d = (a && a.dobras) || {}, f = (a && a.fotos) || {};
+    const p = data.profile || {};
+    body.innerHTML = `<form class="af-form" novalidate>
+      <div class="af-form-grid">
+        <div class="af-form-main">
+          <section class="af-section"><div class="af-row3">
+            ${field('Data da avaliação *','date', a ? a.date : todayISO(), 'type="date" required')}
+            ${field('Altura (m)','altura', a && a.altura, 'inputmode="decimal" placeholder="1,75" autocomplete="off"')}
+            ${field('Peso (kg)','peso', a && a.peso, 'inputmode="decimal" placeholder="70,0" autocomplete="off"')}
+          </div></section>
+          <section class="af-section"><h3>Circunferências (cm)</h3>
+            <div class="af-grid5">${AF.CIRC.map(([k,l])=> field(l, 'c_'+k, c[k])).join('')}</div>
+            <div class="af-lr">${AF.CIRC_LR.map(([k,l])=> `<span class="af-lr-name">${l}</span>${field('Esq.','c_'+k+'_e', (c[k]||{}).esquerdo)}${field('Dir.','c_'+k+'_d', (c[k]||{}).direito)}`).join('')}</div>
+          </section>
+          <section class="af-section"><h3>Dobras cutâneas (mm)</h3><p class="dim af-help">Pollock 7 dobras — preencha todas para calcular o % de gordura.</p>
+            <div class="af-grid4">${AF.DOBRAS.map(([k,l])=> field(l, 'd_'+k, d[k])).join('')}</div>
+          </section>
+          <section class="af-section"><h3>Fotos</h3><p class="dim af-help">Cole o link de cada foto (Google Drive, iCloud…). Ficam como links.</p>
+            <div class="af-grid2">${AF.FOTOS.map(([k,l])=> field(l, 'f_'+k, f[k], 'type="url" placeholder="https://…" autocomplete="off"')).join('')}</div>
+          </section>
+          <section class="af-section"><label class="vf-field"><span>Observações</span><textarea name="observacoes" rows="3" maxlength="2000">${escapeHtml((a && a.observacoes) || '')}</textarea></label></section>
+        </div>
+        <aside class="af-result" aria-live="polite">
+          <h3>Resultado</h3>
+          <div><div class="kpi-l">IMC</div><div class="kpi-v" data-r="imc">—</div><div data-r="cls"></div></div>
+          <dl class="af-res-grid"><div><dt>% gordura</dt><dd data-r="pg">—</dd></div><div><dt>M. gorda</dt><dd data-r="mg">—</dd></div><div><dt>M. magra</dt><dd data-r="mm">—</dd></div></dl>
+          <p class="dim af-help" data-r="warn"></p>
+          <div class="vf-msg" role="alert"></div>
+          <button type="submit" class="primary big">${a ? 'Salvar alterações' : 'Salvar avaliação'}</button>
+          <button type="button" class="ghost big" data-af="back">Cancelar</button>
+        </aside>
+      </div></form>`;
+    const form = body.querySelector('form');
+    const read = ()=>{
+      const v = n=> form.elements[n].value;
+      const circ = {}; AF.CIRC.forEach(([k])=> circ[k] = v('c_'+k));
+      AF.CIRC_LR.forEach(([k])=> circ[k] = { esquerdo: v('c_'+k+'_e'), direito: v('c_'+k+'_d') });
+      const dob = {}; AF.DOBRAS.forEach(([k])=> dob[k] = v('d_'+k));
+      const fot = {}; AF.FOTOS.forEach(([k])=> fot[k] = v('f_'+k));
+      return { date: v('date'), altura: v('altura'), peso: v('peso'), circunferencias: circ, dobras: dob, fotos: fot, observacoes: form.elements.observacoes.value };
+    };
+    const refresh = ()=>{
+      const x = read();
+      const dob = {}; AF.DOBRAS.forEach(([k])=> dob[k] = AF.num(x.dobras[k], 150));
+      const r = AF.calcularAvaliacao({ altura: AF.num(x.altura,3), peso: AF.num(x.peso,500), sexo: p.sexo, idade: p.idade, dobras: dob });
+      const set = (k, html)=> { form.querySelector(`[data-r="${k}"]`).innerHTML = html; };
+      set('imc', r.imc==null ? '—' : fmtN(r.imc,2)); set('cls', imcBadge(r.classificacaoImc));
+      set('pg', r.percentualGordura==null ? '—' : fmtN(r.percentualGordura,1)+'%');
+      set('mg', r.massaGorda==null ? '—' : fmtN(r.massaGorda,1)+' kg'); set('mm', r.massaMagra==null ? '—' : fmtN(r.massaMagra,1)+' kg');
+      set('warn', (!p.sexo || !p.idade) ? 'Sem idade e sexo na anamnese não dá para calcular o % de gordura.' : (AF.somarDobras(dob)==null ? 'Preencha as 7 dobras para calcular o % de gordura.' : ''));
+    };
+    form.addEventListener('input', refresh); refresh();
+    form.addEventListener('submit', async e=>{
+      e.preventDefault();
+      const msg = form.querySelector('.vf-msg'), btn = form.querySelector('button[type=submit]');
+      const x = read();
+      if(!x.date){ msg.textContent = 'Informe a data da avaliação.'; return; }
+      btn.disabled = true; msg.textContent = '';
+      try{
+        const res = await fetch(`/api/assessment/${studentId}/records${view.id ? '/'+view.id : ''}`, { method: view.id ? 'PUT' : 'POST', headers: apiHeaders({'Content-Type':'application/json'}), body: JSON.stringify(x) });
+        if(!res.ok) throw new Error(res.status);
+        showToast('Avaliação salva!');
+        view = {name:'summary'}; await load();
+      }catch(err){ msg.textContent = 'Não consegui salvar agora. Tente de novo.'; btn.disabled = false; }
+    });
+  }
+
+  function renderProfile(){
+    const p = data.profile || {};
+    body.innerHTML = `<form class="af-form" novalidate>
+      <section class="af-section"><h3>Dados básicos</h3><div class="af-row3">
+        ${field('Idade','idade', p.idade, 'type="number" min="10" max="110" inputmode="numeric"')}
+        <label class="vf-field"><span>Sexo</span><select name="sexo"><option value="">Selecione</option><option value="masculino" ${p.sexo==='masculino'?'selected':''}>Masculino</option><option value="feminino" ${p.sexo==='feminino'?'selected':''}>Feminino</option></select></label>
+        ${field('Frequência semanal (dias)','frequenciaSemanal', p.frequenciaSemanal, 'type="number" min="0" max="7" inputmode="numeric"')}
+      </div></section>
+      <section class="af-section"><h3>Anamnese</h3>
+        <div class="af-grid2">${AF.TEXT_FIELDS.map(([k,l])=> field(l, k, p[k], 'maxlength="200" autocomplete="off"')).join('')}</div>
+        <div class="af-checks">${AF.YES_NO.map(([k,l])=> `<label class="af-check"><input type="checkbox" name="${k}" ${p[k]?'checked':''}> ${l}</label>`).join('')}</div>
+        <div class="af-detail">${AF.YES_NO_DETAIL.map(([k,dk,l,ph])=> `<label class="af-check"><input type="checkbox" name="${k}" ${p[k]?'checked':''}> ${l}</label><input name="${dk}" value="${escapeAttr(p[dk]||'')}" placeholder="${ph}" maxlength="200" aria-label="${escapeAttr(l+' '+ph)}">`).join('')}</div>
+      </section>
+      <div class="vf-msg" role="alert"></div>
+      <div class="af-actions"><button type="submit" class="primary">Salvar anamnese</button><button type="button" class="ghost" data-af="back">Cancelar</button></div>
+    </form>`;
+    const form = body.querySelector('form');
+    form.addEventListener('submit', async e=>{
+      e.preventDefault();
+      const out = { idade: form.elements.idade.value, sexo: form.elements.sexo.value, frequenciaSemanal: form.elements.frequenciaSemanal.value };
+      AF.TEXT_FIELDS.forEach(([k])=> out[k] = form.elements[k].value);
+      AF.YES_NO.forEach(([k])=> out[k] = form.elements[k].checked);
+      AF.YES_NO_DETAIL.forEach(([k,dk])=>{ out[k] = form.elements[k].checked; out[dk] = form.elements[dk].value; });
+      const msg = form.querySelector('.vf-msg');
+      try{
+        const res = await fetch(`/api/assessment/${studentId}/profile`, { method:'PUT', headers: apiHeaders({'Content-Type':'application/json'}), body: JSON.stringify(out) });
+        if(!res.ok) throw new Error(res.status);
+        showToast('Anamnese salva!');
+        view = {name:'summary'}; await load();
+      }catch(err){ msg.textContent = 'Não consegui salvar agora. Tente de novo.'; }
+    });
+  }
+
+  body.addEventListener('click', async e=>{
+    const b = e.target.closest('[data-af]');
+    if(!b) return;
+    const act = b.dataset.af;
+    if(act==='new'){ view = {name:'form', id:null}; render(); }
+    else if(act==='edit'){ view = {name:'form', id:b.dataset.id}; render(); }
+    else if(act==='profile'){ view = {name:'profile'}; render(); }
+    else if(act==='back'){ view = {name:'summary'}; render(); }
+    else if(act==='del'){
+      if(!(await confirmDialog('Excluir esta avaliação?'))) return;
+      const res = await fetch(`/api/assessment/${studentId}/records/${b.dataset.id}`, { method:'DELETE', headers: apiHeaders() });
+      if(!res.ok){ alert('Não consegui excluir a avaliação.'); return; }
+      await load();
+    }
+  });
+  await load();
+}
+document.getElementById('openAssessBtn').addEventListener('click', ()=> openAssessment(activeStudentId(), READONLY));
+
 /* ---------- Vídeos de execução (links do YouTube) ----------
    A biblioteca do admin vale para todos; o professor pode trocar ou completar
    para os alunos dele. O vídeo é achado pelo nome do exercício normalizado —
@@ -2303,6 +2909,17 @@ function openVideo(youtubeId, title){
   overlay.querySelector('.video-close').focus();
 }
 document.addEventListener('click', e=>{
+  const coach = e.target.closest('[data-coach]');
+  if(coach){
+    if(coach.dataset.coach==='toggleedit'){
+      EDIT_MODE = !EDIT_MODE;
+      applyReadonlyUI(); renderAll();
+      showToast(EDIT_MODE ? 'Edição ligada: o que você mudar é salvo na hora.' : 'Edição concluída.');
+    }else if(coach.dataset.coach==='assessment'){
+      openAssessment(activeStudentId(), true);
+    }
+    return;
+  }
   const v = e.target.closest('[data-video]');
   if(v){ e.preventDefault(); openVideo(v.dataset.video, v.dataset.videoTitle); }
 });
@@ -2699,7 +3316,9 @@ const ICONS = {
   help: '<svg class="ico" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .9-1 1.6M12 17h.01"/></svg>',
   logout: '<svg class="ico" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 4h4v16h-4M10 8l-4 4 4 4M6 12h10"/></svg>',
   check: '<svg class="ico" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5 9-10"/></svg>',
-  back: '<svg class="ico" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 6l-6 6 6 6"/></svg>'
+  back: '<svg class="ico" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 6l-6 6 6 6"/></svg>',
+  bell: '<svg class="ico" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 17h12l-1.5-2.5V10a4.5 4.5 0 0 0-9 0v4.5zM10 20a2 2 0 0 0 4 0"/></svg>',
+  ruler: '<svg class="ico" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="8" width="18" height="8" rx="1.5"/><path d="M7 8v3M11 8v4M15 8v3M19 8v4"/></svg>'
 };
 if(new URLSearchParams(location.search).get('tab')==='progresso') mobile.tab = 'progresso';
 
@@ -2868,7 +3487,7 @@ function mThisWeekSessions(){
 function mRenderHistoryScreen(){
   mHeader('Treinos');
   let html = '<div class="mpage mpage-flush">' + mSegmented([['list','Esta semana'],['history','Histórico']], 'history', 'treinosview') + '</div>';
-  if(!READONLY){
+  if(!LOCKED()){
     html += `<div style="padding:0 20px 4px;display:flex;gap:8px;flex-wrap:wrap;">
       <button class="mghostbtn" data-maction="addsession">${t('newSession')}</button>
     </div>`;
@@ -2901,7 +3520,7 @@ function mRenderHistoryScreen(){
           </div>`;
         });
       });
-      if(!READONLY){
+      if(!LOCKED()){
         html += `<div style="padding:2px 16px 8px;">
           <button class="mghostbtn" data-maction="addweek" data-prot="${block.key}" style="width:100%;">+ semana</button>
         </div>`;
@@ -2953,7 +3572,7 @@ function mRenderSessionScreen(){
   const session = state.sessions.find(s=> s.id===mobile.sessionId);
   if(!session){ mobile.screen='list'; return mRenderSessionsList(); }
   mHeader('Sessão', {back: true, sub: fmtDate(session.date)});
-  const ro = READONLY;
+  const ro = LOCKED();
   let html = `<div style="padding:4px 20px 6px;">
     <input type="text" class="minput" data-msessname value="${escapeAttr(session.name)}" ${ro?'disabled':''}>
     ${ro?'':`<div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;">
@@ -3172,6 +3791,7 @@ function mRenderInicio(){
     html += `<div class="mweek-day"><span class="mweek-l">${DOW_SHORT[dowOf(d)].charAt(0)}</span><span class="mweek-n ${cls}">${+d.slice(8,10)}</span></div>`;
   }
   html += '</div>';
+  if(!READONLY) html += announcementsHtml();
 
   const next = findNextSession();
   if(next){
@@ -3220,7 +3840,7 @@ function mRenderInicio(){
 function mRenderSessionsList(){
   mHeader('Treinos');
   let html = '<div class="mpage">';
-  if(!READONLY){
+  if(!LOCKED()){
     html += `<div class="mtiles">
       <button class="mtile" data-maction="import"><span class="micon-tile">${ICONS.file}</span><span class="mtile-title">Importar ficha</span><span class="mtile-sub">PDF do professor</span></button>
       <button class="mtile" data-maction="openbuilder"><span class="micon-tile">${ICONS.target}</span><span class="mtile-title">Montar treino</span><span class="mtile-sub">pelo mapa muscular</span></button>
@@ -3273,7 +3893,7 @@ function mRenderEntryScreen(){
   if(!ex){ mobile.screen='session'; return mRenderSessionScreen(); }
   const exIdx = session.exercises.indexOf(ex);
   mHeader(`Exercício ${exIdx+1} de ${session.exercises.length}`, {back: true, sub: session.name});
-  const ro = READONLY;
+  const ro = LOCKED();
   const editing = mobile.setIdx!==null && ex.sets[mobile.setIdx];
   // O alvo mostrado é o da série que está sendo preenchida (a ficha prescreve
   // faixas diferentes para aquecimento, preparatória e séries válidas).
@@ -3404,6 +4024,7 @@ function mRenderPerfil(){
       <h2 class="overline">Meus dados</h2>
       <div class="mlist">
         <button class="mlist-row" data-maction="exportpdf"><span class="accent">${ICONS.download}</span><span class="mlist-label">Baixar relatório em PDF</span><span class="faint">${ICONS.chevron}</span></button>
+        <button class="mlist-row" data-maction="assessment"><span class="accent">${ICONS.ruler}</span><span class="mlist-label">${READONLY ? 'Avaliação física do aluno' : 'Minha avaliação física'}</span><span class="faint">${ICONS.chevron}</span></button>
         ${energyEnabled ? `<div class="mlist-row"><span class="accent">${ICONS.flame}</span><span class="mlist-label">Gasto de energia</span><span class="badge badge-ok">Liberado</span></div>` : ''}
       </div>
     </section>
@@ -3445,6 +4066,7 @@ mContent.addEventListener('click', async e=>{
       return;
     }
     if(act==='exportpdf'){ exportPdf(); return; }
+    if(act==='assessment'){ openAssessment(activeStudentId(), READONLY); return; }
     if(act==='togglemap'){ homeMapOpen = !homeMapOpen; mRenderSessionsList(); return; }
     if(act==='history'){ mobile.screen='history'; mRender(); return; }
     if(act==='gotonext'){
@@ -3704,23 +4326,34 @@ function renderAll(){
   renderDashboard();
   renderVolumeChart();
   renderEnergyChart();
+  renderAnnouncements();
   mRender();
 }
 
 function applyReadonlyUI(){
-  document.getElementById('importCard').style.display = READONLY ? 'none' : '';
-  document.getElementById('addSessionBtn').style.display = READONLY ? 'none' : '';
-  document.getElementById('addProtocolBtn').style.display = READONLY ? 'none' : '';
-  document.getElementById('openBuilderBtn').style.display = READONLY ? 'none' : '';
+  document.getElementById('importCard').style.display = LOCKED() ? 'none' : '';
+  document.getElementById('addSessionBtn').style.display = LOCKED() ? 'none' : '';
+  document.getElementById('addProtocolBtn').style.display = LOCKED() ? 'none' : '';
+  document.getElementById('openBuilderBtn').style.display = LOCKED() ? 'none' : '';
   const banner = document.getElementById('readonlyBanner');
   if(READONLY){
     banner.style.display = 'block';
-    banner.innerHTML = '<div class="card" style="border-color:var(--accent);padding:12px 16px;margin-bottom:22px;">👁 <strong style="color:var(--text);">Área do professor</strong> — modo somente leitura, nada pode ser editado ou excluído aqui, exceto o campo de feedback em cada sessão.</div>';
+    banner.innerHTML = `<div class="card coach-banner">
+      <div>👁 <strong style="color:var(--text);">Área do professor</strong> — ${EDIT_MODE ? 'você está <strong>editando</strong> a ficha deste aluno. As alterações são salvas na hora.' : 'modo leitura: só o feedback de cada sessão pode ser escrito. Para ajustar a ficha, ligue a edição.'}</div>
+      <div class="coach-banner-actions">
+        <button type="button" class="small${EDIT_MODE?' primary':''}" data-coach="toggleedit">${EDIT_MODE ? '✓ Concluir edição' : '✎ Editar ficha'}</button>
+        <button type="button" class="small ghost" data-coach="assessment">📏 Avaliação física</button>
+      </div>
+    </div>`;
   }else{
     banner.style.display = 'none';
   }
   document.getElementById('professorLink').textContent = READONLY ? '‹ voltar aos alunos' : 'sair';
   mProfessorBar.hidden = !READONLY;
+  if(READONLY){
+    mProfessorBar.innerHTML = `<span>${EDIT_MODE ? 'Editando a ficha do aluno' : 'Área do professor — somente leitura'}</span>
+      <button type="button" class="mprofbtn" data-coach="toggleedit">${EDIT_MODE ? 'Concluir' : 'Editar ficha'}</button>`;
+  }
 }
 
 /* ---------- Decide o que mostrar: login, painel do admin/professor ou o app ---------- */
@@ -3763,6 +4396,7 @@ function boot(){
   appWrap.hidden = false;
   mShell.hidden = false;
   READONLY = (auth.role==='professor' || auth.role==='admin');
+  EDIT_MODE = false; stateVersion = null;
   STORE_KEY = 'sobrecarga_v1_' + activeStudentId();
   state = loadLocal();
   try{ energyEnabled = localStorage.getItem(energyFlagKey())==='1'; }catch(e){ energyEnabled = false; }
@@ -3773,6 +4407,7 @@ function boot(){
   loadRemote();
   loadFeatures();
   loadVideos();
+  annList = []; loadAnnouncements();
   if(auth.role==='student' && !mShell.hidden){
     let seen = false;
     try{ seen = localStorage.getItem(tourStorageKey()) === '1'; }catch(e){}

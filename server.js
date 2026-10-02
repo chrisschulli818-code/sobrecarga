@@ -5,6 +5,9 @@ const { Pool } = require('pg');
 const { createLimiter } = require('./lib/ratelimit');
 const { initFromEnv: initFirebaseMirror } = require('./lib/firebase-mirror');
 const { youtubeId, exerciseKey, KEY_RE } = require('./lib/videos');
+const Assessment = require('./lib/assessment');
+const { summarizeActivity } = require('./lib/activity');
+const { sanitizeTemplate, expandTemplate } = require('./lib/templates');
 
 const app = express();
 // O Render fica atrás de um proxy: sem isso req.ip seria sempre o do proxy e
@@ -190,7 +193,39 @@ async function ensureTable() {
     updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     PRIMARY KEY (scope, owner_id, exercise_key)
   )`);
-  for (const t of ['professors', 'app_state_history', 'unlock_requests', 'energy_access', 'exercise_videos']) {
+  // Avaliação física: anamnese/perfil (1 por aluno) e as avaliações datadas.
+  // O conteúdo vai em JSONB (lib/assessment.js valida e recalcula tudo).
+  await pool.query(`CREATE TABLE IF NOT EXISTS student_profiles (
+    student_id TEXT PRIMARY KEY,
+    data JSONB NOT NULL,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+  )`);
+  await pool.query(`CREATE TABLE IF NOT EXISTS assessments (
+    id TEXT PRIMARY KEY,
+    student_id TEXT NOT NULL,
+    assessed_on TEXT NOT NULL,
+    data JSONB NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+  )`);
+  await pool.query(`CREATE INDEX IF NOT EXISTS assessments_student_idx ON assessments (student_id, assessed_on DESC)`);
+  // Avisos do professor (student_ids NULL = todos os alunos dele) e modelos de treino.
+  await pool.query(`CREATE TABLE IF NOT EXISTS announcements (
+    id TEXT PRIMARY KEY,
+    professor_id TEXT NOT NULL,
+    title TEXT NOT NULL,
+    body TEXT NOT NULL,
+    student_ids JSONB,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+  )`);
+  await pool.query(`CREATE INDEX IF NOT EXISTS announcements_prof_idx ON announcements (professor_id, created_at DESC)`);
+  await pool.query(`CREATE TABLE IF NOT EXISTS workout_templates (
+    id TEXT PRIMARY KEY,
+    professor_id TEXT NOT NULL,
+    data JSONB NOT NULL,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+  )`);
+  for (const t of ['professors', 'app_state_history', 'unlock_requests', 'energy_access', 'exercise_videos',
+    'student_profiles', 'assessments', 'announcements', 'workout_templates']) {
     try { await pool.query(`ALTER TABLE ${t} ENABLE ROW LEVEL SECURITY`); }
     catch (err) { console.error(`Não consegui ativar RLS em ${t}:`, err.message); }
   }
@@ -353,6 +388,9 @@ app.use('/api', async (req, res, next) => {
 // caso de versão do histórico) — nada de texto livre indo pro banco.
 app.param('id', (req, res, next, v) => UUID_RE.test(v) ? next() : res.status(400).json({ error: 'invalid_id' }));
 app.param('studentId', (req, res, next, v) => UUID_RE.test(v) ? next() : res.status(400).json({ error: 'invalid_id' }));
+app.param('rid', (req, res, next, v) => UUID_RE.test(v) ? next() : res.status(400).json({ error: 'invalid_id' }));
+app.param('tid', (req, res, next, v) => UUID_RE.test(v) ? next() : res.status(400).json({ error: 'invalid_id' }));
+app.param('aid', (req, res, next, v) => UUID_RE.test(v) ? next() : res.status(400).json({ error: 'invalid_id' }));
 app.param('versionId', (req, res, next, v) => /^\d{1,12}$/.test(v) ? next() : res.status(400).json({ error: 'invalid_id' }));
 
 /* ---------- Autenticação por código (sem senha/e-mail) ----------
@@ -679,24 +717,227 @@ app.get('/api/videos/:studentId', requireStudentAccess, async (req, res) => {
   }
 });
 
-// Resumo de atividade pro painel do professor: última vez que treinou (sessão
-// com alguma carga registrada) e quantos treinos fez nesta semana.
-function summarizeActivity(data) {
-  const sessions = (data && Array.isArray(data.sessions)) ? data.sessions : [];
-  const done = sessions.filter(x => x && Array.isArray(x.exercises) &&
-    x.exercises.some(e => e && Array.isArray(e.sets) && e.sets.some(t => t && t.weight > 0)));
-  const dates = done.map(x => x.date).filter(Boolean).sort();
-  const today = new Date();
-  const dow = today.getDay();
-  const monday = new Date(today);
-  monday.setDate(today.getDate() - (dow === 0 ? 6 : dow - 1));
-  const mondayIso = monday.toISOString().slice(0, 10);
-  return {
-    lastTrainedAt: dates.length ? dates[dates.length - 1] : null,
-    weekDone: done.filter(x => x.date >= mondayIso).length,
-    sessionsTotal: sessions.length
-  };
+/* ---------- Professor: avaliação física, avisos, modelos de treino ---------- */
+// Só o professor DONO do aluno (ou o admin navegando como ele) escreve; o
+// aluno só lê o que é dele. Mesma checagem de requireStudentAccess, mas
+// exigindo o cabeçalho de professor.
+async function requireStudentProfessor(req, res, next) {
+  if (!(req.get('x-professor-code') || '').trim()) return denyCredentials(req, res);
+  return requireStudentAccess(req, res, next);
 }
+
+// Avaliação física: perfil/anamnese + avaliações (mais recente primeiro).
+app.get('/api/assessment/:studentId', requireStudentAccess, async (req, res) => {
+  try {
+    const st = await pool.query('SELECT name FROM students WHERE id = $1', [req.params.studentId]);
+    const prof = await pool.query('SELECT data FROM student_profiles WHERE student_id = $1', [req.params.studentId]);
+    const rows = await pool.query(
+      'SELECT id, assessed_on, data FROM assessments WHERE student_id = $1 ORDER BY assessed_on DESC, created_at DESC LIMIT 200',
+      [req.params.studentId]
+    );
+    res.json({
+      name: st.rows[0] ? st.rows[0].name : '',
+      profile: prof.rows[0] ? prof.rows[0].data : null,
+      assessments: rows.rows.map(r => ({ id: r.id, ...r.data, date: r.assessed_on }))
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'db_error' });
+  }
+});
+app.put('/api/assessment/:studentId/profile', requireStudentProfessor, async (req, res) => {
+  const data = Assessment.sanitizeProfile(req.body);
+  try {
+    await pool.query(
+      `INSERT INTO student_profiles (student_id, data, updated_at) VALUES ($1,$2,now())
+       ON CONFLICT (student_id) DO UPDATE SET data = $2, updated_at = now()`,
+      [req.params.studentId, data]
+    );
+    res.json({ ok: true, profile: data });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'db_error' });
+  }
+});
+async function saveAssessment(req, res, id) {
+  try {
+    const prof = await pool.query('SELECT data FROM student_profiles WHERE student_id = $1', [req.params.studentId]);
+    const a = Assessment.sanitizeAssessment(req.body, prof.rows[0] ? prof.rows[0].data : {});
+    if (!a.date) return res.status(400).json({ error: 'missing_date' });
+    const { date, ...rest } = a;
+    if (id) {
+      const r = await pool.query('UPDATE assessments SET assessed_on = $1, data = $2 WHERE id = $3 AND student_id = $4 RETURNING id',
+        [date, rest, id, req.params.studentId]);
+      if (!r.rows[0]) return res.status(404).json({ error: 'not_found' });
+    } else {
+      const n = await pool.query('SELECT COUNT(*)::int AS n FROM assessments WHERE student_id = $1', [req.params.studentId]);
+      if (n.rows[0].n >= 200) return res.status(409).json({ error: 'too_many' });
+      id = crypto.randomUUID();
+      await pool.query('INSERT INTO assessments (id, student_id, assessed_on, data) VALUES ($1,$2,$3,$4)', [id, req.params.studentId, date, rest]);
+    }
+    res.json({ ok: true, assessment: { id, ...rest, date } });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'db_error' });
+  }
+}
+app.post('/api/assessment/:studentId/records', requireStudentProfessor, (req, res) => saveAssessment(req, res, null));
+app.put('/api/assessment/:studentId/records/:rid', requireStudentProfessor, (req, res) => saveAssessment(req, res, req.params.rid));
+app.delete('/api/assessment/:studentId/records/:rid', requireStudentProfessor, async (req, res) => {
+  try {
+    await pool.query('DELETE FROM assessments WHERE id = $1 AND student_id = $2', [req.params.rid, req.params.studentId]);
+    res.json({ ok: true });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'db_error' });
+  }
+});
+
+// Avisos: o professor publica (pra todos os alunos ou pra alguns) e o aluno lê.
+app.get('/api/professor/announcements', requireProfessor, async (req, res) => {
+  try {
+    const r = await pool.query(
+      'SELECT id, title, body, student_ids, created_at FROM announcements WHERE professor_id = $1 ORDER BY created_at DESC LIMIT 50',
+      [req.professorId]
+    );
+    res.json(r.rows.map(a => ({ id: a.id, title: a.title, body: a.body, studentIds: a.student_ids, createdAt: a.created_at })));
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'db_error' });
+  }
+});
+app.post('/api/professor/announcements', requireProfessor, async (req, res) => {
+  const title = cleanText((req.body || {}).title, 80);
+  const body = String((req.body || {}).body == null ? '' : (req.body || {}).body).replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/g, ' ').trim().slice(0, 1000);
+  if (!title || !body) return res.status(400).json({ error: 'missing_text' });
+  try {
+    let ids = null;
+    const asked = (req.body || {}).studentIds;
+    if (Array.isArray(asked)) {
+      const wanted = [...new Set(asked.filter(v => typeof v === 'string' && UUID_RE.test(v)))].slice(0, 200);
+      if (!wanted.length) return res.status(400).json({ error: 'no_students' });
+      const own = await pool.query('SELECT id FROM students WHERE professor_id = $1 AND id = ANY($2::text[])', [req.professorId, wanted]);
+      ids = own.rows.map(x => x.id);
+      if (!ids.length) return res.status(400).json({ error: 'no_students' });
+    }
+    const n = await pool.query('SELECT COUNT(*)::int AS n FROM announcements WHERE professor_id = $1', [req.professorId]);
+    if (n.rows[0].n >= 200) {
+      await pool.query(`DELETE FROM announcements WHERE id IN (SELECT id FROM announcements WHERE professor_id = $1 ORDER BY created_at ASC LIMIT 20)`, [req.professorId]);
+    }
+    const id = crypto.randomUUID();
+    await pool.query('INSERT INTO announcements (id, professor_id, title, body, student_ids) VALUES ($1,$2,$3,$4,$5)',
+      [id, req.professorId, title, body, ids ? JSON.stringify(ids) : null]);
+    res.json({ ok: true, id });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'db_error' });
+  }
+});
+app.delete('/api/professor/announcements/:aid', requireProfessor, async (req, res) => {
+  try {
+    await pool.query('DELETE FROM announcements WHERE id = $1 AND professor_id = $2', [req.params.aid, req.professorId]);
+    res.json({ ok: true });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'db_error' });
+  }
+});
+app.get('/api/announcements/:studentId', requireStudentAccess, async (req, res) => {
+  try {
+    const r = await pool.query(
+      `SELECT a.id, a.title, a.body, a.created_at FROM announcements a
+       JOIN students s ON s.professor_id = a.professor_id
+       WHERE s.id = $1 AND a.created_at > now() - interval '45 days'
+         AND (a.student_ids IS NULL OR a.student_ids ? $1)
+       ORDER BY a.created_at DESC LIMIT 10`,
+      [req.params.studentId]
+    );
+    res.json(r.rows.map(a => ({ id: a.id, title: a.title, body: a.body, createdAt: a.created_at })));
+  } catch (err) {
+    console.error(err);
+    res.json([]);
+  }
+});
+
+// Modelos de treino do professor + envio pra vários alunos.
+app.get('/api/professor/templates', requireProfessor, async (req, res) => {
+  try {
+    const r = await pool.query('SELECT id, data FROM workout_templates WHERE professor_id = $1 ORDER BY updated_at DESC LIMIT 100', [req.professorId]);
+    res.json(r.rows.map(t => ({ id: t.id, ...t.data })));
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'db_error' });
+  }
+});
+async function saveTemplate(req, res, id) {
+  const tpl = sanitizeTemplate(req.body);
+  if (!tpl) return res.status(400).json({ error: 'invalid_template' });
+  try {
+    if (id) {
+      const r = await pool.query('UPDATE workout_templates SET data = $1, updated_at = now() WHERE id = $2 AND professor_id = $3 RETURNING id', [tpl, id, req.professorId]);
+      if (!r.rows[0]) return res.status(404).json({ error: 'not_found' });
+    } else {
+      const n = await pool.query('SELECT COUNT(*)::int AS n FROM workout_templates WHERE professor_id = $1', [req.professorId]);
+      if (n.rows[0].n >= 100) return res.status(409).json({ error: 'too_many' });
+      id = crypto.randomUUID();
+      await pool.query('INSERT INTO workout_templates (id, professor_id, data) VALUES ($1,$2,$3)', [id, req.professorId, tpl]);
+    }
+    res.json({ ok: true, template: { id, ...tpl } });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'db_error' });
+  }
+}
+app.post('/api/professor/templates', requireProfessor, (req, res) => saveTemplate(req, res, null));
+app.put('/api/professor/templates/:tid', requireProfessor, (req, res) => saveTemplate(req, res, req.params.tid));
+app.delete('/api/professor/templates/:tid', requireProfessor, async (req, res) => {
+  try {
+    await pool.query('DELETE FROM workout_templates WHERE id = $1 AND professor_id = $2', [req.params.tid, req.professorId]);
+    res.json({ ok: true });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'db_error' });
+  }
+});
+// Envia o modelo: cria um protocolo novo (com as semanas) na ficha de cada
+// aluno escolhido. Guarda antes uma versão no histórico, igual ao salvamento
+// normal; o aparelho do aluno funde as sessões novas sem perder o que já tem.
+app.post('/api/professor/templates/:tid/send', requireProfessor, async (req, res) => {
+  const body = req.body || {};
+  const wanted = [...new Set((Array.isArray(body.studentIds) ? body.studentIds : []).filter(v => typeof v === 'string' && UUID_RE.test(v)))].slice(0, 100);
+  if (!wanted.length) return res.status(400).json({ error: 'no_students' });
+  try {
+    const t = await pool.query('SELECT data FROM workout_templates WHERE id = $1 AND professor_id = $2', [req.params.tid, req.professorId]);
+    if (!t.rows[0]) return res.status(404).json({ error: 'not_found' });
+    const tpl = t.rows[0].data;
+    const own = await pool.query('SELECT id FROM students WHERE professor_id = $1 AND id = ANY($2::text[])', [req.professorId, wanted]);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(String(body.startDate || ''))) return res.status(400).json({ error: 'invalid_date' });
+    const result = { sent: [], skipped: [] };
+    for (const { id: sid } of own.rows) {
+      const exp = expandTemplate(tpl, body.startDate, body.weeks, new Date().toISOString().slice(0, 10));
+      const cur = await pool.query('SELECT data FROM app_state WHERE id = $1', [sid]);
+      const data = (cur.rows[0] && cur.rows[0].data) || { sessions: [], protocols: [] };
+      const sessions = Array.isArray(data.sessions) ? data.sessions : [];
+      const protocols = Array.isArray(data.protocols) ? data.protocols : [];
+      if (sessions.length + exp.sessions.length > 3000 || protocols.length >= 300) { result.skipped.push(sid); continue; }
+      try {
+        await pool.query(
+          `INSERT INTO app_state_history (student_id, data) SELECT id, data FROM app_state WHERE id = $1
+           AND NOT EXISTS (SELECT 1 FROM app_state_history h WHERE h.student_id = $1 AND h.taken_at > now() - interval '30 minutes')`, [sid]);
+      } catch (histErr) { console.error('Falha ao guardar histórico (o envio segue):', histErr.message); }
+      const next = { sessions: sessions.concat(exp.sessions), protocols: protocols.concat([exp.protocol]) };
+      await pool.query(
+        `INSERT INTO app_state (id, data, updated_at) VALUES ($1,$2,now()) ON CONFLICT (id) DO UPDATE SET data = $2, updated_at = now()`,
+        [sid, next]);
+      if (mirror) mirror.mirrorState(sid, next).catch(() => {});
+      result.sent.push(sid);
+    }
+    res.json({ ok: true, ...result });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'db_error' });
+  }
+});
 
 app.get('/api/students', requireProfessor, async (req, res) => {
   try {
@@ -832,6 +1073,8 @@ app.delete('/api/students/:id', requireProfessor, async (req, res) => {
       await pool.query('DELETE FROM app_state_history WHERE student_id = $1', [req.params.id]);
       await pool.query('DELETE FROM unlock_requests WHERE student_id = $1', [req.params.id]);
       await pool.query(`DELETE FROM energy_access WHERE kind = 'student' AND target_id = $1`, [req.params.id]).catch(() => {});
+      await pool.query('DELETE FROM student_profiles WHERE student_id = $1', [req.params.id]).catch(() => {});
+      await pool.query('DELETE FROM assessments WHERE student_id = $1', [req.params.id]).catch(() => {});
     }
     res.json({ ok: true });
   } catch (err) {
@@ -840,9 +1083,13 @@ app.delete('/api/students/:id', requireProfessor, async (req, res) => {
   }
 });
 
+// Versão da ficha (updated_at em segundos, com microssegundos): o professor
+// manda de volta em x-if-version e o servidor recusa o salvamento (409) se o
+// aluno gravou nesse meio-tempo — assim editar a ficha nunca apaga cargas novas.
 app.get('/api/state/:studentId', requireStudentAccess, async (req, res) => {
   try {
-    const r = await pool.query('SELECT data FROM app_state WHERE id = $1', [req.params.studentId]);
+    const r = await pool.query('SELECT data, extract(epoch from updated_at)::text AS v FROM app_state WHERE id = $1', [req.params.studentId]);
+    if (r.rows[0]) res.set('X-State-Version', r.rows[0].v);
     res.json(r.rows[0] ? r.rows[0].data : { sessions: [], protocols: [] });
   } catch (err) {
     console.error(err);
@@ -877,13 +1124,27 @@ app.put('/api/state/:studentId', requireStudentAccess, async (req, res) => {
     } catch (histErr) {
       console.error('Falha ao guardar histórico (o salvamento segue):', histErr.message);
     }
-    await pool.query(
-      `INSERT INTO app_state (id, data, updated_at) VALUES ($1, $2, now())
-       ON CONFLICT (id) DO UPDATE SET data = $2, updated_at = now()`,
-      [req.params.studentId, data]
-    );
+    const ifVersion = (req.get('x-if-version') || '').trim();
+    let w;
+    if (ifVersion) {
+      if (!/^\d{1,12}(\.\d{1,6})?$/.test(ifVersion)) return res.status(400).json({ error: 'invalid_version' });
+      w = await pool.query(
+        `UPDATE app_state SET data = $2, updated_at = now()
+         WHERE id = $1 AND extract(epoch from updated_at)::text = $3
+         RETURNING extract(epoch from updated_at)::text AS v`,
+        [req.params.studentId, data, ifVersion]
+      );
+      if (!w.rows[0]) return res.status(409).json({ error: 'conflict' });
+    } else {
+      w = await pool.query(
+        `INSERT INTO app_state (id, data, updated_at) VALUES ($1, $2, now())
+         ON CONFLICT (id) DO UPDATE SET data = $2, updated_at = now()
+         RETURNING extract(epoch from updated_at)::text AS v`,
+        [req.params.studentId, data]
+      );
+    }
     if (mirror) mirror.mirrorState(req.params.studentId, data).catch(() => {});
-    res.json({ ok: true });
+    res.json({ ok: true, version: w.rows[0].v });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'db_error' });
@@ -905,6 +1166,8 @@ app.delete('/api/admin/professors/:id', requireAdmin, async (req, res) => {
     await pool.query('DELETE FROM professors WHERE id = $1', [req.params.id]);
     await pool.query(`DELETE FROM energy_access WHERE kind = 'professor' AND target_id = $1`, [req.params.id]).catch(() => {});
     await pool.query(`DELETE FROM exercise_videos WHERE scope = 'professor' AND owner_id = $1`, [req.params.id]).catch(() => {});
+    await pool.query('DELETE FROM announcements WHERE professor_id = $1', [req.params.id]).catch(() => {});
+    await pool.query('DELETE FROM workout_templates WHERE professor_id = $1', [req.params.id]).catch(() => {});
     res.json({ ok: true });
   } catch (err) {
     console.error(err);
@@ -920,9 +1183,13 @@ app.get('/api/admin/export', requireAdmin, async (req, res) => {
     const states = (await pool.query('SELECT id, data, updated_at FROM app_state ORDER BY id')).rows;
     const energyAccess = (await pool.query('SELECT kind, target_id, enabled_at FROM energy_access').catch(() => ({ rows: [] }))).rows;
     const exerciseVideos = (await pool.query('SELECT scope, owner_id, exercise_key, name, youtube_id, updated_at FROM exercise_videos').catch(() => ({ rows: [] }))).rows;
+    const studentProfiles = (await pool.query('SELECT student_id, data, updated_at FROM student_profiles').catch(() => ({ rows: [] }))).rows;
+    const assessments = (await pool.query('SELECT id, student_id, assessed_on, data, created_at FROM assessments ORDER BY student_id, assessed_on').catch(() => ({ rows: [] }))).rows;
+    const announcements = (await pool.query('SELECT id, professor_id, title, body, student_ids, created_at FROM announcements').catch(() => ({ rows: [] }))).rows;
+    const workoutTemplates = (await pool.query('SELECT id, professor_id, data, updated_at FROM workout_templates').catch(() => ({ rows: [] }))).rows;
     const stamp = new Date().toISOString().slice(0, 10);
     res.set('Content-Disposition', `attachment; filename="sobrecarga-backup-${stamp}.json"`);
-    res.json({ exportedAt: new Date().toISOString(), professors, students, states, energyAccess, exerciseVideos });
+    res.json({ exportedAt: new Date().toISOString(), professors, students, states, energyAccess, exerciseVideos, studentProfiles, assessments, announcements, workoutTemplates });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'db_error' });
@@ -1010,6 +1277,7 @@ app.use((err, req, res, next) => {
 // server.js e package.json.
 const PUBLIC_FILES = new Set([
   'index.html', 'styles.css', 'app.js', 'manifest.webmanifest', 'sw.js',
+  'lib/assessment.js',
   'icons/icon-180.png', 'icons/icon-192.png', 'icons/icon-512.png'
 ]);
 app.use((req, res, next) => {
