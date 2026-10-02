@@ -51,11 +51,11 @@ test('cabeçalhos de segurança presentes e sem x-powered-by', async () => {
 
 test('só os arquivos do site são públicos', async () => {
   await withServer(async port => {
-    for (const p of ['/', '/app.js', '/styles.css', '/sw.js', '/manifest.webmanifest', '/icons/icon-192.png']) {
+    for (const p of ['/', '/app.js', '/styles.css', '/sw.js', '/manifest.webmanifest', '/icons/icon-192.png', '/lib/assessment.js']) {
       assert.strictEqual((await get(port, p)).status, 200, p);
     }
     for (const p of ['/server.js', '/package.json', '/package-lock.json', '/render.yaml', '/README.md',
-      '/lib/ratelimit.js', '/tests/smoke.js', '/.gitignore', '/.git/config', '/node_modules/express/package.json', '/..%2fserver.js']) {
+      '/lib/ratelimit.js', '/lib/activity.js', '/lib/templates.js', '/lib/videos.js', '/tests/smoke.js', '/.gitignore', '/.git/config', '/node_modules/express/package.json', '/..%2fserver.js']) {
       assert.notStrictEqual((await get(port, p)).status, 200, `${p} não pode ser público`);
     }
   });

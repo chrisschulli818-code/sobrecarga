@@ -131,7 +131,23 @@
         <button class="small primary" id="addStudentBtn">+ novo aluno</button>
       </div>
     </div>
+    <div class="kpi-grid" id="coachKpis"></div>
+    <div id="coachTools"></div>
     <div id="studentsList"></div>
+  </div>
+  <div class="card">
+    <div class="card-head">
+      <h2><span class="chip">📋</span>Modelos de treino</h2>
+      <span class="hint">Monte uma vez, envie para vários alunos</span>
+    </div>
+    <div id="profTemplates"></div>
+  </div>
+  <div class="card">
+    <div class="card-head">
+      <h2><span class="chip">📣</span>Avisos para a turma</h2>
+      <span class="hint">Recados que aparecem no Início do aluno</span>
+    </div>
+    <div id="profAnnouncements"></div>
   </div>
   <div class="card">
     <div class="card-head">
@@ -162,6 +178,7 @@
   </div>
 
   <div id="readonlyBanner" style="display:none;" class="hint"></div>
+  <div id="studentAnnouncements"></div>
 
   <div class="card" id="dashCard">
     <div class="dash">
@@ -256,6 +273,14 @@
     <div id="progressWrap"></div>
   </div>
 
+  <div class="card" id="assessCard">
+    <div class="card-head">
+      <h2><span class="chip">📏</span>Avaliação física</h2>
+      <span class="hint">Peso, medidas, % de gordura e anamnese</span>
+    </div>
+    <button class="primary small" id="openAssessBtn">Abrir avaliação física</button>
+  </div>
+
   <div class="card">
     <div class="card-head">
       <h2><span class="chip">⬇</span>Exportar</h2>
@@ -336,4 +361,5 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
 <datalist id="exerciseNameList"></datalist>
+<script src="/lib/assessment.js"></script>
 <script src="/app.js"></script>

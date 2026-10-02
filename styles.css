@@ -810,3 +810,148 @@ button.primary.big{height:52px;margin-top:6px;border-radius:14px;font-size:15px;
 .video-card-actions button{text-transform:none;letter-spacing:0;}
 @media (max-width:760px){ .video-form{grid-template-columns:1fr;} }
 .video-card-actions{align-items:center;} .video-card-actions .badge{margin-right:auto;}
+
+/* ---------- Professor: acompanhamento, avaliação física, avisos, modelos ---------- */
+.confirm-overlay{z-index:5000;}
+.badge-bad{background:rgba(224,114,95,.16);color:var(--down);}
+.coach-banner{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;border-color:var(--accent);padding:12px 16px;margin-bottom:22px;font-size:13.5px;}
+.coach-banner-actions{display:flex;gap:8px;flex-wrap:wrap;}
+.mprofessor-bar{display:flex;align-items:center;justify-content:space-between;gap:10px;}
+.mprofbtn{height:32px;padding:0 12px;border-radius:999px;border:1px solid var(--accent-text);background:none;color:var(--accent-text);font-size:12px;font-weight:700;text-transform:none;letter-spacing:0;}
+#coachKpis{margin-bottom:16px;}
+#coachKpis:empty{display:none;}
+.coach-chips{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;}
+.chip-btn{display:inline-flex;align-items:center;gap:8px;height:36px;padding:0 14px;border-radius:999px;border:1px solid var(--border-strong);background:none;color:var(--text-dim);font-size:13px;font-weight:700;text-transform:none;letter-spacing:0;}
+.chip-btn.active{background:var(--accent-tint);border-color:var(--accent);color:var(--text);}
+.chip-n{font-size:12px;padding:1px 8px;border-radius:999px;background:var(--surface-2);color:var(--text-dim);}
+.chip-btn.active .chip-n{background:var(--accent);color:var(--accent-ink);}
+.coach-tools-row{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px;}
+.coach-tools-row .search-box{max-width:340px;}
+.coach-sort select{min-height:40px;border-radius:10px;border:1px solid var(--border);background:var(--bg);color:var(--text);padding:0 12px;font-family:inherit;font-size:14px;}
+.student-row{align-items:flex-start;}
+.srow-main{min-width:0;}
+.sbadges{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;}
+.student-actions{flex-wrap:wrap;justify-content:flex-end;}
+
+/* janelas (avaliação física, modelo de treino, envio) */
+.af-overlay{position:fixed;inset:0;z-index:900;background:rgba(4,6,3,.82);display:flex;align-items:center;justify-content:center;padding:16px;}
+.af-box{width:100%;max-width:980px;max-height:calc(100vh - 32px);max-height:calc(100dvh - 32px);display:flex;flex-direction:column;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius-lg);overflow:hidden;}
+.af-box-sm{max-width:560px;}
+.af-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;padding:16px 16px 12px 20px;border-bottom:1px solid var(--border);}
+.af-title{margin:2px 0 0;font-size:22px;font-weight:800;text-transform:none;letter-spacing:-.01em;}
+.af-close{width:44px;height:44px;padding:0;justify-content:center;border:none;background:var(--surface-2);border-radius:12px;font-size:16px;flex:none;}
+.af-body{overflow:auto;padding:16px 20px 24px;-webkit-overflow-scrolling:touch;}
+.af-actions{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px;}
+.af-actions button,.af-result .big{text-transform:none;letter-spacing:0;min-height:44px;font-size:14px;}
+.af-note{margin:0 0 14px;padding:10px 14px;border-radius:12px;background:rgba(227,193,79,.12);color:var(--warn);font-size:13px;}
+.af-section{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-md);padding:16px;margin-bottom:14px;}
+.af-section h3{margin:0 0 12px;font-size:15px;font-weight:800;text-transform:none;letter-spacing:0;}
+.af-help{margin:-6px 0 10px;font-size:12.5px;}
+.af-form-grid{display:grid;grid-template-columns:1fr 300px;gap:16px;align-items:start;}
+.af-row3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;}
+.af-grid5{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:12px;}
+.af-grid4{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;}
+.af-grid2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;}
+.af-lr{display:grid;grid-template-columns:130px 1fr 1fr;gap:10px 12px;align-items:end;max-width:480px;margin-top:14px;}
+.af-lr-name{font-size:13px;font-weight:700;padding-bottom:12px;}
+.vf-field select,.vf-field textarea{min-height:44px;box-sizing:border-box;width:100%;border-radius:var(--radius-sm);border:1px solid var(--border);background:var(--surface-2);color:var(--text);font-family:inherit;font-size:14px;padding:9px 11px;}
+.af-result{position:sticky;top:0;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-md);padding:16px;display:flex;flex-direction:column;gap:14px;}
+.af-result h3{margin:0;font-size:15px;font-weight:800;text-transform:none;}
+.af-res-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:0;padding-top:12px;border-top:1px solid var(--border);}
+.af-res-grid dt{font-size:11px;color:var(--text-faint);}
+.af-res-grid dd{margin:2px 0 0;font-size:15px;font-weight:800;}
+.kpi-u{font-size:13px;font-weight:600;color:var(--text-dim);}
+.af-charts{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:12px;margin:14px 0;}
+.af-chart{margin:0;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-md);padding:14px;}
+.af-chart figcaption{font-size:14px;font-weight:800;margin-bottom:6px;}
+.af-chart svg{width:100%;height:auto;display:block;}
+.af-grid{stroke:var(--border);}
+.af-tick{font-size:10px;fill:var(--text-faint);}
+.af-line{stroke:var(--accent-text);stroke-width:2.5;stroke-linejoin:round;stroke-linecap:round;}
+.af-dot{fill:var(--surface);stroke:var(--accent-text);stroke-width:2.5;}
+.af-item{background:var(--surface-2);border:1px solid var(--border);border-radius:var(--radius-md);margin-bottom:8px;}
+.af-item summary{display:flex;gap:12px;align-items:center;justify-content:space-between;flex-wrap:wrap;padding:12px 14px;cursor:pointer;min-height:44px;box-sizing:border-box;}
+.af-item-date{font-weight:800;font-size:14px;}
+.af-item-vals{font-size:13px;color:var(--text-dim);}
+.af-item-body{padding:0 14px 14px;}
+.af-item-actions{display:flex;gap:8px;margin-top:12px;}
+.af-dl{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:8px 18px;margin:10px 0 0;}
+.af-dl > div{border-bottom:1px solid var(--border);padding-bottom:6px;}
+.af-dl dt{font-size:12px;color:var(--text-faint);}
+.af-dl dd{margin:2px 0 0;font-size:14px;font-weight:700;}
+.af-anam{grid-template-columns:repeat(auto-fill,minmax(260px,1fr));}
+.af-photos,.af-obs{margin:12px 0 0;font-size:13.5px;}
+.af-photos a{color:var(--accent-text);font-weight:700;}
+.af-checks{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:4px 12px;margin:14px 0;}
+.af-check{display:flex;align-items:center;gap:10px;min-height:40px;font-size:14px;font-weight:600;cursor:pointer;}
+.af-check input{width:20px;height:20px;accent-color:var(--accent);flex:none;}
+.af-detail{display:grid;grid-template-columns:minmax(200px,260px) 1fr;gap:6px 14px;align-items:center;}
+.af-detail input[type=text],.af-detail input:not([type]){min-height:40px;}
+@media (max-width:760px){
+  .af-overlay{padding:0;align-items:stretch;}
+  .af-box{max-width:none;max-height:none;border-radius:0;border:none;}
+  .af-form-grid{grid-template-columns:1fr;}
+  .af-result{position:static;}
+  .af-row3,.af-grid4,.af-grid2{grid-template-columns:repeat(2,minmax(0,1fr));}
+  .af-grid5{grid-template-columns:repeat(2,minmax(0,1fr));}
+  .af-detail{grid-template-columns:1fr;}
+}
+
+/* avisos */
+.ann-form{display:flex;flex-direction:column;gap:12px;max-width:640px;}
+.ann-form .primary{align-self:flex-start;height:44px;text-transform:none;letter-spacing:0;font-size:14px;}
+.ann-aud{border:1px solid var(--border);border-radius:var(--radius-sm);padding:8px 12px 10px;margin:0;}
+.ann-aud legend{font-size:12.5px;font-weight:700;color:var(--text-dim);padding:0 6px;}
+.ann-pick{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:2px 12px;margin-top:6px;max-height:220px;overflow:auto;}
+.ann-list{display:flex;flex-direction:column;gap:8px;margin-top:14px;}
+.ann-item{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;background:var(--surface-2);border:1px solid var(--border);border-radius:var(--radius-md);padding:12px 14px;}
+.ann-title{font-size:14.5px;font-weight:800;}
+.ann-body{font-size:13.5px;color:var(--text-dim);margin-top:2px;white-space:pre-wrap;overflow-wrap:anywhere;}
+.ann-main{min-width:0;flex:1;}
+.ann-student{display:flex;flex-direction:column;gap:8px;}
+.mpage .ann-student{margin:0;}
+#studentAnnouncements .ann-student{margin-bottom:18px;}
+.ann-card{display:flex;align-items:flex-start;gap:12px;background:var(--accent-tint);border:1px solid var(--border);border-radius:var(--radius-md);padding:12px 12px 12px 14px;}
+.ann-x{width:36px;height:36px;flex:none;padding:0;justify-content:center;border:none;background:none;color:var(--text-dim);font-size:14px;}
+
+/* modelos de treino */
+.tpl-top{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;margin-bottom:14px;}
+.tpl-top .primary{height:44px;text-transform:none;letter-spacing:0;font-size:14px;}
+.tpl-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px;}
+.tpl-card{background:var(--surface-2);border:1px solid var(--border);border-radius:var(--radius-md);padding:14px;display:flex;flex-direction:column;gap:6px;}
+.tpl-name{font-size:15px;font-weight:800;}
+.tpl-actions{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;}
+.tpl-actions button,.tpl-day button{text-transform:none;letter-spacing:0;}
+.tpl-day-head{display:grid;grid-template-columns:1fr 180px auto;gap:12px;align-items:end;margin-bottom:12px;}
+.tpl-ex-head,.tpl-ex{display:grid;grid-template-columns:minmax(0,2.4fr) 70px minmax(0,1fr) minmax(0,1fr) 40px;gap:8px;align-items:center;}
+.tpl-ex-head{font-size:11.5px;font-weight:700;color:var(--text-faint);margin-bottom:4px;}
+.tpl-ex{margin-bottom:8px;}
+.tpl-ex input{min-height:44px;box-sizing:border-box;}
+.send-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:2px 12px;max-height:260px;overflow:auto;}
+@media (max-width:760px){
+  .tpl-day-head{grid-template-columns:1fr;}
+  .tpl-ex-head{display:none;}
+  .tpl-ex{grid-template-columns:1fr 1fr 40px;}
+  .tpl-ex input:first-child{grid-column:1 / -1;}
+}
+
+/* campos sem type (nome, título, exercício…) também seguem o tema */
+input:not([type]),input[type=search],input[type=url]{
+  width:100%;background:var(--surface-2);border:1px solid var(--border);color:var(--text);
+  border-radius:var(--radius-sm);padding:7px 9px;font-family:inherit;font-size:14px;
+}
+.search-box input[type=search]{background:none;border:none;padding:0;border-radius:0;}
+.af-form input[type=number],.tpl-ex input[type=number]{text-align:left;}
+.af-form input,.tpl-ex input,.send-list input,.ann-form input,.ann-form textarea{min-height:44px;box-sizing:border-box;}
+.af-check input,.ann-aud input{min-height:0;}
+.af-tick{font-size:13px;}
+.af-chart svg text{font-family:'Archivo',sans-serif;}
+.ann-aud{margin-bottom:0;}
+@media (max-width:760px){
+  #coachKpis{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;}
+  #coachKpis .kpi{padding:10px 12px;}
+  #coachKpis .kpi-v{font-size:20px;}
+  .tpl-ex{grid-template-columns:64px minmax(0,1fr) minmax(0,1fr) 40px;}
+  .tpl-ex input:first-child{grid-column:1 / -1;}
+  .student-actions{justify-content:flex-start;}
+}
