@@ -2684,10 +2684,11 @@ async function openAssessment(studentId, canEdit){
     const stat = (label, v, unit, dl, extra)=> `<div class="kpi"><div class="kpi-l">${label}</div><div class="kpi-v">${v==null?'—':fmtN(v,2)}<span class="kpi-u"> ${unit}</span></div>${extra||''}${dl?`<div class="kpi-s">${dl}</div>`:''}</div>`;
     const series = pick=> chrono.flatMap(a=>{ const v = pick(a); return v==null ? [] : [{label: shortBR(a.date), value: v}]; });
     const needsProfile = !data.profile || !data.profile.sexo || !data.profile.idade;
-    let html = '';
+    let html = `<div class="af-actions">
+      ${canEdit ? `<button type="button" class="primary" data-af="new">+ Nova avaliação</button>
+        <button type="button" class="ghost" data-af="profile">${data.profile ? 'Editar anamnese' : 'Preencher anamnese'}</button>` : ''}
+      <button type="button" class="${canEdit ? 'ghost' : 'primary'}" data-af="pdf">⬇ Exportar PDF</button></div>`;
     if(canEdit){
-      html += `<div class="af-actions"><button type="button" class="primary" data-af="new">+ Nova avaliação</button>
-        <button type="button" class="ghost" data-af="profile">${data.profile ? 'Editar anamnese' : 'Preencher anamnese'}</button></div>`;
       if(needsProfile) html += `<p class="af-note">Preencha <strong>idade e sexo</strong> na anamnese para o app calcular o % de gordura (Pollock 7 dobras).</p>`;
     }
     html += `<div class="kpi-grid">
@@ -2712,7 +2713,28 @@ async function openAssessment(studentId, canEdit){
         </div></details>`).join('');
     }
     html += `</section><section class="af-section"><h3>Anamnese</h3>${anamneseHtml(data.profile)}</section>`;
+    if(canEdit){
+      const pr = data.professor || {};
+      html += `<section class="af-section"><h3>Contato no PDF</h3><p class="dim af-help">Aparece no cabeçalho do PDF da avaliação, no lugar do Instagram e do WhatsApp da planilha.</p>
+        <form class="af-contact" novalidate><div class="af-grid2">
+          ${field('Instagram', 'instagram', pr.instagram, 'maxlength="60" placeholder="@seuinstagram" autocomplete="off"')}
+          ${field('WhatsApp', 'whatsapp', pr.whatsapp, 'inputmode="tel" maxlength="20" placeholder="(41) 99999-9999" autocomplete="off"')}
+        </div><div class="vf-msg" role="status"></div><button type="submit" class="ghost">Salvar contato</button></form></section>`;
+    }
     body.innerHTML = html;
+    const cf = body.querySelector('.af-contact');
+    if(cf) cf.addEventListener('submit', async e=>{
+      e.preventDefault();
+      const msg = cf.querySelector('.vf-msg');
+      try{
+        const res = await fetch('/api/professor/contact', { method:'PUT', headers: apiHeaders({'Content-Type':'application/json'}), body: JSON.stringify({ instagram: cf.instagram.value, whatsapp: cf.whatsapp.value }) });
+        if(!res.ok) throw new Error(res.status);
+        const r = await res.json();
+        data.professor = Object.assign({}, data.professor, { instagram: r.instagram, whatsapp: r.whatsapp });
+        cf.instagram.value = r.instagram ? '@' + r.instagram : ''; cf.whatsapp.value = r.whatsapp;
+        msg.style.color = 'var(--up)'; msg.textContent = 'Contato salvo.';
+      }catch(err){ msg.style.color = ''; msg.textContent = 'Não consegui salvar agora.'; }
+    });
   }
 
   const field = (label, name, val, attrs)=> `<label class="vf-field"><span>${label}</span><input name="${name}" value="${escapeAttr(val==null?'':val)}" ${attrs||'inputmode="decimal" autocomplete="off"'}></label>`;
@@ -2827,6 +2849,7 @@ async function openAssessment(studentId, canEdit){
     else if(act==='edit'){ view = {name:'form', id:b.dataset.id}; render(); }
     else if(act==='profile'){ view = {name:'profile'}; render(); }
     else if(act==='back'){ view = {name:'summary'}; render(); }
+    else if(act==='pdf'){ exportAssessmentPdf(data); }
     else if(act==='del'){
       if(!(await confirmDialog('Excluir esta avaliação?'))) return;
       const res = await fetch(`/api/assessment/${studentId}/records/${b.dataset.id}`, { method:'DELETE', headers: apiHeaders() });
@@ -2836,6 +2859,279 @@ async function openAssessment(studentId, canEdit){
   });
   await load();
 }
+/* ---------- PDF da avaliação física ----------
+   Mesmas seções da planilha do professor (dados, anamnese, IMC, circunferências
+   e dobras por data, composição corporal, gráficos, fotos, observações), no
+   visual do Sobrecarga. Página clara (dá pra imprimir) com a faixa escura da
+   marca e o verde do app. Fotos entram como links clicáveis (o app não carrega
+   imagem de outro site). */
+function buildAssessmentPdf(data){
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ unit: 'mm', format: 'a4' });
+  const W = 210, H = 297, M = 14, CW = W - 2*M, FOOT = 14;
+  const C = { dark:[11,15,12], green:[59,112,61], soft:[147,176,148], tint:[232,240,232], zebra:[246,249,246],
+              line:[213,221,213], text:[27,35,28], muted:[92,107,95], amber:[184,134,28], red:[176,58,46], white:[255,255,255] };
+  const fill = c=> doc.setFillColor(c[0], c[1], c[2]);
+  const stroke = c=> doc.setDrawColor(c[0], c[1], c[2]);
+  const ink = c=> doc.setTextColor(c[0], c[1], c[2]);
+  const font = (style, size)=>{ doc.setFont('helvetica', style); doc.setFontSize(size); };
+  // A fonte padrão do PDF só tem Latin-1 e alguns símbolos: o resto (emoji, "−", setas) vira equivalente ou some.
+  const safe = t=> String(t==null ? '' : t).normalize('NFC').replace(/[\u2212\u2012]/g,'-').replace(/[\u2192\u21D2]/g,'>')
+    .replace(/[^\n\x20-\x7E\u00A0-\u00FF\u2013\u2014\u2018\u2019\u201C\u201D\u2022\u2026]/g,'');
+  const n = (v, d)=> (v==null || v==='') ? '—' : Number(v).toLocaleString('pt-BR', {minimumFractionDigits:0, maximumFractionDigits: d==null?1:d});
+  const dShort = iso=> `${iso.slice(8,10)}/${iso.slice(5,7)}/${iso.slice(2,4)}`;
+  const dLong = iso=> `${iso.slice(8,10)}/${iso.slice(5,7)}/${iso.slice(0,4)}`;
+
+  const list = (data.assessments || []).slice().sort((a,b)=> a.date.localeCompare(b.date));   // cronológico
+  const last = list[list.length-1] || {};
+  const cols = list.slice(-6);                                    // as 6 datas mais recentes nas tabelas
+  const P = data.profile || {};
+  const prof = data.professor || {};
+  let y = 0;
+
+  // ----- cabeçalho (faixa escura com a marca) -----
+  fill(C.dark); doc.rect(0, 0, W, 34, 'F');
+  fill(C.green); doc.roundedRect(M, 9, 16, 16, 4, 4, 'F');
+  stroke(C.white); doc.setLineWidth(0.9); doc.setLineCap('round');       // halter da marca
+  doc.line(M+3.6, 17, M+4.8, 17); doc.line(M+11.2, 17, M+12.4, 17); doc.line(M+5.9, 14.6, M+5.9, 19.4);
+  doc.line(M+10.1, 14.6, M+10.1, 19.4); doc.line(M+5.9, 17, M+10.1, 17);
+  ink(C.white); font('bold', 21); doc.text('AVALIAÇÃO FÍSICA', M+21, 18.5);
+  ink(C.soft); font('normal', 8.5); doc.text('SOBRECARGA · DIÁRIO DE TREINO', M+21, 24.5);
+  const contact = [];
+  if(prof.name) contact.push(['bold', safe('Prof. ' + prof.name)]);
+  if(prof.instagram) contact.push(['normal', 'Instagram @' + prof.instagram]);
+  if(prof.whatsapp){
+    const w = prof.whatsapp.replace(/^55(?=\d{10,11}$)/, '');
+    contact.push(['normal', 'WhatsApp ' + (w.length===11 ? `(${w.slice(0,2)}) ${w.slice(2,7)}-${w.slice(7)}` : w.length===10 ? `(${w.slice(0,2)}) ${w.slice(2,6)}-${w.slice(6)}` : prof.whatsapp)]);
+  }
+  contact.forEach(([st, txt], i)=>{ ink(i===0 ? C.white : C.soft); font(st, i===0 ? 9.5 : 8.5); doc.text(txt, W-M, 13 + i*5.4, {align:'right'}); });
+  y = 43;
+
+  const ensure = h=>{ if(y + h > H - FOOT){ doc.addPage(); y = 16; } };
+  const section = (title, minBody)=>{
+    ensure(12 + (minBody||0));
+    fill(C.green); doc.roundedRect(M, y, 1.8, 5.6, 0.9, 0.9, 'F');
+    ink(C.text); font('bold', 11); doc.text(title.toUpperCase(), M+4.5, y+4.3);
+    y += 9;
+  };
+  const card = (h)=>{ stroke(C.line); doc.setLineWidth(0.25); fill(C.white); doc.roundedRect(M, y, CW, h, 2.5, 2.5, 'FD'); };
+  const pair = (x, yy, label, value, w)=>{
+    ink(C.muted); font('normal', 7.2); doc.text(safe(label).toUpperCase(), x, yy);
+    ink(C.text); font('bold', 9.5);
+    const lines = doc.splitTextToSize(safe(value==null||value===''?'—':value) || '—', w);
+    doc.text(lines, x, yy+4.6);
+    return lines.length;
+  };
+
+  // ----- dados do avaliado -----
+  section('Dados do avaliado', 28);
+  card(27);
+  const phone = (data.phone || '').replace(/\D/g, '');
+  const phoneTxt = phone.length>=10 ? (phone.length>=12 ? phone.replace(/^55/, '') : phone) : '';
+  const phoneFmt = phoneTxt.length===11 ? `(${phoneTxt.slice(0,2)}) ${phoneTxt.slice(2,7)}-${phoneTxt.slice(7)}` : phoneTxt.length===10 ? `(${phoneTxt.slice(0,2)}) ${phoneTxt.slice(2,6)}-${phoneTxt.slice(6)}` : '';
+  const cw4 = CW/4;
+  pair(M+5, y+7, 'Nome', data.name || '—', cw4*1.6);
+  pair(M+5+cw4*1.9, y+7, 'Idade', P.idade!=null ? P.idade+' anos' : '—', cw4-4);
+  pair(M+5+cw4*2.7, y+7, 'Sexo', P.sexo ? (P.sexo==='masculino'?'Masculino':'Feminino') : '—', cw4-4);
+  pair(M+5, y+18, 'Contato', phoneFmt || '—', cw4*1.6);
+  pair(M+5+cw4*1.9, y+18, 'Última avaliação', last.date ? dLong(last.date) : '—', cw4*1.7);
+  pair(M+5+cw4*2.9, y+18, 'Avaliações registradas', String(list.length), cw4-4);
+  y += 27 + 8;
+
+  // ----- anamnese -----
+  section('Anamnese', 40);
+  const yn = (v, d)=> v ? ('Sim' + (d ? ' — ' + d : '')) : 'Não';
+  const qa = [];
+  if(data.profile){
+    qa.push(['Já treinou antes?', yn(P.jaTreinouAntes)], ['Treina há quanto tempo?', P.tempoDeTreino], ['Tempo sem atividade física?', P.tempoSemAtividadeFisica],
+      ['Objetivo?', P.objetivo], ['Frequência semanal?', P.frequenciaSemanal ? P.frequenciaSemanal + 'x por semana' : ''], ['Tempo de treino por dia?', P.tempoTreinoPorDia],
+      ['Doença/problema de saúde?', yn(P.temDoencaOuProblemaSaude, P.doencaOuProblemaSaudeDetalhe)], ['Limitação de movimento?', yn(P.temLimitacaoMovimento, P.limitacaoMovimentoDetalhe)],
+      ['Dor em algum movimento?', yn(P.temDorEmMovimento, P.dorEmMovimentoDetalhe)], ['Cirurgias?', yn(P.fezCirurgias, P.cirurgiasDetalhe)],
+      ['Medicamento controlado?', yn(P.usaMedicamentoControlado, P.medicamentoControladoDetalhe)], ['Está fazendo dieta?', yn(P.estaFazendoDieta)],
+      ['Consumo de álcool?', yn(P.consomeAlcool)], ['Fuma?', yn(P.fuma)]);
+  }
+  if(!qa.length){
+    card(12); ink(C.muted); font('normal', 9); doc.text('Anamnese ainda não preenchida.', M+5, y+7.3); y += 12 + 8;
+  }else{
+    const colW = (CW - 15)/2, rows = Math.ceil(qa.length/2);
+    // altura de cada linha = a maior das duas células (respostas longas quebram)
+    const heights = [];
+    for(let r=0;r<rows;r++){
+      let lines = 1;
+      [qa[r*2], qa[r*2+1]].forEach(q=>{ if(q){ font('bold', 9.5); lines = Math.max(lines, doc.splitTextToSize(safe(q[1]||'—') || '—', colW).length); } });
+      heights.push(9.6 + (lines-1)*4.2);
+    }
+    const total = heights.reduce((a,b)=> a+b, 0) + 6;
+    ensure(total + 4);
+    card(total);
+    let yy = y + 7;
+    for(let r=0;r<rows;r++){
+      [qa[r*2], qa[r*2+1]].forEach((q, i)=>{ if(q) pair(M+5 + i*(colW+5), yy, q[0], q[1], colW); });
+      if(r<rows-1){ stroke(C.line); doc.setLineWidth(0.15); doc.line(M+5, yy+heights[r]-4.2, W-M-5, yy+heights[r]-4.2); }
+      yy += heights[r];
+    }
+    y += total + 8;
+  }
+
+  // ----- IMC -----
+  section('Índice de massa corporal (IMC)', 56);
+  const bw = (CW - 9)/4;
+  const clsColor = c=> c==='Peso normal' ? C.green : (c==='Abaixo do peso' || c==='Sobrepeso') ? C.amber : C.red;
+  const stat = (i, label, value, color, size)=>{
+    const x = M + i*(bw+3);
+    fill(C.tint); stroke(C.line); doc.setLineWidth(0.25); doc.roundedRect(x, y, bw, 24, 2.5, 2.5, 'FD');
+    ink(C.muted); font('normal', 7.2); doc.text(label.toUpperCase(), x+bw/2, y+6.5, {align:'center'});
+    ink(color || C.text); font('bold', size || 19); doc.text(doc.splitTextToSize(safe(value), bw-4), x+bw/2, y+16.5, {align:'center'});
+  };
+  stat(0, 'Altura (m)', last.altura!=null ? n(last.altura, 2) : '—');
+  stat(1, 'Peso (kg)', last.peso!=null ? n(last.peso, 1) : '—');
+  stat(2, 'Seu IMC', last.imc!=null ? n(last.imc, 2) : '—', last.imc!=null ? clsColor(last.classificacaoImc) : null);
+  stat(3, 'Classificação', last.classificacaoImc || '—', last.classificacaoImc ? clsColor(last.classificacaoImc) : null, 11);
+  y += 24 + 5;
+  // régua de classificação (a atual fica destacada)
+  const scale = [['0 a 18,49','Abaixo do peso'],['18,5 a 24,99','Peso normal'],['25 a 29,99','Sobrepeso'],['30 a 34,99','Obesidade I'],['35 a 39,99','Obesidade II'],['40 ou mais','Obesidade III']];
+  const full = ['Abaixo do peso','Peso normal','Sobrepeso','Obesidade Grau I','Obesidade Grau II','Obesidade Grau III'];
+  const sw = CW/6;
+  scale.forEach(([rng, lbl], i)=>{
+    const on = last.classificacaoImc===full[i];
+    fill(on ? clsColor(full[i]) : C.zebra); stroke(C.line); doc.setLineWidth(0.2);
+    doc.roundedRect(M + i*sw + 0.5, y, sw-1, 11, 1.8, 1.8, 'FD');
+    ink(on ? C.white : C.muted); font('bold', 6.8); doc.text(lbl, M + i*sw + sw/2, y+4.5, {align:'center'});
+    font('normal', 6.8); doc.text(rng, M + i*sw + sw/2, y+8.4, {align:'center'});
+  });
+  y += 11 + 9;
+
+  // ----- tabelas por data -----
+  const dateHead = ['', ...cols.map(a=> dShort(a.date)), ...(cols.length>1 ? ['Variação'] : [])];
+  const delta = (get, d)=>{
+    // do primeiro ao último valor que existe entre as datas mostradas
+    const have = cols.map(get).filter(v=> v!=null);
+    if(cols.length<2) return null;
+    if(have.length<2) return '—';
+    const v = have[have.length-1] - have[0];
+    return (v>0?'+':'') + n(v, d==null?1:d);
+  };
+  const rowOf = (label, get, d)=> [label, ...cols.map(a=> n(get(a), d==null?1:d)), ...(cols.length>1 ? [delta(get, d)] : [])];
+  const table = (rows, opts)=>{
+    const o = opts || {};
+    doc.autoTable({
+      startY: y, margin: { left: M, right: M, bottom: FOOT }, head: [dateHead], body: rows, theme: 'grid',
+      styles: { font: 'helvetica', fontSize: 8.2, cellPadding: { top: 1.7, bottom: 1.7, left: 2.2, right: 2.2 }, lineColor: C.line, lineWidth: 0.2, textColor: C.text, halign: 'center', valign: 'middle' },
+      headStyles: { fillColor: C.green, textColor: C.white, fontStyle: 'bold', halign: 'center' },
+      alternateRowStyles: { fillColor: C.zebra },
+      columnStyles: { 0: { halign: 'left', fontStyle: 'bold', cellWidth: 44 }, ...(cols.length>1 ? { [cols.length+1]: { fontStyle: 'bold' } } : {}) },
+      didParseCell: h=>{ if(o.boldLast && h.section==='body' && h.row.index===rows.length-1){ h.cell.styles.fontStyle = 'bold'; h.cell.styles.fillColor = C.tint; } }
+    });
+    y = doc.lastAutoTable.finalY + 8;
+  };
+  const circ = (k, side)=> a=> { const c = a.circunferencias || {}; return side ? (c[k] || {})[side] : c[k]; };
+  if(!cols.length){
+    section('Avaliações'); card(14); ink(C.muted); font('normal', 9); doc.text('Nenhuma avaliação registrada ainda.', M+5, y+8.5); y += 22;
+  }else{
+    section('Composição corporal', 30);
+    table([rowOf('IMC', a=> a.imc, 2), rowOf('Massa magra (kg)', a=> a.massaMagra), rowOf('Massa gorda (kg)', a=> a.massaGorda), rowOf('% de gordura corporal', a=> a.percentualGordura)]);
+    section('Circunferências (cm)', 50);
+    table([
+      rowOf('Ombro', circ('ombro')), rowOf('Tórax', circ('torax')), rowOf('Cintura', circ('cintura')), rowOf('Abdominal', circ('abdominal')), rowOf('Quadril', circ('quadril')),
+      rowOf('Braço (E)', circ('bracoNormal','esquerdo')), rowOf('Braço (E) contraído', circ('bracoContraido','esquerdo')), rowOf('Antebraço (E)', circ('antebraco','esquerdo')),
+      rowOf('Braço (D)', circ('bracoNormal','direito')), rowOf('Braço (D) contraído', circ('bracoContraido','direito')), rowOf('Antebraço (D)', circ('antebraco','direito')),
+      rowOf('Coxa (E)', circ('coxa','esquerdo')), rowOf('Coxa (D)', circ('coxa','direito')), rowOf('Panturrilha (E)', circ('panturrilha','esquerdo')), rowOf('Panturrilha (D)', circ('panturrilha','direito'))
+    ]);
+    section('Dobras cutâneas (mm)', 50);
+    table([...AF.DOBRAS.map(([k,l])=> rowOf(l, a=> (a.dobras||{})[k])), rowOf('Peso (kg)', a=> a.peso)], { boldLast: true });
+
+    // ----- gráficos de evolução -----
+    const pts = list.slice(-8);
+    const chartW = (CW - 6)/2, chartH = 46;
+    const chart = (x, yy, title, unit, get, d)=>{
+      stroke(C.line); doc.setLineWidth(0.25); fill(C.white); doc.roundedRect(x, yy, chartW, chartH, 2.5, 2.5, 'FD');
+      ink(C.text); font('bold', 9); doc.text(title, x+4, yy+6.2);
+      ink(C.muted); font('normal', 7.5); doc.text(unit, x+chartW-4, yy+6.2, {align:'right'});
+      const series = pts.map(a=> ({ d: a.date, v: get(a) })).filter(p=> p.v!=null);
+      if(series.length<2){
+        ink(C.muted); font('normal', 8);
+        doc.text(series.length ? [`${n(series[0].v, d)} ${unit}`, 'Registre mais uma avaliação', 'para ver a evolução.'] : 'Sem dados', x+chartW/2, yy+chartH/2, {align:'center'});
+        return;
+      }
+      const gx0 = x+10, gx1 = x+chartW-7, gy0 = yy+15, gy1 = yy+chartH-9;
+      const vs = series.map(p=> p.v), mn = Math.min(...vs), mx = Math.max(...vs), pad = (mx-mn || 1)*0.25, lo = mn-pad, hi = mx+pad;
+      const px = i=> gx0 + (i*(gx1-gx0))/(series.length-1), py = v=> gy0 + ((hi-v)/(hi-lo))*(gy1-gy0);
+      stroke(C.line); doc.setLineWidth(0.15);
+      [lo+pad, (mn+mx)/2, hi-pad].forEach(t=>{ doc.line(gx0, py(t), gx1, py(t)); });
+      stroke(C.green); doc.setLineWidth(0.7); doc.setLineCap('round'); doc.setLineJoin('round');
+      series.forEach((p,i)=>{ if(i) doc.line(px(i-1), py(series[i-1].v), px(i), py(p.v)); });
+      series.forEach((p,i)=>{
+        const isLast = i===series.length-1;
+        fill(isLast ? C.green : C.white); stroke(C.green); doc.setLineWidth(0.5); doc.circle(px(i), py(p.v), 1.2, 'FD');
+        ink(isLast ? C.green : C.text); font(isLast ? 'bold' : 'normal', 7); doc.text(n(p.v, d), px(i), py(p.v)-2.6, {align: i===0 ? 'left' : isLast ? 'right' : 'center'});
+        ink(C.muted); font('normal', 6.5); doc.text(series.length>4 ? p.d.slice(8,10)+'/'+p.d.slice(5,7) : dShort(p.d), px(i), yy+chartH-3.5, {align: i===0 ? 'left' : isLast ? 'right' : 'center'});
+      });
+    };
+    section('Evolução', chartH*2 + 14);
+    ensure(chartH*2 + 6);
+    chart(M, y, 'Peso', 'kg', a=> a.peso, 1); chart(M+chartW+6, y, '% de gordura corporal', '%', a=> a.percentualGordura, 1);
+    chart(M, y+chartH+6, 'Massa magra', 'kg', a=> a.massaMagra, 1); chart(M+chartW+6, y+chartH+6, 'Massa gorda', 'kg', a=> a.massaGorda, 1);
+    y += chartH*2 + 6 + 8;
+  }
+
+  // ----- fotos (links) -----
+  const photoOf = k=>{ for(let i=list.length-1;i>=0;i--){ const f = (list[i].fotos||{})[k]; if(f) return { url: f, date: list[i].date }; } return null; };
+  section('Fotos', 2*38 + 10);
+  const pw = (CW - 4)/2, ph = 38;
+  AF.FOTOS.forEach(([k, label], i)=>{
+    const x = M + (i%2)*(pw+4), yy = y + Math.floor(i/2)*(ph+4);
+    fill(C.tint); stroke(C.line); doc.setLineWidth(0.25); doc.roundedRect(x, yy, pw, ph, 2.5, 2.5, 'FD');
+    ink(C.text); font('bold', 13); doc.text(label, x+pw/2, yy+ph/2 - 1, {align:'center'});
+    const ph0 = photoOf(k);
+    if(ph0){
+      ink(C.green); font('bold', 8.5);
+      doc.textWithLink('Abrir foto (' + dShort(ph0.date) + ')', x+pw/2, yy+ph/2 + 6, { url: ph0.url, align:'center' });
+    }
+  });
+  y += 2*ph + 4 + 8;
+
+  // ----- observações -----
+  const obs = list.filter(a=> a.observacoes).slice(-4);
+  section('Observações', 24);
+  if(!obs.length){
+    card(14); ink(C.muted); font('normal', 9); doc.text('Sem observações.', M+5, y+8.5); y += 14;
+  }else{
+    obs.forEach(a=>{
+      font('normal', 9);
+      const lines = doc.splitTextToSize(safe(a.observacoes), CW-10);
+      const h = 9 + lines.length*4.3;
+      ensure(h + 3); card(h);
+      ink(C.green); font('bold', 7.5); doc.text(dLong(a.date), M+5, y+5.6);
+      ink(C.text); font('normal', 9); doc.text(lines, M+5, y+10.4);
+      y += h + 3;
+    });
+  }
+
+  // ----- rodapé em todas as páginas -----
+  const pages = doc.internal.getNumberOfPages();
+  for(let i=1;i<=pages;i++){
+    doc.setPage(i);
+    stroke(C.line); doc.setLineWidth(0.25); doc.line(M, H-FOOT+4, W-M, H-FOOT+4);
+    ink(C.muted); font('normal', 7.5);
+    doc.text(safe(`Sobrecarga · Avaliação física de ${data.name || 'aluno'}`), M, H-FOOT+9);
+    doc.text(`Gerado em ${dLong(todayISO())}`, W/2, H-FOOT+9, {align:'center'});
+    doc.text(`Página ${i} de ${pages}`, W-M, H-FOOT+9, {align:'right'});
+  }
+  return doc;
+}
+function exportAssessmentPdf(data){
+  if(!(window.jspdf && window.jspdf.jsPDF && window.jspdf.jsPDF.API && window.jspdf.jsPDF.API.autoTable)){
+    alert('Não consegui carregar o gerador de PDF. Confira a internet e tente de novo.');
+    return;
+  }
+  if(!(data.assessments||[]).length){ alert('Registre pelo menos uma avaliação antes de exportar o PDF.'); return; }
+  let doc;
+  try{ doc = buildAssessmentPdf(data); }
+  catch(e){ console.error(e); alert('Não consegui gerar o PDF agora. Tente de novo.'); return; }
+  const safe = String(data.name||'aluno').normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^A-Za-z0-9]+/g,'-').replace(/^-|-$/g,'').toLowerCase() || 'aluno';
+  deliverPdf(doc, `avaliacao-fisica-${safe}-${todayISO()}.pdf`);
+}
+
 document.getElementById('openAssessBtn').addEventListener('click', ()=> openAssessment(activeStudentId(), READONLY));
 
 /* ---------- Vídeos de execução (links do YouTube) ----------

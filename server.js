@@ -208,6 +208,13 @@ async function ensureTable() {
     created_at TIMESTAMPTZ NOT NULL DEFAULT now()
   )`);
   await pool.query(`CREATE INDEX IF NOT EXISTS assessments_student_idx ON assessments (student_id, assessed_on DESC)`);
+  // Contato do professor que sai no cabeçalho do PDF da avaliação física.
+  await pool.query(`CREATE TABLE IF NOT EXISTS professor_contacts (
+    professor_id TEXT PRIMARY KEY,
+    instagram TEXT NOT NULL DEFAULT '',
+    whatsapp TEXT NOT NULL DEFAULT '',
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+  )`);
   // Avisos do professor (student_ids NULL = todos os alunos dele) e modelos de treino.
   await pool.query(`CREATE TABLE IF NOT EXISTS announcements (
     id TEXT PRIMARY KEY,
@@ -225,7 +232,7 @@ async function ensureTable() {
     updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
   )`);
   for (const t of ['professors', 'app_state_history', 'unlock_requests', 'energy_access', 'exercise_videos',
-    'student_profiles', 'assessments', 'announcements', 'workout_templates']) {
+    'student_profiles', 'assessments', 'announcements', 'workout_templates', 'professor_contacts']) {
     try { await pool.query(`ALTER TABLE ${t} ENABLE ROW LEVEL SECURITY`); }
     catch (err) { console.error(`Não consegui ativar RLS em ${t}:`, err.message); }
   }
@@ -729,14 +736,24 @@ async function requireStudentProfessor(req, res, next) {
 // Avaliação física: perfil/anamnese + avaliações (mais recente primeiro).
 app.get('/api/assessment/:studentId', requireStudentAccess, async (req, res) => {
   try {
-    const st = await pool.query('SELECT name FROM students WHERE id = $1', [req.params.studentId]);
+    const st = await pool.query('SELECT name, professor_id FROM students WHERE id = $1', [req.params.studentId]);
+    let phone = '';
+    try { phone = ((await pool.query('SELECT phone FROM students WHERE id = $1', [req.params.studentId])).rows[0] || {}).phone || ''; } catch (e) { /* coluna phone ausente */ }
     const prof = await pool.query('SELECT data FROM student_profiles WHERE student_id = $1', [req.params.studentId]);
     const rows = await pool.query(
       'SELECT id, assessed_on, data FROM assessments WHERE student_id = $1 ORDER BY assessed_on DESC, created_at DESC LIMIT 200',
       [req.params.studentId]
     );
+    let professor = null;
+    if (st.rows[0] && st.rows[0].professor_id) {
+      const p = await pool.query('SELECT name FROM professors WHERE id = $1', [st.rows[0].professor_id]);
+      const c = await pool.query('SELECT instagram, whatsapp FROM professor_contacts WHERE professor_id = $1', [st.rows[0].professor_id]);
+      professor = { name: p.rows[0] ? p.rows[0].name : '', instagram: c.rows[0] ? c.rows[0].instagram : '', whatsapp: c.rows[0] ? c.rows[0].whatsapp : '' };
+    }
     res.json({
       name: st.rows[0] ? st.rows[0].name : '',
+      phone,
+      professor,
       profile: prof.rows[0] ? prof.rows[0].data : null,
       assessments: rows.rows.map(r => ({ id: r.id, ...r.data, date: r.assessed_on }))
     });
@@ -787,6 +804,35 @@ app.delete('/api/assessment/:studentId/records/:rid', requireStudentProfessor, a
   try {
     await pool.query('DELETE FROM assessments WHERE id = $1 AND student_id = $2', [req.params.rid, req.params.studentId]);
     res.json({ ok: true });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'db_error' });
+  }
+});
+
+// Contato do professor (Instagram e WhatsApp) para o cabeçalho do PDF.
+app.get('/api/professor/contact', requireProfessor, async (req, res) => {
+  try {
+    const r = await pool.query('SELECT instagram, whatsapp FROM professor_contacts WHERE professor_id = $1', [req.professorId]);
+    res.json(r.rows[0] || { instagram: '', whatsapp: '' });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'db_error' });
+  }
+});
+app.put('/api/professor/contact', requireProfessor, async (req, res) => {
+  const b = req.body || {};
+  // Aceita @usuario, usuario ou o link inteiro (com ?igsh=… no fim); guarda só o nome de usuário.
+  const igRaw = String(b.instagram == null ? '' : b.instagram).trim().split(/[?#]/)[0].replace(/^.*instagram\.com\//i, '');
+  const instagram = (igRaw.split('/').filter(Boolean)[0] || '').replace(/^@/, '').replace(/[^A-Za-z0-9._]/g, '').slice(0, 30);
+  const whatsapp = String(b.whatsapp == null ? '' : b.whatsapp).replace(/\D/g, '').slice(0, 15);
+  try {
+    await pool.query(
+      `INSERT INTO professor_contacts (professor_id, instagram, whatsapp, updated_at) VALUES ($1,$2,$3,now())
+       ON CONFLICT (professor_id) DO UPDATE SET instagram = $2, whatsapp = $3, updated_at = now()`,
+      [req.professorId, instagram, whatsapp]
+    );
+    res.json({ ok: true, instagram, whatsapp });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'db_error' });
@@ -1167,6 +1213,7 @@ app.delete('/api/admin/professors/:id', requireAdmin, async (req, res) => {
     await pool.query(`DELETE FROM energy_access WHERE kind = 'professor' AND target_id = $1`, [req.params.id]).catch(() => {});
     await pool.query(`DELETE FROM exercise_videos WHERE scope = 'professor' AND owner_id = $1`, [req.params.id]).catch(() => {});
     await pool.query('DELETE FROM announcements WHERE professor_id = $1', [req.params.id]).catch(() => {});
+    await pool.query('DELETE FROM professor_contacts WHERE professor_id = $1', [req.params.id]).catch(() => {});
     await pool.query('DELETE FROM workout_templates WHERE professor_id = $1', [req.params.id]).catch(() => {});
     res.json({ ok: true });
   } catch (err) {
