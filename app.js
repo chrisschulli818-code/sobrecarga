@@ -1191,9 +1191,13 @@ async function handleFile(file){
 
     const gridGroups = await extractGridWorkouts(pdf);
 
+    const tableGroups = gridGroups.length ? [] : await extractTableWorkouts(pdf);
+
     let groups;
     if(gridGroups.length){
       groups = gridGroups;
+    }else if(tableGroups.length){
+      groups = tableGroups;
     }else{
       // fallback: PDF não tem o formato de grade (Séries/Aquec/Prep/1ª..5ª) — usa
       // leitura linha a linha genérica, separando por dia de treino quando dá
@@ -1228,6 +1232,158 @@ async function handleFile(file){
 /* Reconstrói tabelas no formato "grade de treino" (colunas Aquec/Prep/1ª..5ª por
    série), agrupando por posição x/y dos textos — esse tipo de PDF não tem "kg",
    só faixas de repetição prescritas (ex.: "6 a 10", "max"), sem carga. */
+/* ---------- Leitor de tabelas por posição ----------
+   Fichas em tabela (Exercício / Aquecimento / Série de trabalho / Reps / Cadência…)
+   têm células que quebram em várias linhas e nem sempre alinham na vertical, então
+   o texto linha a linha confunde. Aqui as colunas vêm da posição dos títulos do
+   cabeçalho e cada linha da tabela é ancorada na coluna de repetições. */
+function tableColumnType(text){
+  const t = String(text||'').toLowerCase().replace(/\s+/g,' ').trim();
+  if(/^exerc[ií]cios?$|^movimentos?$|^nome$/.test(t)) return 'name';
+  if(/^s[ée]ries?\s*[x×]\s*rep/.test(t)) return 'setsreps';
+  if(/^dia$|^treino$/.test(t)) return 'day';
+  if(/^rep/.test(t)) return 'reps';
+  if(/aquec/.test(t)) return 'warm';
+  if(/^cad[eê]ncia|^tempo$/.test(t)) return 'cad';
+  if(/^descanso|^intervalo|^pausa$/.test(t)) return 'rest';
+  if(/^carga|^peso|^kg$/.test(t)) return 'load';
+  if(/^s[ée]ries?|^sets?$/.test(t)) return 'sets';
+  return null;
+}
+function tableCellText(list){
+  return list.slice().sort((a,b)=> (b.y-a.y) || (a.x-b.x)).map(c=> c.str).join(' ').replace(/\s+/g,' ').trim();
+}
+// items: [{x, y, w, h, str}] de UMA página. Devolve as tabelas de treino (de cima pra baixo).
+function parseTablePage(items){
+  const tables = [];
+  const heads = items.filter(it=> tableColumnType(it.str)==='name').sort((a,b)=> b.y-a.y);
+  let prevEnd = Infinity;
+  heads.forEach((h, hi)=>{
+    const near = items.filter(it=> Math.abs(it.y-h.y)<=9).sort((a,b)=> a.x-b.x);
+    const cols = [];
+    near.forEach(c=>{
+      const type = tableColumnType(c.str);
+      if(type && !cols.some(k=> k.type===type)) cols.push({ type, x: c.x, end: c.x+c.w });
+    });
+    if(cols.length<3 || !cols.some(c=> c.type==='reps' || c.type==='sets' || c.type==='setsreps')) return;
+    // títulos de coluna que não conhecemos ("Observação") também delimitam a coluna anterior
+    near.forEach(c=>{
+      if(!tableColumnType(c.str) && !cols.some(k=> Math.abs(k.x-c.x)<=10)) cols.push({ type: 'other', x: c.x, end: c.x+c.w });
+    });
+    cols.sort((a,b)=> a.x-b.x);
+    cols.forEach((c,i)=>{
+      c.lo = i===0 ? -Infinity : (cols[i-1].end + c.x)/2;
+      c.hi = i===cols.length-1 ? Infinity : (c.end + cols[i+1].x)/2;
+    });
+    const colOf = x=> cols.find(c=> x>=c.lo && x<c.hi);
+    const headerBottom = Math.min(...near.map(c=> c.y));
+    const anchorCol = ['reps','setsreps','sets','load'].map(t=> cols.find(c=> c.type===t)).find(Boolean);
+    const nextHead = heads[hi+1];
+    const limitY = nextHead ? nextHead.y + 14 : -Infinity;
+    const region = items.filter(it=> it.y < headerBottom-0.5 && it.y > limitY);
+    const anchorRe = anchorCol.type==='load' ? /\d/ : /^(\d{1,3}(\s*[-–a]\s*\d{1,3})?|m[aá]x\w*|falha)$/i;
+    const ys = [];
+    region.filter(it=> colOf(it.x)===anchorCol && anchorRe.test(it.str.trim()))
+      .sort((a,b)=> b.y-a.y).forEach(it=>{
+        if(ys.length && ys[ys.length-1]-it.y<=4) return;
+        // uma linha de verdade tem outras células preenchidas (texto solto com número não)
+        const filled = new Set(region.filter(o=> Math.abs(o.y-it.y)<=18).map(o=> colOf(o.x)).filter(c=> c && c.type!=='name' && c!==anchorCol));
+        if(cols.length>=4 && filled.size<2) return;
+        ys.push(it.y);
+      });
+    if(!ys.length) return;
+    const diffs = ys.slice(1).map((y,i)=> ys[i]-y).sort((a,b)=> a-b);
+    const pitch = diffs.length ? diffs[Math.floor(diffs.length/2)] : 30;
+    const bottomBound = ys[ys.length-1] - Math.max(14, 0.6*pitch);
+    const rows = [];
+    ys.forEach((y,i)=>{
+      const top = i===0 ? headerBottom : (ys[i-1]+y)/2;
+      const bottom = i===ys.length-1 ? bottomBound : (y+ys[i+1])/2;
+      const band = region.filter(it=> it.y<top && it.y>=bottom);
+      const cell = {};
+      cols.forEach(c=> { cell[c.type] = tableCellText(band.filter(it=> colOf(it.x)===c)); });
+      rows.push(cell);
+    });
+
+    // título do dia: o título mais destacado acima da tabela (e depois do fim da anterior)
+    const above = items.filter(it=> it.y > h.y+9 && it.y < prevEnd);
+    let cands = above.filter(it=> isStrongWorkoutHeading(it.str));
+    if(!cands.length) cands = above.filter(it=> isWorkoutHeadingLine(it.str) && it.str.trim().length>=4);
+    let title = null;
+    if(cands.length){
+      const best = cands.slice().sort((a,b)=> (b.h-a.h) || (a.y-b.y))[0];
+      const parts = above.filter(it=> Math.abs(it.h-best.h)<=2 && it.x>=best.x-3 && it.y<=best.y+1 && it.y>=best.y-40)
+        .sort((a,b)=> (b.y-a.y) || (a.x-b.x));
+      const chain = []; let last = best.y;
+      for(const it of parts){ if(last-it.y>24) break; chain.push(it); last = Math.min(last, it.y); }
+      title = chain.map(it=> it.str.trim()).join(' ').replace(/\s+/g,' ').slice(0,80);
+    }
+    tables.push({ y: h.y, title, rows, cols: cols.map(c=> c.type) });
+    prevEnd = bottomBound;
+  });
+  return tables;
+}
+
+// Converte uma linha da tabela em { name, sets, reps, weight, target }.
+function tableRowToExercise(cell){
+  const name = (cell.name||'').replace(/^\s*\d{1,2}\s*[.)\-–]\s*/,'').replace(/\s+/g,' ').trim();
+  if(!name) return null;
+  let sets = null, reps = null, weight = 0, target = '';
+  const num = v=> parseInt(v,10);
+  if(cell.setsreps){
+    const m = cell.setsreps.match(/(\d{1,2})\s*[xX×]\s*(\d{1,3})(?:\s*(?:a|à|-|–)\s*(\d{1,3}))?/);
+    if(m){ sets = num(m[1]); reps = num(m[3]||m[2]); if(m[3]) target = `${m[2]} a ${m[3]}`; }
+  }
+  if(cell.sets){ const m = cell.sets.match(/^\s*(\d{1,2})\b/); if(m) sets = num(m[1]); }
+  if(cell.reps){
+    const t = cell.reps;
+    const r = t.match(/(\d{1,3})\s*(?:a|à|-|–|até)\s*(\d{1,3})/);
+    if(r){ reps = num(r[2]); target = `${r[1]} a ${r[2]}`; }
+    else if(/\d/.test(t)){ reps = parseRepsTarget(t); }
+    else if(/m[aá]x|falha/i.test(t)){ reps = 10; target = 'Máx'; }
+  }
+  if(cell.load){ const m = cell.load.match(/(\d{1,3}(?:[.,]\d)?)/); if(m) weight = parseFloat(m[1].replace(',','.')); }
+  if(reps===null && sets===null && !weight) return null;
+  // cadência (ex.: 4-1-X-2) vai junto da faixa de repetições, pra não se perder
+  const cad = (cell.cad||'').match(/[\dX](?:\s*[-–]\s*[\dX]){2,3}/i);
+  if(cad) target = cleanTarget((target ? target + ' · ' : '') + cad[0].replace(/\s+/g,'').toUpperCase());
+  return { name, sets: sets||1, reps: reps||10, weight, target: target || '' };
+}
+
+async function extractTableWorkouts(pdf){
+  const groups = [];
+  const push = (title, rows)=>{
+    if(!rows.length) return;
+    const last = groups[groups.length-1];
+    if(last && (title===null || title===last.title)){ last.rows.push(...rows); return; }
+    groups.push({ title: title || `Treino ${groups.length+1}`, rows: rows.slice() });
+  };
+  for(let p=1;p<=pdf.numPages;p++){
+    const page = await pdf.getPage(p);
+    const content = await page.getTextContent();
+    const items = content.items
+      .filter(it=> it.str && it.str.trim() && typeof it.width==='number')
+      .map(it=> ({ x: it.transform[4], y: it.transform[5], w: it.width, h: it.height||0, str: it.str.trim() }));
+    parseTablePage(items).forEach(t=>{
+      const dayCol = t.cols.includes('day');
+      if(dayCol){
+        const byDay = new Map();
+        t.rows.forEach(r=>{
+          const ex = tableRowToExercise(r);
+          if(!ex) return;
+          const key = (r.day||'').trim() || '?';
+          if(!byDay.has(key)) byDay.set(key, []);
+          byDay.get(key).push(ex);
+        });
+        byDay.forEach((rows, key)=> push(/^treino|^dia/i.test(key) ? key : 'Treino '+key, rows));
+      }else{
+        push(t.title, t.rows.map(tableRowToExercise).filter(Boolean));
+      }
+    });
+  }
+  return groups.filter(g=> g.rows.length>0);
+}
+
 async function extractGridWorkouts(pdf){
   const groups = [];
   const COLS = ['aquec','prep','1','2','3','4','5'];

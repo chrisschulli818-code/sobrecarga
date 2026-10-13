@@ -2,8 +2,8 @@ const test = require('node:test');
 const assert = require('node:assert');
 const { loadFunctions } = require('./helpers/load-app-functions');
 
-const { parseLines, splitIntoDayGroups, isWorkoutHeadingLine, isTableHeaderLine, stripHeaderTail } =
-  loadFunctions(['parseLines', 'splitIntoDayGroups', 'isWorkoutHeadingLine', 'isStrongWorkoutHeading', 'isTableHeaderLine', 'stripHeaderTail', 'isDataOnlyLine', 'splitByDayColumn', 'isTableHeaderWord']);
+const { parseLines, splitIntoDayGroups, isWorkoutHeadingLine, isTableHeaderLine, stripHeaderTail, parseTablePage, tableRowToExercise } =
+  loadFunctions(['parseLines', 'splitIntoDayGroups', 'isWorkoutHeadingLine', 'isStrongWorkoutHeading', 'isTableHeaderLine', 'stripHeaderTail', 'isDataOnlyLine', 'splitByDayColumn', 'isTableHeaderWord', 'tableColumnType', 'tableCellText', 'parseTablePage', 'tableRowToExercise', 'cleanTarget', 'parseRepsTarget']);
 
 // Objetos criados dentro do vm têm outro protótipo; compara como JSON puro.
 const plain = x => JSON.parse(JSON.stringify(x));
@@ -110,4 +110,24 @@ test('tempo de descanso não vira série nem carga', () => {
 test('títulos "A - PEITO" separam o dia', () => {
   assert.ok(isWorkoutHeadingLine('A - PEITO'));
   assert.ok(!isWorkoutHeadingLine('Aluno: Ana'));
+});
+
+test('tabela por posição: células quebradas em várias linhas, reps e cadência', () => {
+  const it = (x, y, str, h = 9) => ({ x, y, w: str.length * 4, h, str });
+  const items = [
+    it(65, 769, 'DIA 1 (SEGUNDA-FEIRA): PEITO', 14), it(312, 767, 'FOCO: PEITORAL', 8), it(65, 749, '& COSTAS I', 14),
+    it(58, 670, 'EXERCÍCIO', 8), it(212, 670, 'AQUECIMENTO', 8), it(289, 676, 'SÉRIE DE TRABALHO', 8), it(289, 664, '(0 RIR)', 8),
+    it(397, 670, 'REPS', 8), it(433, 670, 'CADÊNCIA', 8), it(490, 670, 'DESCANSO', 8),
+    it(289, 641, '1 Série (Falha'), it(58, 635, '1. Peck Deck (Voador Máquina)'), it(212, 635, '1 a 2 séries'), it(397, 635, '6 - 10'), it(433, 635, '4-1-X-2'), it(490, 635, '2 min'), it(289, 628, 'Absoluta)'),
+    it(58, 606, '2. Supino Inclinado /'), it(289, 606, '1 Série (Falha'), it(212, 600, '1 a 2 séries'), it(397, 600, '6 - 8'), it(433, 600, '4-1-X-0'), it(58, 593, 'Smith (30°)'), it(289, 593, 'Pause)'),
+    it(51, 560, 'JUSTIFICATIVA ANATÔMICA', 13), it(397, 540, '3')
+  ];
+  const tables = plain(parseTablePage(items));
+  assert.strictEqual(tables.length, 1);
+  assert.strictEqual(tables[0].title, 'DIA 1 (SEGUNDA-FEIRA): PEITO & COSTAS I');
+  assert.strictEqual(tables[0].rows.length, 2);
+  assert.deepStrictEqual(plain(tables[0].rows.map(tableRowToExercise)), [
+    { name: 'Peck Deck (Voador Máquina)', sets: 1, reps: 10, weight: 0, target: '6 a 10 · 4-1-X-2' },
+    { name: 'Supino Inclinado / Smith (30°)', sets: 1, reps: 8, weight: 0, target: '6 a 8 · 4-1-X-0' }
+  ]);
 });
