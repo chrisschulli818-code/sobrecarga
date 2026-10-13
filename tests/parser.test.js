@@ -2,8 +2,8 @@ const test = require('node:test');
 const assert = require('node:assert');
 const { loadFunctions } = require('./helpers/load-app-functions');
 
-const { parseLines, splitIntoDayGroups, isWorkoutHeadingLine } =
-  loadFunctions(['parseLines', 'splitIntoDayGroups', 'isWorkoutHeadingLine']);
+const { parseLines, splitIntoDayGroups, isWorkoutHeadingLine, isTableHeaderLine, stripHeaderTail } =
+  loadFunctions(['parseLines', 'splitIntoDayGroups', 'isWorkoutHeadingLine', 'isStrongWorkoutHeading', 'isTableHeaderLine', 'stripHeaderTail', 'isDataOnlyLine', 'splitByDayColumn', 'isTableHeaderWord']);
 
 // Objetos criados dentro do vm têm outro protótipo; compara como JSON puro.
 const plain = x => JSON.parse(JSON.stringify(x));
@@ -75,4 +75,39 @@ test('sem títulos de dia: uma sessão só, com o nome do arquivo', () => {
 test('reconhece títulos de treino', () => {
   for (const t of ['TREINO A', 'Treino 2 - Terça', 'DIA 1', 'Sexta-feira', 'PEITO E TRÍCEPS']) assert.ok(isWorkoutHeadingLine(t), t);
   for (const t of ['Supino reto 4x10', 'Rosca direta 3x12 15kg']) assert.ok(!isWorkoutHeadingLine(t), t);
+});
+
+test('cabeçalho do PDF antes do primeiro treino não vira um dia', () => {
+  const groups = splitIntoDayGroups(['FICHA DE TREINO - Ana', 'Treino A', 'Supino 4x10', 'Treino B', 'Remada 4x10'], 'f');
+  assert.deepStrictEqual(plain(groups.map(g => g.title)), ['Treino A', 'Treino B']);
+});
+
+test('nome em CAIXA ALTA com os dados na linha seguinte não é título de dia', () => {
+  const groups = splitIntoDayGroups(['SEGUNDA-FEIRA — PEITO', '1. SUPINO RETO', '4 séries x 8 a 12 repetições', 'QUARTA-FEIRA — COSTAS', '1. PUXADA', '4 séries x 10 repetições'], 'f');
+  assert.strictEqual(groups.length, 2);
+  const rows = parseLines(groups[0].lines);
+  assert.deepStrictEqual(plain(rows), [{ name: 'SUPINO RETO', sets: 4, reps: 12, weight: 0, target: '8 a 12' }]);
+});
+
+test('coluna "Dia" repetida em cada linha separa os treinos', () => {
+  const groups = splitIntoDayGroups(['Planilha', 'Dia Exercício Séries Reps', 'A Supino 4 10', 'A Crucifixo 3 12', 'B Puxada 4 10', 'B Remada 4 8', 'C Agachamento 4 8'], 'f');
+  assert.deepStrictEqual(plain(groups.map(g => g.title)), ['Treino A', 'Treino B', 'Treino C']);
+  assert.strictEqual(groups[0].lines.length, 2);
+});
+
+test('linha de cabeçalho de tabela é ignorada e sai do título do dia', () => {
+  assert.ok(isTableHeaderLine('EXERCÍCIO SÉRIES REPS CARGA'));
+  assert.ok(!isTableHeaderLine('Supino reto'));
+  assert.strictEqual(stripHeaderTail('TREINO A - SUPERIOR 1 Séries x Reps Observação'), 'TREINO A - SUPERIOR 1');
+});
+
+test('tempo de descanso não vira série nem carga', () => {
+  assert.deepStrictEqual(plain(parseLines(['Supino reto 4 8-10 60 kg 90s'])), [{ name: 'Supino reto', sets: 4, reps: 10, weight: 60, target: '8 a 10' }]);
+  assert.deepStrictEqual(plain(parseLines(['Crucifixo 3 12-15 60s'])), [{ name: 'Crucifixo', sets: 3, reps: 15, weight: 0, target: '12 a 15' }]);
+  assert.deepStrictEqual(plain(parseLines(['Remada 4x10 descanso 2 min'])), [{ name: 'Remada', sets: 4, reps: 10, weight: 0, target: '' }]);
+});
+
+test('títulos "A - PEITO" separam o dia', () => {
+  assert.ok(isWorkoutHeadingLine('A - PEITO'));
+  assert.ok(!isWorkoutHeadingLine('Aluno: Ana'));
 });

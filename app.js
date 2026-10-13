@@ -1202,7 +1202,7 @@ async function handleFile(file){
       for(let p=1;p<=pdf.numPages;p++){
         const page = await pdf.getPage(p);
         const content = await page.getTextContent();
-        lines = lines.concat(groupIntoLines(content.items, 8));
+        lines = lines.concat(pageLines(content.items, 8));
       }
       if(lines.length===0){
         dropLabel.innerHTML = '<strong>Não consegui ler texto desse PDF.</strong> Pode ser um PDF escaneado (imagem) — tente outro arquivo ou monte o treino na mão.';
@@ -1356,25 +1356,109 @@ function groupIntoLines(items, gap){
              .filter(Boolean);
 }
 
+// Lê a página inteira em linhas. Se houver dois treinos lado a lado (dois títulos
+// "TREINO A" / "TREINO B" na mesma altura), lê a coluna da esquerda inteira e depois
+// a da direita, em vez de misturar os dois na mesma linha.
+function pageLines(items, gap){
+  const flat = items.filter(it=> it.str && it.str.trim() && typeof it.width==='number')
+    .map(it=> ({x: it.transform[4], y: it.transform[5], w: it.width, str: it.str.trim(), orig: it}));
+  if(flat.length!==items.filter(it=> it.str && it.str.trim()).length) return groupIntoLines(items, gap);
+  const g = gap!==undefined ? gap : 3;
+  for(const row of clusterByY(flat, g, true)){
+    const chunks = [];
+    row.slice().sort((a,b)=> a.x-b.x).forEach(it=>{
+      const last = chunks[chunks.length-1];
+      if(last && it.x - last.end <= 20){ last.str += ' ' + it.str; last.end = it.x + it.w; }
+      else chunks.push({x: it.x, end: it.x + it.w, str: it.str});
+    });
+    const heads = chunks.filter(c=> isWorkoutHeadingLine(c.str));
+    if(heads.length<2) continue;
+    const colXs = heads.map(c=> c.x);
+    const rowY = Math.max(...row.map(it=> it.y));
+    const above = [], cols = colXs.map(()=> []);
+    flat.forEach(it=>{
+      if(it.y > rowY + g){ above.push(it.orig); return; }
+      let ci = 0;
+      colXs.forEach((cx,i)=>{ if(it.x >= cx - 5) ci = i; });
+      cols[ci].push(it.orig);
+    });
+    return [above, ...cols].reduce((acc, its)=> acc.concat(its.length ? groupIntoLines(its, g) : []), []);
+  }
+  return groupIntoLines(items, gap);
+}
+
+// Cabeçalho de tabela ("Exercício  Séries  Reps  Carga") — não é título de treino
+// nem exercício. As palavras do fim da linha também saem do título do dia.
+function isTableHeaderWord(w){ return /^(exerc[ií]cios?|s[ée]ries?|reps?|repeti[cç][oõ]es|carga|peso|kg|descanso|intervalo|obs\.?|observa[cç](?:[aã]o|[oõ]es)|dia|n[ºo°]|#|ordem|x|e)$/i.test(w); }
+function isTableHeaderLine(line){
+  const t = line.trim().split(/\s+/);
+  return t.length>=2 && t.every(w=> isTableHeaderWord(w)) && t.some(w=> /^(exerc|s[ée]rie|rep|carga|peso)/i.test(w));
+}
+function stripHeaderTail(line){
+  const t = line.trim().split(/\s+/);
+  while(t.length>1 && isTableHeaderWord(t[t.length-1])) t.pop();
+  return t.join(' ');
+}
+// Linha só com números/unidades ("4 séries x 8 a 12 repetições", "3x12", "60 kg").
+function isDataOnlyLine(line){
+  const l = line.toLowerCase();
+  const rest = l.replace(/s[ée]ries?|repeti[cç][oõ]es?|reps?|kgs?|carga|peso|descanso|m[aá]x(?:imo)?|at[ée]\s*a?\s*falha|segundos?|seg|min|\bde\b|\ba\b|\bx\b|[\d.,×@:\-–()]/g,'');
+  return !/[a-zà-ú]/.test(rest) && /\d|falha|m[aá]x/.test(l);
+}
+
 // Detecta linhas de título de treino ("TREINO A", "DIA 1", "Segunda-feira",
 // ou uma linha curta em CAIXA ALTA sem números) pra separar um PDF com vários
 // dias de treino em várias sessões, mesmo fora do formato de grade.
-function isWorkoutHeadingLine(line){
+function isStrongWorkoutHeading(line){
   const l = line.trim();
-  if(!l || l.length>48) return false;
+  if(!l || l.length>60) return false;
   if(/^treino\b/i.test(l)) return true;
   if(/^dia\s*\d+/i.test(l)) return true;
   if(/^(day)\s*\d+/i.test(l)) return true;
   if(/^(segunda|ter[cç]a|quarta|quinta|sexta|s[aá]bado|domingo)([\s-]?feira)?\b/i.test(l)) return true;
+  // "A - PEITO", "B: COSTAS"
+  if(l.length<=40 && !/\d/.test(l) && /^[A-F]\s*[-–—:]\s*\S/.test(l)) return true;
+  return false;
+}
+function isWorkoutHeadingLine(line){
+  const l = line.trim();
+  if(!l || l.length>60) return false;
+  if(/^(observa|legenda|aviso|aluno|nome|objetivo|ficha|programa|planilha)/i.test(l)) return false;
+  if(isStrongWorkoutHeading(l)) return true;
   if(l.length<=40 && !/\d/.test(l) && l===l.toUpperCase() && /[A-ZÀ-Ú]{3,}/.test(l)) return true;
   return false;
 }
+
+// Tabela única com a coluna "Dia" repetida em cada linha ("A  Supino reto  4  10").
+function splitByDayColumn(lines){
+  const re = /^([A-F])\s+(?=\S)/;
+  const hit = lines.filter(l=> re.test(l) && /[a-zà-ú]{2}/i.test(l.replace(re,'')));
+  const letters = new Set(hit.map(l=> l.match(re)[1]));
+  if(letters.size<2 || hit.length<4 || hit.length < (lines.length-2)*0.7) return null;
+  const groups = new Map();
+  hit.forEach(l=>{
+    const k = l.match(re)[1];
+    if(!groups.has(k)) groups.set(k, { title: 'Treino '+k, lines: [] });
+    groups.get(k).lines.push(l.replace(re,''));
+  });
+  return [...groups.values()];
+}
+
 function splitIntoDayGroups(lines, fallbackTitle){
+  const original = lines;
+  lines = lines.filter(l=> !isTableHeaderLine(l));
+  const byColumn = splitByDayColumn(lines);
+  if(byColumn) return byColumn;
   const groups = [];
   let current = null;
-  lines.forEach(line=>{
-    if(isWorkoutHeadingLine(line)){
-      current = { title: line.trim(), lines: [] };
+  lines.forEach((line, i)=>{
+    const head = stripHeaderTail(line);
+    // Nome do exercício em CAIXA ALTA sozinho na linha, com os dados na seguinte
+    // ("SUPINO RETO" / "4 séries x 10"), não é título de dia.
+    const isHead = isWorkoutHeadingLine(head)
+      && (isStrongWorkoutHeading(head) || !(lines[i+1] && isDataOnlyLine(lines[i+1])));
+    if(isHead){
+      current = { title: head, lines: [], heading: true };
       groups.push(current);
     }else{
       if(!current){ current = { title: fallbackTitle, lines: [] }; groups.push(current); }
@@ -1383,9 +1467,11 @@ function splitIntoDayGroups(lines, fallbackTitle){
   });
   // Só um "dia" encontrado (ou nenhum título reconhecido) → não vale a pena
   // dividir, fica tudo numa sessão só com o nome do arquivo.
+  // Com 2+ dias, o que vem antes do primeiro título (nome do aluno, objetivo…) é
+  // cabeçalho do PDF, não um treino.
   const withContent = groups.filter(g=> g.lines.length>0);
-  if(withContent.length<=1) return [{ title: fallbackTitle, lines }];
-  return withContent;
+  if(withContent.filter(g=> g.heading).length<2) return [{ title: fallbackTitle, lines: original }];
+  return withContent.filter(g=> g.heading);
 }
 
 // Leitor genérico de fichas fora do formato "grade" — tenta reconhecer vários
@@ -1401,7 +1487,8 @@ function parseLines(lines){
   const weightWordRe = /(?:peso|carga)\s*[:\-]?\s*(\d{1,3}(?:[.,]\d)?)\s*(?:kg)?/i;
   const weightRe = /(\d{1,3}(?:[.,]\d)?)\s*(?:kg|kgs|kilos)\b/i;
   const setsxRepsRangeRe = /(\d{1,2})\s*[xX×]\s*(\d{1,3})\s*(?:a|à|-|–|até|ate)\s*(\d{1,3})\b/i;
-  const setsPhraseRe = /(\d{1,2})\s*s[ée]ries?\s*(?:de|x|×)?\s*(\d{1,3})\s*rep[a-zà-ú]*/i;
+  const setsPhraseRe = /(\d{1,2})\s*s[ée]ries?\s*(?:de|x|×)?\s*(\d{1,3})(?:\s*(?:a|à|-|–|até|ate)\s*(\d{1,3}))?(?:\s*rep[a-zà-ú]*)?/i;
+  const restRe = /(?:descanso|intervalo)?\s*:?\s*\b\d{1,3}\s*(?:s|seg|segs|segundos?|min|minutos?)(?![a-zà-ú])/gi;
   const setsxRepsRe = /(\d{1,2})\s*[xX×]\s*(\d{1,3})\b(?:\s*rep[a-zà-ú]*)?/;
   const setsSpaceRangeRe = /(\d{1,2})\s+(\d{1,3})\s*(?:a|à|-|–|até|ate)\s*(\d{1,3})\s*$/i;
   const repsRangeRe = /(\d{1,3})\s*(?:a|à|-|–|até|ate)\s*(\d{1,3})(?:\s*rep[a-zà-ú]*)?/i;
@@ -1414,7 +1501,8 @@ function parseLines(lines){
   lines.forEach(line=>{
     if(!line || line.length<2 || headerWordsRe.test(line.trim())) return;
 
-    let rest = line;
+    // tempo de descanso ("90s", "2 min", "descanso: 60 seg") não é série nem carga
+    let rest = line.replace(restRe,' ');
     let sets=null, reps=null, weight=null, target=null;
 
     // peso/carga — tenta a forma com rótulo ("peso: 25kg") primeiro, depois
@@ -1436,7 +1524,8 @@ function parseLines(lines){
       target = `${m[2]} a ${m[3]}`;
       rest = rest.replace(setsxRepsRangeRe,'');
     }else if((m = rest.match(setsPhraseRe))){
-      sets = parseInt(m[1],10); reps = parseInt(m[2],10);
+      sets = parseInt(m[1],10); reps = parseInt(m[3]||m[2],10);
+      if(m[3]) target = `${m[2]} a ${m[3]}`;
       rest = rest.replace(setsPhraseRe,'');
     }else if((m = rest.match(setsxRepsRe))){
       sets = parseInt(m[1],10); reps = parseInt(m[2],10);
@@ -1483,13 +1572,14 @@ function parseLines(lines){
       target = 'Máx'; usedMax = true; rest = rest.replace(maxRe,'');
     }
 
-    let name = rest
+    const cleanName = txt=> txt
       .replace(/^\s*\d{1,2}\s*(?:[).:]|[-–—])\s+/,'')      // numeração do item: "1) ", "2. ", "3 - "
       .replace(/[-–—:|@]+/g,' ')
       .replace(/\(\s*\)/g,' ')                              // parênteses que ficaram vazios: "(carga 14kg)" → "()"
       .replace(/\s+(?:reps?|repeti[cç][oõ]es|s[ée]ries?)\s*$/i,'') // "rep" / "séries" soltos no fim
       .replace(/\s{2,}/g,' ')
       .trim();
+    let name = cleanName(rest);
 
     const hasData = sets!==null || reps!==null || weight!==null || usedMax;
 
@@ -1498,7 +1588,7 @@ function parseLines(lines){
       pendingName = line.trim();
       return;
     }
-    if(!name && pendingName) name = pendingName;
+    if(!name && pendingName) name = cleanName(pendingName);
     if(!name) name = 'Exercício';
     pendingName = null;
     rows.push({ name, sets: sets||1, reps: reps||10, weight: weight||0, target: target||'' });
