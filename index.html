@@ -123,7 +123,13 @@
     <a href="#" id="profDashBackToAdmin" class="hint" style="text-decoration:underline;display:none;">‹ voltar aos professores</a>
     <button class="ghost small" id="logoutBtnProf" data-i18n="logout">sair</button>
   </div>
-  <div class="card">
+  <nav class="prof-tabs" id="profTabs" role="tablist" aria-label="Seções do painel">
+    <button type="button" role="tab" class="prof-tab active" data-ptab="alunos" aria-selected="true">Alunos</button>
+    <button type="button" role="tab" class="prof-tab" data-ptab="modelos" aria-selected="false">Modelos</button>
+    <button type="button" role="tab" class="prof-tab" data-ptab="avisos" aria-selected="false">Avisos</button>
+    <button type="button" role="tab" class="prof-tab" data-ptab="videos" aria-selected="false">Vídeos</button>
+  </nav>
+  <div class="card" data-psec="alunos">
     <div class="card-head">
       <h2><span class="chip">👥</span>Alunos</h2>
       <div style="display:flex;gap:8px;">
@@ -135,21 +141,21 @@
     <div id="coachTools"></div>
     <div id="studentsList"></div>
   </div>
-  <div class="card">
+  <div class="card" data-psec="modelos" hidden>
     <div class="card-head">
       <h2><span class="chip">📋</span>Modelos de treino</h2>
       <span class="hint">Monte uma vez, envie para vários alunos</span>
     </div>
     <div id="profTemplates"></div>
   </div>
-  <div class="card">
+  <div class="card" data-psec="avisos" hidden>
     <div class="card-head">
       <h2><span class="chip">📣</span>Avisos para a turma</h2>
       <span class="hint">Recados que aparecem no Início do aluno</span>
     </div>
     <div id="profAnnouncements"></div>
   </div>
-  <div class="card">
+  <div class="card" data-psec="videos" hidden>
     <div class="card-head">
       <h2><span class="chip">▶</span>Vídeos de execução</h2>
       <span class="hint">Aparecem pro aluno no botão "Ver execução" de cada exercício</span>

@@ -496,7 +496,8 @@ function renderCoachSummary(){
     ['Parados há +7 dias', named.filter(isStale).length, 'precisam de contato'],
     ['Recordes nos últimos 30 dias', named.reduce((n,s)=> n+(s.records30||[]).length, 0), `${named.filter(s=> (s.records30||[]).length).length} aluno(s)`]
   ];
-  document.getElementById('coachKpis').innerHTML = kpis.map(([l,v,sub])=> `<div class="kpi"><div class="kpi-l">${l}</div><div class="kpi-v">${v}</div>${sub?`<div class="kpi-s">${sub}</div>`:''}</div>`).join('');
+  const alertIdx = { 2: 'warn' };
+  document.getElementById('coachKpis').innerHTML = kpis.map(([l,v,sub],i)=> `<div class="kpi${alertIdx[i] && v>0 ? ' kpi-'+alertIdx[i] : ''}${i===3 && v>0 ? ' kpi-record' : ''}"><div class="kpi-l">${l}</div><div class="kpi-v">${v}</div>${sub?`<div class="kpi-s">${sub}</div>`:''}</div>`).join('');
   document.getElementById('coachTools').innerHTML = `
     <div class="coach-chips" role="tablist">${coachFilters().map(([k,l,n])=> `<button type="button" role="tab" aria-selected="${coachView.filter===k}" class="chip-btn${coachView.filter===k?' active':''}" data-cfilter="${k}">${l} <span class="chip-n">${n}</span></button>`).join('')}</div>
     <div class="coach-tools-row">
@@ -531,7 +532,10 @@ function renderStudentRows(){
     if((s.records30||[]).length) badges.push(`<span class="badge badge-ok" title="${escapeAttr(s.records30.join(', '))}">🏆 ${s.records30.length} ${s.records30.length===1?'recorde':'recordes'}</span>`);
     if((s.loadDrops||[]).length) badges.push(`<span class="badge badge-bad" title="${escapeAttr(s.loadDrops.join(', '))}">▼ Carga caindo: ${escapeHtml(s.loadDrops.slice(0,2).join(', '))}${s.loadDrops.length>2?'…':''}</span>`);
     const freq = s.name ? `${s.weekDone}${s.weekPlanned?'/'+s.weekPlanned:''} ${s.weekPlanned? 'treinos na semana' : (s.weekDone===1?'treino nesta semana':'treinos nesta semana')} · ${s.done28} nos últimos 28 dias` : '';
+    // anilha de estado: vermelha = carga caindo, amarela = parado, verde = treinando, cinza = ainda não treinou
+    const state = !s.name ? 'wait' : ((s.loadDrops||[]).length ? 'drop' : (stale ? (s.lastTrainedAt ? 'stale' : 'none') : 'ok'));
     return `<div class="student-row${s.name?'':' student-row-unclaimed'}">
+      <span class="sdisc sdisc-${state}" aria-hidden="true"></span>
       <div class="srow-main">
         <div class="sname">${s.name ? escapeHtml(s.name) : '— aguardando aluno —'}${s.locked ? ' <span title="Aparelho travado" style="opacity:.7;">🔒</span>' : ''}</div>
         <div class="scode">${escapeHtml(s.code)}</div>
@@ -560,6 +564,19 @@ async function renderProfessorDashboard(){
   renderCoachSummary();
   renderStudentRows();
 }
+// Seções do painel do professor (Alunos / Modelos / Avisos / Vídeos): uma por vez.
+function showProfTab(tab){
+  document.querySelectorAll('#profTabs [data-ptab]').forEach(b=>{
+    const on = b.dataset.ptab===tab;
+    b.classList.toggle('active', on);
+    b.setAttribute('aria-selected', on ? 'true' : 'false');
+  });
+  document.querySelectorAll('#professorDashboard [data-psec]').forEach(sec=>{ sec.hidden = sec.dataset.psec!==tab; });
+}
+document.getElementById('profTabs').addEventListener('click', e=>{
+  const b = e.target.closest('[data-ptab]');
+  if(b) showProfTab(b.dataset.ptab);
+});
 document.getElementById('coachTools').addEventListener('click', e=>{
   const f = e.target.closest('[data-cfilter]');
   if(f){ coachView.filter = f.dataset.cfilter; renderCoachSummary(); renderStudentRows(); }
