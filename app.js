@@ -842,7 +842,7 @@ function showCodesModal(title, codes){
   overlay.innerHTML = `
     <div class="confirm-box" style="max-width:360px;">
       <p style="margin-bottom:10px;"><strong>${escapeHtml(title)}</strong></p>
-      <div style="background:var(--surface-2);border:1px solid var(--border);padding:10px;max-height:260px;overflow:auto;font-family:'Archivo',sans-serif;">
+      <div style="background:var(--surface-2);border:1px solid var(--border);padding:10px;max-height:260px;overflow:auto;font-family:var(--font-ui);">
         ${codes.map(c=> `<div style="padding:5px 2px;letter-spacing:.08em;font-weight:700;color:var(--accent-text);">${escapeHtml(c)}</div>`).join('')}
       </div>
       <div class="confirm-actions">
@@ -4428,6 +4428,49 @@ function mRenderSessionsList(){
   mContent.innerHTML = html;
 }
 
+/* ---------- Anilhas: o peso da série desenhado na barra ----------
+   Cores das anilhas de competição (25 vermelha, 20 azul, 15 amarela, 10 verde,
+   5 branca, 2,5 preta, 1,25 cromada). Aparece só em exercícios de barra livre. */
+const PLATE_SIZES = [
+  [25,'--plate-25',46,12], [20,'--plate-20',44,11], [15,'--plate-15',40,10], [10,'--plate-10',34,9],
+  [5,'--plate-5',28,7], [2.5,'--plate-2',22,6], [1.25,'--plate-1',18,5]
+];
+function platesFor(total, bar){
+  const barKg = bar || 20;
+  const t = parseFloat(String(total).replace(',','.')) || 0;
+  if(t < barKg + 2.5) return null;
+  let side = Math.round(((t - barKg) / 2) * 100) / 100;
+  const plates = [];
+  PLATE_SIZES.forEach(p=>{
+    while(side >= p[0] - 1e-9){ plates.push(p[0]); side = Math.round((side - p[0]) * 100) / 100; }
+  });
+  return { plates, leftover: side };
+}
+function isBarbellExercise(name){
+  const n = String(name||'');
+  if(/m[aá]quina|halter|polia|articulad|smith|hack|unilateral|barra\s*[wv]\b|leg press|cadeira/i.test(n)) return false;
+  return /barra|supino (reto|inclinado)|agachamento livre|levantamento terra|\bstiff\b|remada curvada|rack pull|meio terra|desenvolvimento militar/i.test(n);
+}
+function platesInnerHtml(total){
+  const t = parseFloat(String(total).replace(',','.')) || 0;
+  const r = platesFor(t);
+  if(t <= 0) return '<div class="mplates-cap">Digite o peso para ver as anilhas de cada lado da barra.</div>';
+  if(!r) return '<div class="mplates-cap"><strong>Só a barra</strong> (20 kg)</div>';
+  const discs = r.plates.map(kg=>{
+    const sz = PLATE_SIZES.find(p=> p[0]===kg);
+    return `<i class="plate" style="--c:var(${sz[1]});height:${sz[2]}px;width:${sz[3]}px"></i>`;
+  }).join('');
+  const label = r.plates.map(kg=> String(kg).replace('.',',')).join(' + ');
+  const miss = r.leftover > 0 ? ` <span class="faint">(faltam ${String(r.leftover).replace('.',',')} kg por lado)</span>` : '';
+  return `<div class="mplates-viz" role="img" aria-label="Por lado: ${label} kg"><span class="bar-shaft"></span><span class="bar-collar"></span>${discs}<span class="bar-tip"></span></div>
+    <div class="mplates-cap"><strong>Por lado</strong> ${label} kg · barra 20 kg${miss}</div>`;
+}
+function refreshPlates(){
+  const host = mContent.querySelector('#mPlatesHost');
+  const input = mContent.querySelector('[data-mweightinput]');
+  if(host && input) host.innerHTML = platesInnerHtml(input.value);
+}
+
 /* --- Registrar série --- */
 function mRenderEntryScreen(){
   const session = state.sessions.find(s=> s.id===mobile.sessionId);
@@ -4465,6 +4508,7 @@ function mRenderEntryScreen(){
       ${ro?'':`<div class="mstep-btns"><button type="button" data-mstep="reps:-1" aria-label="Menos uma repetição">−</button><button type="button" data-mstep="reps:1" aria-label="Mais uma repetição">+</button></div>`}
     </div>
   </div>
+  ${isBarbellExercise(ex.name) ? `<div class="mplates" id="mPlatesHost">${platesInnerHtml(mobile.padWeight)}</div>` : ''}
   <section class="mstack">
     <h2 class="overline">Séries</h2>`;
   if(ex.sets.length===0){
@@ -4740,6 +4784,7 @@ mContent.addEventListener('click', async e=>{
     mobile[key] = String(val);
     const input = mContent.querySelector(field==='weight' ? '[data-mweightinput]' : '[data-mrepsinput]');
     if(input) input.value = mobile[key];
+    if(field==='weight') refreshPlates();
     return;
   }
   const rtBtn = e.target.closest('[data-rt]');
@@ -4817,6 +4862,7 @@ mContent.addEventListener('change', e=>{
 mContent.addEventListener('input', e=>{
   if(e.target.matches('[data-mweightinput]')){
     mobile.padWeight = e.target.value;
+    refreshPlates();
     return;
   }
   if(e.target.matches('[data-mrepsinput]')){
