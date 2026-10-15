@@ -1204,3 +1204,4 @@ input:not([type]),input[type=search],input[type=url]{
 .mpage{padding-top:16px;}
 .mpage > .mweek:first-child{margin-top:-16px;}
 button.primary,button.small,button.ghost,#dashNextBtn{text-transform:none;letter-spacing:0;font-family:var(--font-ui);font-weight:700;font-size:15px;}
+.danger-btn{color:var(--down)!important;border:1px solid var(--down)!important;background:transparent!important;}

@@ -3396,6 +3396,7 @@ function exportAssessmentPdf(data){
 }
 
 document.getElementById('openAssessBtn').addEventListener('click', ()=> openAssessment(activeStudentId(), READONLY));
+document.getElementById('clearAllBtn').addEventListener('click', clearAllWorkouts);
 
 /* ---------- Vídeos dos exercícios (links do YouTube) ----------
    A biblioteca do admin vale para todos; o professor pode trocar ou completar
@@ -4614,6 +4615,26 @@ function mRenderProgresso(){
   mContent.innerHTML = html;
 }
 
+/* --- Apagar todos os treinos (só o próprio aluno) --- */
+async function clearAllWorkouts(){
+  if(READONLY || !(auth && auth.role==='student')) return;
+  const nSess = state.sessions.length;
+  if(nSess===0 && state.protocols.length===0){ showToast('Você não tem treinos para apagar.'); return; }
+  const ok = await confirmDialog(`Apagar TODOS os seus treinos (${plural(nSess,'treino','treinos')}) e fichas? Os recordes e o histórico de cargas somem junto. Isso não dá para desfazer.`, { okLabel: 'Apagar tudo' });
+  if(!ok) return;
+  state.sessions = [];
+  state.protocols = [];
+  openSessionId = null; openProtocols.clear(); openMonths.clear(); openWeeks.clear();
+  mobile.screen = 'list'; mobile.sessionId = null; mobile.exId = null; mobile.setIdx = null; mobile.protKey = null; mobile.weekKey = null;
+  try{ ensureProtocols(); }catch(e){}
+  saveLocal();
+  renderAll();
+  clearTimeout(syncTimer);
+  hasPendingSave = true; saveSeq++; markDirty();
+  await syncRemote();
+  showToast(hasPendingSave ? 'Treinos apagados neste aparelho. Vão sumir dos outros quando a internet voltar.' : 'Todos os treinos foram apagados.');
+}
+
 /* --- Perfil --- */
 function mRenderPerfil(){
   mHeader('Perfil');
@@ -4641,6 +4662,7 @@ function mRenderPerfil(){
         ${isStudent ? `<button class="mlist-row" data-maction="tour"><span class="accent">${ICONS.help}</span><span class="mlist-label">Ver o tour do app</span><span class="faint">${ICONS.chevron}</span></button>` : ''}
       </div>
     </section>
+    ${isStudent && !READONLY ? `<button class="mghostbtn mdanger big" data-maction="clearall">Apagar todos os meus treinos</button>` : ''}
     ${READONLY
       ? `<button class="mghostbtn big" data-maction="backtostudents">${ICONS.back} Voltar aos alunos</button>`
       : `<button class="mdangerbtn" data-maction="logout">${ICONS.logout} Sair</button>`}
@@ -4659,6 +4681,7 @@ mContent.addEventListener('click', async e=>{
     if(act==='gotab'){ mobile.tab = action.dataset.val; mobile.screen = 'list'; mRender(); return; }
     if(act==='lang'){ setLang(action.dataset.val); return; }
     if(act==='tour'){ startTour(); return; }
+    if(act==='clearall'){ clearAllWorkouts(); return; }
     if(act==='logout'){ confirmLogout(); return; }
     if(act==='backtostudents'){ currentStudentId = null; boot(); return; }
     if(act==='skipset'){
@@ -4967,6 +4990,7 @@ function renderAll(){
 
 function applyReadonlyUI(){
   document.getElementById('importCard').style.display = LOCKED() ? 'none' : '';
+  document.getElementById('clearAllCard').style.display = (READONLY || !(auth && auth.role==='student')) ? 'none' : '';
   document.getElementById('addSessionBtn').style.display = LOCKED() ? 'none' : '';
   document.getElementById('addProtocolBtn').style.display = LOCKED() ? 'none' : '';
   document.getElementById('openBuilderBtn').style.display = LOCKED() ? 'none' : '';
