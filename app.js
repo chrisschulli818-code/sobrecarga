@@ -1264,7 +1264,7 @@ function tableColumnType(text){
   if(/^cad[eê]ncia|^tempo$/.test(t)) return 'cad';
   if(/^descanso|^intervalo|^pausa$/.test(t)) return 'rest';
   if(/^carga|^peso|^kg$/.test(t)) return 'load';
-  if(/^s[ée]ries?|^sets?$/.test(t)) return 'sets';
+  if(/^s[ée]ries?|^sets?$|^trabalho/.test(t)) return 'sets';
   return null;
 }
 function tableCellText(list){
@@ -1341,6 +1341,13 @@ function parseTablePage(items){
   return tables;
 }
 
+// Quantas séries de aquecimento a linha pede ("2", "1-2", "1 a 2 séries", "1 série leve"; "-" = nenhuma).
+function tableRowWarmup(cell){
+  const m = String(cell.warm||'').match(/\d+/);
+  const n = m ? parseInt(m[0],10) : 0;
+  return Math.min(Math.max(n,0), 4);
+}
+
 // Converte uma linha da tabela em { name, sets, reps, weight, target }.
 function tableRowToExercise(cell){
   const name = (cell.name||'').replace(/^\s*\d{1,2}\s*[.)\-–]\s*/,'').replace(/\s+/g,' ').trim();
@@ -1367,6 +1374,19 @@ function tableRowToExercise(cell){
   return { name, sets: sets||1, reps: reps||10, weight, target: target || '' };
 }
 
+// Linhas da tabela já como séries: o aquecimento (se houver) vem antes da série de trabalho.
+function tableRowsWithWarmup(cells){
+  const out = [];
+  cells.forEach(c=>{
+    const ex = tableRowToExercise(c);
+    if(!ex) return;
+    const w = tableRowWarmup(c);
+    if(w>0) out.push({ name: ex.name, sets: w, reps: 5, weight: 0, target: 'Aquec.' });
+    out.push(ex);
+  });
+  return out;
+}
+
 async function extractTableWorkouts(pdf){
   const groups = [];
   const push = (title, rows)=>{
@@ -1386,15 +1406,13 @@ async function extractTableWorkouts(pdf){
       if(dayCol){
         const byDay = new Map();
         t.rows.forEach(r=>{
-          const ex = tableRowToExercise(r);
-          if(!ex) return;
           const key = (r.day||'').trim() || '?';
           if(!byDay.has(key)) byDay.set(key, []);
-          byDay.get(key).push(ex);
+          byDay.get(key).push(...tableRowsWithWarmup([r]));
         });
         byDay.forEach((rows, key)=> push(/^treino|^dia/i.test(key) ? key : 'Treino '+key, rows));
       }else{
-        push(t.title, t.rows.map(tableRowToExercise).filter(Boolean));
+        push(t.title, tableRowsWithWarmup(t.rows));
       }
     });
   }
@@ -1511,11 +1529,14 @@ function cleanTarget(text){
 }
 // Resumo do alvo de um exercício: junta os alvos distintos das séries na ordem
 // (ex.: aquecimento "15", preparatória "10" e as válidas "6 a 10").
+// Séries de aquecimento vêm da coluna "Aquec." da ficha e ficam marcadas com este alvo.
+function isWarmupTarget(t){ return /^aquec/i.test(String(t||'').trim()); }
+function metaPhrase(t, withReps){ return isWarmupTarget(t) ? 'aquecimento' : 'meta '+t+(withReps ? ' reps' : ''); }
 function exerciseTarget(ex){
   const seen = [];
   ex.sets.forEach(s=>{
     const t = (s.target||'').trim();
-    if(t && !seen.includes(t)) seen.push(t);
+    if(t && !isWarmupTarget(t) && !seen.includes(t)) seen.push(t);
   });
   return seen.join(' · ');
 }
@@ -1803,12 +1824,33 @@ const stageWrap = document.getElementById('stageWrap');
 const stageGroupsWrap = document.getElementById('stageGroupsWrap');
 let stageGroups = [];
 
+// Em que dia cada treino cai. Se os títulos trazem dia da semana ("Segunda-feira", "(QUINTA-FEIRA)"),
+// vale o próximo dia da semana igual a partir de hoje. Senão, "DIA 1 … DIA 5" dizem a distância entre
+// os treinos, preservando os descansos que faltam (3→5). Sem nada disso, um treino por dia.
+function weekdayIndex(t){
+  const m = String(t||'').match(/(domingo|segunda|ter[cç]a|quarta|quinta|sexta|s[aá]bado)/i);
+  if(!m) return null;
+  const w = m[1].toLowerCase();
+  return w.startsWith('dom') ? 0 : w.startsWith('seg') ? 1 : w.startsWith('ter') ? 2 : w.startsWith('qua') ? 3 : w.startsWith('qui') ? 4 : w.startsWith('sex') ? 5 : 6;
+}
+function planDayDates(titles, todayIso){
+  const base = todayIso;
+  const todayDow = new Date(base+'T00:00:00').getDay();
+  const dows = titles.map(weekdayIndex);
+  if(titles.length>1 && dows.every(d=> d!==null)) return dows.map(d=> addDaysISO(base, (d - todayDow + 7) % 7));
+  const nums = titles.map(t=> { const m = String(t||'').match(/^\s*dia\s*(\d{1,2})\b/i); return m ? parseInt(m[1],10) : null; });
+  const ok = titles.length>1 && nums.every((n,i)=> n!==null && n>=1 && n<=14 && (i===0 || n>nums[i-1]));
+  return titles.map((_,i)=> addDaysISO(base, ok ? nums[i]-nums[0] : i));
+}
+
 function openStage(groups, fileName){
   const today = todayISO();
-  stageGroups = (groups.length? groups : [{title: fileName.replace(/\.pdf$/i,''), rows:[]}]).map((g,i)=> ({
+  const list = groups.length ? groups : [{title: fileName.replace(/\.pdf$/i,''), rows:[]}];
+  const dayDates = planDayDates(list.map(g=> g.title), today);
+  stageGroups = list.map((g,i)=> ({
     id: uid(),
     name: (g.title || `Treino ${i+1}`).slice(0,80),
-    date: addDaysISO(today, i),
+    date: dayDates[i],
     rows: g.rows.length? g.rows : [{name:'', sets:1, reps:10, weight:0}]
   }));
   stageProtocol = { mode: 'new', id: null, name: suggestProtocolName(stageGroups[0].date), weeks: 4 };
@@ -4511,7 +4553,7 @@ function mRenderEntryScreen(){
   html += `<section>
     <div class="mex-head"><h1 class="mex-name">${escapeHtml(ex.name)}</h1>${videoButtonHtml(ex.name)}</div>
     <div class="mchips">
-      <span class="mchip-pill strong">${editing ? `Série ${mobile.setIdx+1}` : 'Nova série'}${curTarget ? ' · meta '+escapeHtml(curTarget)+' reps' : ''}</span>
+      <span class="mchip-pill strong">${editing ? `Série ${mobile.setIdx+1}` : 'Nova série'}${curTarget ? ' · '+escapeHtml(metaPhrase(curTarget, true)) : ''}</span>
       <span class="mchip-pill">${lastLoad ? `Última vez: ${lastLoad.weight}kg × ${lastLoad.reps}` : 'Sem histórico anterior'}</span>
     </div>
   </section>
@@ -4539,7 +4581,7 @@ function mRenderEntryScreen(){
       html += `<div class="mset ${sel?'sel':''}" data-mselset="${i}">
         <span class="mset-dot ${feito?'done':(sel?'cur':'')}">${feito ? ICONS.check : i+1}</span>
         <span class="mset-name">Série ${i+1}</span>
-        <span class="mset-val">${feito ? `${s.weight}kg × ${s.reps}` : (sel ? 'agora' : (s.target ? 'meta '+escapeHtml(s.target) : '—'))}</span>
+        <span class="mset-val">${feito ? `${s.weight}kg × ${s.reps}` : (sel ? 'agora' : (s.target ? escapeHtml(metaPhrase(s.target, false)) : '—'))}</span>
         ${ro?'':`<button class="micon-btn" data-mdelset="${i}" aria-label="Remover série ${i+1}">✕</button>`}
       </div>`;
     });
