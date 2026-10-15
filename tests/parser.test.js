@@ -2,8 +2,8 @@ const test = require('node:test');
 const assert = require('node:assert');
 const { loadFunctions } = require('./helpers/load-app-functions');
 
-const { parseLines, splitIntoDayGroups, isWorkoutHeadingLine, isTableHeaderLine, stripHeaderTail, parseTablePage, tableRowToExercise } =
-  loadFunctions(['parseLines', 'splitIntoDayGroups', 'isWorkoutHeadingLine', 'isStrongWorkoutHeading', 'isTableHeaderLine', 'stripHeaderTail', 'isDataOnlyLine', 'splitByDayColumn', 'isTableHeaderWord', 'tableColumnType', 'tableCellText', 'parseTablePage', 'tableRowToExercise', 'cleanTarget', 'parseRepsTarget']);
+const { parseLines, splitIntoDayGroups, isWorkoutHeadingLine, isTableHeaderLine, stripHeaderTail, parseTablePage, tableRowToExercise, tableRowWarmup, tableRowsWithWarmup, planDayDates, metaPhrase, exerciseTarget } =
+  loadFunctions(['parseLines', 'splitIntoDayGroups', 'isWorkoutHeadingLine', 'isStrongWorkoutHeading', 'isTableHeaderLine', 'stripHeaderTail', 'isDataOnlyLine', 'splitByDayColumn', 'isTableHeaderWord', 'tableColumnType', 'tableCellText', 'parseTablePage', 'tableRowToExercise', 'cleanTarget', 'parseRepsTarget', 'tableRowWarmup', 'tableRowsWithWarmup', 'planDayDates', 'weekdayIndex', 'addDaysISO', 'isWarmupTarget', 'metaPhrase', 'exerciseTarget']);
 
 // Objetos criados dentro do vm têm outro protótipo; compara como JSON puro.
 const plain = x => JSON.parse(JSON.stringify(x));
@@ -130,4 +130,33 @@ test('tabela por posição: células quebradas em várias linhas, reps e cadênc
     { name: 'Peck Deck (Voador Máquina)', sets: 1, reps: 10, weight: 0, target: '6 a 10 · 4-1-X-2' },
     { name: 'Supino Inclinado / Smith (30°)', sets: 1, reps: 8, weight: 0, target: '6 a 8 · 4-1-X-0' }
   ]);
+});
+
+test('coluna Aquec. vira séries de aquecimento antes da série de trabalho', () => {
+  assert.strictEqual(tableRowWarmup({ warm: '2' }), 2);
+  assert.strictEqual(tableRowWarmup({ warm: '1-2' }), 1);
+  assert.strictEqual(tableRowWarmup({ warm: '1 série leve' }), 1);
+  assert.strictEqual(tableRowWarmup({ warm: '-' }), 0);
+  assert.strictEqual(tableRowWarmup({}), 0);
+  const rows = plain(tableRowsWithWarmup([{ name: '1. Pullover', warm: '2', sets: '1 (Falha Absoluta)', reps: '8-10', cad: '4-1-X-2' }]));
+  assert.deepStrictEqual(rows, [
+    { name: 'Pullover', sets: 2, reps: 5, weight: 0, target: 'Aquec.' },
+    { name: 'Pullover', sets: 1, reps: 10, weight: 0, target: '8 a 10 · 4-1-X-2' }
+  ]);
+});
+
+test('a meta do exercício ignora o aquecimento', () => {
+  assert.strictEqual(exerciseTarget({ sets: [{ target: 'Aquec.' }, { target: '8 a 10' }] }), '8 a 10');
+  assert.strictEqual(metaPhrase('Aquec.', true), 'aquecimento');
+  assert.strictEqual(metaPhrase('8 a 10', true), 'meta 8 a 10 reps');
+});
+
+test('datas dos treinos: dia da semana do título ou número do dia, preservando descansos', () => {
+  // 2026-10-14 é quarta-feira
+  assert.deepStrictEqual(plain(planDayDates(['DIA 1: Costas', 'DIA 2: Pernas', 'DIA 3: Peito', 'DIA 5: Costas II', 'DIA 6: Pernas II'], '2026-10-14')),
+    ['2026-10-14', '2026-10-15', '2026-10-16', '2026-10-18', '2026-10-19']);
+  assert.deepStrictEqual(plain(planDayDates(['DIA 1 (SEGUNDA-FEIRA)', 'DIA 2 (TERÇA-FEIRA)', 'DIA 3 (QUINTA-FEIRA)'], '2026-10-14')),
+    ['2026-10-19', '2026-10-20', '2026-10-15']);
+  assert.deepStrictEqual(plain(planDayDates(['Treino A', 'Treino B', 'Treino C'], '2026-10-14')), ['2026-10-14', '2026-10-15', '2026-10-16']);
+  assert.deepStrictEqual(plain(planDayDates(['DIA 2', 'DIA 1'], '2026-10-14')), ['2026-10-14', '2026-10-15']);
 });

@@ -87,3 +87,6 @@ O banco é um projeto Supabase (não expira), configurado manualmente: cole a co
 
 ### Apagar todos os treinos
 No **Perfil**, o aluno tem "Apagar todos os meus treinos" (celular e computador). Pede confirmação dizendo quantos treinos serão apagados, remove treinos e fichas do aparelho e do servidor e não aparece para o professor vendo a ficha do aluno. O servidor costuma guardar uma cópia de segurança anterior (`app_state_history`, por até 30 dias), mas ela não volta sozinha: restaurar é um pedido ao administrador.
+
+### Fichas Heavy Duty (Mentzer / Delavier)
+Tabelas como `Exercício / Aquec. / Trabalho (0 RIR) / Reps / Cadência / Descanso` são lidas por coluna. A coluna **Aquec.** vira séries de aquecimento (marcadas como "aquecimento", sem carga) antes da série de trabalho, e a faixa de repetições e a cadência entram na meta. O texto corrido (justificativas, diretrizes) é ignorado. Ao importar, cada treino cai no dia certo: se o título traz o dia da semana ("Segunda-feira") vale o próximo dia igual; se traz só "DIA 1 … DIA 5", a distância entre os números é mantida, então os dias de descanso entre eles continuam vazios. A data de cada treino ainda pode ser ajustada antes de adicionar. O tempo de descanso da tabela não é guardado (o app não tem campo para isso).
