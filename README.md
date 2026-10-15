@@ -86,4 +86,4 @@ O leitor (`parseLines` em `app.js`) reconhece vários formatos: `4x10 60kg`, `3 
 O banco é um projeto Supabase (não expira), configurado manualmente: cole a connection string em **Environment → `DATABASE_URL`**. O `render.yaml` só descreve o serviço web. O plano gratuito "dorme" após um tempo parado; o primeiro acesso depois pode demorar alguns segundos.
 
 ### Apagar todos os treinos
-No **Perfil**, o aluno tem "Apagar todos os meus treinos" (celular e computador). Pede confirmação dizendo quantos treinos serão apagados, remove treinos e fichas do aparelho e do servidor e não aparece para o professor vendo a ficha do aluno. O servidor guarda uma cópia de segurança recente (`app_state_history`), que só o administrador consegue restaurar.
+No **Perfil**, o aluno tem "Apagar todos os meus treinos" (celular e computador). Pede confirmação dizendo quantos treinos serão apagados, remove treinos e fichas do aparelho e do servidor e não aparece para o professor vendo a ficha do aluno. O servidor costuma guardar uma cópia de segurança anterior (`app_state_history`, por até 30 dias), mas ela não volta sozinha: restaurar é um pedido ao administrador.
