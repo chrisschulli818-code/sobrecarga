@@ -1154,3 +1154,38 @@ input:not([type]),input[type=search],input[type=url]{
 .af-actions .ghost{background:var(--surface);border:1px solid var(--border-strong);color:var(--text);}
 .af-section h3{font-family:var(--font-num);font-size:20px;font-weight:700;letter-spacing:.03em;text-transform:uppercase;}
 .af-overlay .kpi-v{font-family:var(--font-num);font-size:38px;}
+
+/* =====================================================================
+   Tom mais amigável: frases em vez de caixa alta, cantos mais macios,
+   botões maiores e legíveis. A condensada fica só para números e títulos.
+   ===================================================================== */
+:root{--radius-lg:18px;--radius-md:14px;--radius-sm:10px;}
+.mprimarybtn,.mghostbtn,.mdangerbtn,.prof-tab,.chip-btn,.af-actions button,.student-actions button:not(.ghost),.student-actions [data-assess],
+.hero .ghost,.hero button.small,[data-psec] .card-head button.small,.seg button,.mtab span,.mtoday .mprimarybtn,.drop,.mimportbtn,.mseeall{
+  font-family:var(--font-ui);text-transform:none;letter-spacing:0;font-weight:700;
+}
+.mprimarybtn{font-size:17px;min-height:50px;}
+.mghostbtn{font-size:15px;}
+.mghostbtn.small{font-size:14px;}
+.prof-tab{font-size:16px;}
+.chip-btn{font-size:15px;height:42px;}
+.chip-btn .chip-n{font-size:14px;}
+.af-actions button{font-size:16px;}
+.student-actions button:not(.ghost),.student-actions [data-assess]{font-size:15px;}
+.hero .ghost,.hero button.small{font-size:15px;}
+[data-psec] .card-head button.small{font-size:15px;}
+.mtab span{font-size:12px;}
+.overline,.mstepper label,#coachKpis .kpi-l,.vf-field,.msec-head h2,.af-section h3,.card-head h2{text-transform:none;letter-spacing:0;}
+.overline{font-size:15px;font-weight:600;color:var(--text-dim);}
+.msec-head h2,.af-section h3,.card-head h2{font-size:22px;}
+.mstepper label{font-size:15px;}
+#coachKpis .kpi-l{font-size:16px;}
+.vf-field{font-size:15px;}
+.mgrouplabel,th{text-transform:none;letter-spacing:0;font-size:13px;}
+.mtoday-top .overline.accent{color:var(--accent-text);}
+.mshell .overline,.mshell .mstepper label,.mtitle,.msection-title,.mgrouplabel,.mpad-label,.dash-cta .k,.mdash-cta .k,.dash-stat .l,.mdash-stat .l,.stat .l,
+.tour-tooltip .tt-title,.tour-tooltip .tt-step,.mbottom-tab,.prof-table-head,.builder-header h2,.builder-muscle-label,.dash-cta .v,.mdash-cta .v,.mplates-cap strong,th{
+  text-transform:none;letter-spacing:0;
+}
+.mshell .mday-dow{text-transform:none;letter-spacing:0;}
+.mweek-l{font-size:14px;}
