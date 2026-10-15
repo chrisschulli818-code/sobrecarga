@@ -29,3 +29,9 @@ usam o mesmo cabeçalho azul.
 - **Força máxima estimada** (antes "1RM"), **Total levantado** (antes "volume"), **Calorias gastas** (antes "energia"), **Evolução** (antes "rendimento"), **Ficha de saúde** (antes "anamnese").
 - **Sem treinar há 7+ dias** (antes "parados"), **Perdendo carga** (antes "carga caindo").
 Botões e rótulos em frase normal, não em caixa alta; a fonte condensada fica para números e títulos.
+
+## Organização
+O app tem 4 áreas, iguais no celular (abas embaixo) e no computador (abas no topo):
+**Início** (treino de hoje, semana, avisos), **Treinos** (meus treinos, importar ficha em PDF, montar pelo músculo),
+**Progresso** (total levantado, calorias, evolução) e **Perfil** (avaliação física, relatório em PDF, idioma).
+O painel do professor segue a mesma ideia: Alunos, Fichas prontas, Avisos, Vídeos.

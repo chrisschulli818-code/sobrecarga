@@ -1189,3 +1189,18 @@ input:not([type]),input[type=search],input[type=url]{
 }
 .mshell .mday-dow{text-transform:none;letter-spacing:0;}
 .mweek-l{font-size:14px;}
+
+/* abas do app no computador */
+.sec-off{display:none!important;}
+.app-tabs{margin-top:0;}
+[data-asec]{padding:20px 22px;}
+[data-asec] .card-head{margin-bottom:14px;}
+.dweek{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:8px;max-width:640px;}
+.dweek-day{display:flex;flex-direction:column;align-items:center;gap:6px;}
+.dweek-l{font-size:14px;font-weight:600;color:var(--text-dim);}
+.dweek-n{width:48px;height:48px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:var(--surface-3);color:var(--text-dim);font-family:var(--font-num);font-size:22px;font-weight:600;}
+.dweek-n.done{background:var(--accent);color:var(--accent-ink);box-shadow:0 0 0 3px var(--accent-tint);}
+.dweek-n.today{background:none;border:2px solid var(--accent);color:var(--text);}
+.mpage{padding-top:16px;}
+.mpage > .mweek:first-child{margin-top:-16px;}
+button.primary,button.small,button.ghost,#dashNextBtn{text-transform:none;letter-spacing:0;font-family:var(--font-ui);font-weight:700;font-size:15px;}

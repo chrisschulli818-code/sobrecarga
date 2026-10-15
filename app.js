@@ -15,7 +15,7 @@ const I18N = {
     homeTab:'Início', profileTab:'Perfil',
     codePlaceholder:'Ex.: K7M2QX', enter:'Entrar', accessAsCoach:'Acessar como professor',
     coachHintToast:'Digite seu código de professor no campo acima.',
-    nextWorkout:'Próximo treino', startWorkout:'Ir para o treino',
+    nextWorkout:'Próximo treino', startWorkout:'Abrir treino',
     weeksLabel:'semanas', sessionsLabel:'Treinos', exercisesLabel:'Exercícios',
     muscleMap:'Escolher pelo músculo', muscleMapHint:'Toque num músculo pra montar o treino na hora',
     front:'Frente', back:'Costas', importPdf:'↥ Importar / escanear PDF',
@@ -2697,7 +2697,7 @@ function renderDashboard(){
   if(next){
     label.textContent = next.name;
     btn.disabled = false;
-    btn.onclick = ()=> openSessionFromDashboard(next.id);
+    btn.onclick = ()=> { showAppTab('treinos'); openSessionFromDashboard(next.id); };
   }else{
     label.textContent = state.sessions.length ? 'Tudo em dia 🎉' : 'Importe sua ficha para começar';
     btn.disabled = true;
@@ -3779,6 +3779,7 @@ document.getElementById('builderSaveBtn').addEventListener('click', ()=>{
   save();
   closeBuilder();
   renderAll();
+  showAppTab('treinos');
   const list = document.getElementById('sessionsList');
   if(list) list.scrollIntoView({behavior:'smooth', block:'start'});
 });
@@ -4350,7 +4351,6 @@ function mRenderInicio(){
     html += `<div class="mweek-day"><span class="mweek-l">${DOW_SHORT[dowOf(d)]}</span><span class="mweek-n ${cls}">${+d.slice(8,10)}</span></div>`;
   }
   html += '</div>';
-  if(!READONLY) html += announcementsHtml();
 
   const next = findNextSession();
   if(next){
@@ -4375,6 +4375,7 @@ function mRenderInicio(){
   const month = today.slice(0,7);
   const monthCount = state.sessions.filter(s=> s.date.slice(0,7)===month && s.exercises.some(e=> e.sets.some(x=> x.weight>0))).length;
   const records = recentRecords();
+  if(!READONLY) html += announcementsHtml();
   html += `<div class="mstat-grid">
     <div class="mstat"><div class="n">${computeStreak()}</div><div class="l">semanas seguidas</div></div>
     <div class="mstat"><div class="n">${monthCount}</div><div class="l">treinos no mês</div></div>
@@ -4924,7 +4925,36 @@ mContent.addEventListener('input', e=>{
   }
 });
 
+/* ---------- Abas do app no computador (mesmas 4 abas do celular) ---------- */
+function showAppTab(tab){
+  document.querySelectorAll('#appTabs [data-atab]').forEach(b=>{
+    const on = b.dataset.atab===tab;
+    b.classList.toggle('active', on);
+    b.setAttribute('aria-selected', on ? 'true' : 'false');
+  });
+  document.querySelectorAll('#appWrap [data-asec]').forEach(el=>{ el.classList.toggle('sec-off', el.dataset.asec!==tab); });
+}
+document.getElementById('appTabs').addEventListener('click', e=>{
+  const b = e.target.closest('[data-atab]');
+  if(b) showAppTab(b.dataset.atab);
+});
+showAppTab('inicio');
+function renderDesktopWeek(){
+  const box = document.getElementById('dWeek');
+  if(!box) return;
+  const today = todayISO();
+  const monday = getWeekKey(today);
+  const trained = new Set(state.sessions.filter(s=> s.exercises.some(e=> e.sets.some(x=> x.weight>0))).map(s=> s.date));
+  let html = '';
+  for(let i=0;i<7;i++){
+    const d = addDaysISO(monday, i);
+    const cls = trained.has(d) ? 'done' : (d===today ? 'today' : '');
+    html += `<div class="dweek-day"><span class="dweek-l">${DOW_SHORT[dowOf(d)]}</span><span class="dweek-n ${cls}">${+d.slice(8,10)}</span></div>`;
+  }
+  box.innerHTML = html;
+}
 function renderAll(){
+  renderDesktopWeek();
   renderSessions();
   renderProgress();
   renderStats();

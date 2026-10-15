@@ -183,17 +183,23 @@
     </div>
   </div>
 
+  <nav class="prof-tabs app-tabs" id="appTabs" role="tablist" aria-label="Seções do app">
+    <button type="button" role="tab" class="prof-tab active" data-atab="inicio" aria-selected="true">Início</button>
+    <button type="button" role="tab" class="prof-tab" data-atab="treinos" aria-selected="false">Treinos</button>
+    <button type="button" role="tab" class="prof-tab" data-atab="progresso" aria-selected="false">Progresso</button>
+    <button type="button" role="tab" class="prof-tab" data-atab="perfil" aria-selected="false">Perfil</button>
+  </nav>
   <div id="readonlyBanner" style="display:none;" class="hint"></div>
-  <div id="studentAnnouncements"></div>
+  <div id="studentAnnouncements" data-asec="inicio"></div>
 
-  <div class="card" id="dashCard">
+  <div class="card" data-asec="inicio" id="dashCard">
     <div class="dash">
       <div class="dash-cta">
         <div>
           <div class="k">Próximo treino</div>
           <div class="v" id="dashNextLabel">—</div>
         </div>
-        <button class="primary small" id="dashNextBtn" style="align-self:flex-start;">Ir para o treino</button>
+        <button class="primary small" id="dashNextBtn" style="align-self:flex-start;">Abrir treino</button>
       </div>
       <div class="dash-stats">
         <div class="dash-stat"><div class="n" id="statStreak">0</div><div class="l">🔥 semanas seguidas</div></div>
@@ -203,17 +209,25 @@
     </div>
   </div>
 
-  <div class="card" id="homeMapCard">
+  <div class="card" data-asec="inicio" id="homeWeekCard">
+    <div class="card-head"><h2><span class="chip">📅</span>Sua semana</h2><span class="hint">Os dias em que você treinou ficam preenchidos</span></div>
+    <div class="dweek" id="dWeek"></div>
+  </div>
+  <div class="card" data-asec="treinos">
     <div class="card-head">
-      <h2><span class="chip">🗺️</span>Mapa Muscular</h2>
-      <span class="hint">Toque num músculo pra montar o treino na hora</span>
+      <h2><span class="chip">✎</span>Meus treinos</h2>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;">
+        <button class="small" id="addProtocolBtn">+ nova ficha</button>
+        <button class="small" id="addSessionBtn">+ novo treino manual</button>
+        <button class="small primary" id="openBuilderBtn">🎯 montar treino</button>
+      </div>
     </div>
-    <div id="homeMuscleMapWrap"></div>
+    <div id="sessionsList"></div>
   </div>
 
-  <div class="card" id="importCard">
+  <div class="card" data-asec="treinos" id="importCard">
     <div class="card-head">
-      <h2><span class="chip">↥</span>Importar PDF</h2>
+      <h2><span class="chip">↥</span>Importar ficha em PDF</h2>
       <span class="hint">Detecta cada treino do PDF como um treino separado. Fichas de prescrição não têm carga — preencha depois de treinar</span>
     </div>
     <label class="drop" id="drop" tabindex="0">
@@ -243,19 +257,15 @@
     </div>
   </div>
 
-  <div class="card">
+  <div class="card" data-asec="treinos" id="homeMapCard">
     <div class="card-head">
-      <h2><span class="chip">✎</span>Treinos</h2>
-      <div style="display:flex;gap:8px;flex-wrap:wrap;">
-        <button class="small" id="addProtocolBtn">+ nova ficha</button>
-        <button class="small" id="addSessionBtn">+ novo treino manual</button>
-        <button class="small primary" id="openBuilderBtn">🎯 montar treino</button>
-      </div>
+      <h2><span class="chip">🗺️</span>Montar treino pelo músculo</h2>
+      <span class="hint">Toque num músculo pra montar o treino na hora</span>
     </div>
-    <div id="sessionsList"></div>
+    <div id="homeMuscleMapWrap"></div>
   </div>
 
-  <div class="card">
+  <div class="card" data-asec="progresso">
     <div class="card-head">
       <h2><span class="chip">📈</span>Total levantado por semana</h2>
       <span class="hint">Peso × repetições somados por semana</span>
@@ -263,7 +273,7 @@
     <div id="volumeWrap"></div>
   </div>
 
-  <div class="card" id="energyCard" hidden>
+  <div class="card" data-asec="progresso" id="energyCard" hidden>
     <div class="card-head">
       <h2><span class="chip">🔥</span>Calorias gastas</h2>
       <span class="hint">Estimativa em kcal a partir do peso e das repetições de cada treino</span>
@@ -271,7 +281,7 @@
     <div id="energyWrap"></div>
   </div>
 
-  <div class="card">
+  <div class="card" data-asec="progresso">
     <div class="card-head">
       <h2><span class="chip">Δ</span>Evolução</h2>
       <span class="hint">Força máxima estimada (carga para 1 repetição) — compara o último treino com o anterior</span>
@@ -279,7 +289,7 @@
     <div id="progressWrap"></div>
   </div>
 
-  <div class="card" id="assessCard">
+  <div class="card" data-asec="perfil" id="assessCard">
     <div class="card-head">
       <h2><span class="chip">📏</span>Avaliação física</h2>
       <span class="hint">Peso, medidas, % de gordura e ficha de saúde</span>
@@ -287,7 +297,7 @@
     <button class="primary small" id="openAssessBtn">Abrir avaliação física</button>
   </div>
 
-  <div class="card">
+  <div class="card" data-asec="perfil">
     <div class="card-head">
       <h2><span class="chip">⬇</span>Exportar</h2>
       <span class="hint">Gera um PDF com todos os treinos registrados e o relatório de evolução</span>
