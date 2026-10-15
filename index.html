@@ -59,7 +59,7 @@
       </button>
       <button type="button" class="admin-nav-item" data-adminview="videos">
         <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="3"/><path d="M10 9v6l5-3z"/></svg>
-        Vídeos de execução
+        Vídeos dos exercícios
       </button>
       <button type="button" class="admin-nav-item" id="backupBtn" title="Baixa todos os dados (professores, alunos e fichas) em um arquivo">
         <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></svg>
@@ -88,7 +88,7 @@
           <span class="sr-only">Buscar professor</span>
           <input type="search" id="profSearch" placeholder="Buscar professor" autocomplete="off">
         </label>
-        <span class="hint">O interruptor liga o gráfico de gasto de energia (kcal) para todos os alunos do professor. Para liberar só um aluno, use o 🔥 dentro de "Ver painel".</span>
+        <span class="hint">O interruptor liga o gráfico de calorias gastas (kcal) para todos os alunos do professor. Para liberar só um aluno, use o 🔥 dentro de "Ver painel".</span>
       </div>
       <div class="prof-table-head" aria-hidden="true">
         <span>Nome</span><span>Código</span><span>Alunos</span><span>Gráfico de kcal</span><span class="ta-r">Ações</span>
@@ -99,7 +99,7 @@
   <main class="admin-main" id="adminViewVideos" hidden>
     <div class="admin-head">
       <div>
-        <h1>Vídeos de execução</h1>
+        <h1>Vídeos dos exercícios</h1>
         <p class="admin-lead">A biblioteca vale para todos os alunos. Cada professor pode trocar ou completar os vídeos para os alunos dele.</p>
       </div>
     </div>
@@ -125,7 +125,7 @@
   </div>
   <nav class="prof-tabs" id="profTabs" role="tablist" aria-label="Seções do painel">
     <button type="button" role="tab" class="prof-tab active" data-ptab="alunos" aria-selected="true">Alunos</button>
-    <button type="button" role="tab" class="prof-tab" data-ptab="modelos" aria-selected="false">Modelos</button>
+    <button type="button" role="tab" class="prof-tab" data-ptab="modelos" aria-selected="false">Fichas prontas</button>
     <button type="button" role="tab" class="prof-tab" data-ptab="avisos" aria-selected="false">Avisos</button>
     <button type="button" role="tab" class="prof-tab" data-ptab="videos" aria-selected="false">Vídeos</button>
   </nav>
@@ -133,7 +133,7 @@
     <div class="card-head">
       <h2><span class="chip">👥</span>Alunos</h2>
       <div style="display:flex;gap:8px;">
-        <button class="small ghost" id="bulkCodesBtn">🎲 Gerar 10 códigos</button>
+        <button class="small ghost" id="bulkCodesBtn">🎲 Criar 10 códigos de aluno</button>
         <button class="small primary" id="addStudentBtn">+ novo aluno</button>
       </div>
     </div>
@@ -143,7 +143,7 @@
   </div>
   <div class="card" data-psec="modelos" hidden>
     <div class="card-head">
-      <h2><span class="chip">📋</span>Modelos de treino</h2>
+      <h2><span class="chip">📋</span>Fichas prontas</h2>
       <span class="hint">Monte uma vez, envie para vários alunos</span>
     </div>
     <div id="profTemplates"></div>
@@ -157,7 +157,7 @@
   </div>
   <div class="card" data-psec="videos" hidden>
     <div class="card-head">
-      <h2><span class="chip">▶</span>Vídeos de execução</h2>
+      <h2><span class="chip">▶</span>Vídeos dos exercícios</h2>
       <span class="hint">Aparecem pro aluno no botão "Ver execução" de cada exercício</span>
     </div>
     <div id="profVideos"></div>
@@ -183,38 +183,52 @@
     </div>
   </div>
 
+  <nav class="prof-tabs app-tabs" id="appTabs" role="tablist" aria-label="Seções do app">
+    <button type="button" role="tab" class="prof-tab active" data-atab="inicio" aria-selected="true">Início</button>
+    <button type="button" role="tab" class="prof-tab" data-atab="treinos" aria-selected="false">Treinos</button>
+    <button type="button" role="tab" class="prof-tab" data-atab="progresso" aria-selected="false">Progresso</button>
+    <button type="button" role="tab" class="prof-tab" data-atab="perfil" aria-selected="false">Perfil</button>
+  </nav>
   <div id="readonlyBanner" style="display:none;" class="hint"></div>
-  <div id="studentAnnouncements"></div>
+  <div id="studentAnnouncements" data-asec="inicio"></div>
 
-  <div class="card" id="dashCard">
+  <div class="card" data-asec="inicio" id="dashCard">
     <div class="dash">
       <div class="dash-cta">
         <div>
           <div class="k">Próximo treino</div>
           <div class="v" id="dashNextLabel">—</div>
         </div>
-        <button class="primary small" id="dashNextBtn" style="align-self:flex-start;">Ir para o treino</button>
+        <button class="primary small" id="dashNextBtn" style="align-self:flex-start;">Abrir treino</button>
       </div>
       <div class="dash-stats">
         <div class="dash-stat"><div class="n" id="statStreak">0</div><div class="l">🔥 semanas seguidas</div></div>
-        <div class="dash-stat"><div class="n" id="statSessions">0</div><div class="l">Sessões</div></div>
-        <div class="dash-stat"><div class="n" id="statUp">0</div><div class="l">Em alta</div></div>
+        <div class="dash-stat"><div class="n" id="statSessions">0</div><div class="l">Treinos</div></div>
+        <div class="dash-stat"><div class="n" id="statUp">0</div><div class="l">Recordes</div></div>
       </div>
     </div>
   </div>
 
-  <div class="card" id="homeMapCard">
+  <div class="card" data-asec="inicio" id="homeWeekCard">
+    <div class="card-head"><h2><span class="chip">📅</span>Sua semana</h2><span class="hint">Os dias em que você treinou ficam preenchidos</span></div>
+    <div class="dweek" id="dWeek"></div>
+  </div>
+  <div class="card" data-asec="treinos">
     <div class="card-head">
-      <h2><span class="chip">🗺️</span>Mapa Muscular</h2>
-      <span class="hint">Toque num músculo pra montar o treino na hora</span>
+      <h2><span class="chip">✎</span>Meus treinos</h2>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;">
+        <button class="small" id="addProtocolBtn">+ nova ficha</button>
+        <button class="small" id="addSessionBtn">+ novo treino manual</button>
+        <button class="small primary" id="openBuilderBtn">🎯 montar treino</button>
+      </div>
     </div>
-    <div id="homeMuscleMapWrap"></div>
+    <div id="sessionsList"></div>
   </div>
 
-  <div class="card" id="importCard">
+  <div class="card" data-asec="treinos" id="importCard">
     <div class="card-head">
-      <h2><span class="chip">↥</span>Importar PDF</h2>
-      <span class="hint">Detecta cada treino do PDF como uma sessão separada. Fichas de prescrição não têm carga — preencha depois de treinar</span>
+      <h2><span class="chip">↥</span>Importar ficha em PDF</h2>
+      <span class="hint">Detecta cada treino do PDF como um treino separado. Fichas de prescrição não têm carga — preencha depois de treinar</span>
     </div>
     <label class="drop" id="drop" tabindex="0">
       <input type="file" id="fileInput" accept="application/pdf">
@@ -223,11 +237,11 @@
     <div id="stageWrap" style="display:none;margin-top:18px;">
       <div class="stage-group" style="display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap;">
         <div style="flex:1;min-width:180px;">
-          <label class="hint">Protocolo</label>
+          <label class="hint">Ficha</label>
           <select id="stageProtocolSelect"></select>
         </div>
         <div style="flex:1;min-width:180px;" id="stageProtocolNameWrap">
-          <label class="hint">Nome do novo protocolo</label>
+          <label class="hint">Nome da nova ficha</label>
           <input type="text" id="stageProtocolName">
         </div>
         <div style="width:150px;">
@@ -238,59 +252,55 @@
       <div id="stageGroupsWrap"></div>
       <div class="stage-actions">
         <button class="ghost small" id="stageCancel">Cancelar</button>
-        <button class="primary small" id="stageConfirm">Adicionar sessões</button>
+        <button class="primary small" id="stageConfirm">Adicionar treinos</button>
       </div>
     </div>
   </div>
 
-  <div class="card">
+  <div class="card" data-asec="treinos" id="homeMapCard">
     <div class="card-head">
-      <h2><span class="chip">✎</span>Sessões</h2>
-      <div style="display:flex;gap:8px;flex-wrap:wrap;">
-        <button class="small" id="addProtocolBtn">+ novo protocolo</button>
-        <button class="small" id="addSessionBtn">+ nova sessão manual</button>
-        <button class="small primary" id="openBuilderBtn">🎯 montar treino</button>
-      </div>
+      <h2><span class="chip">🗺️</span>Montar treino pelo músculo</h2>
+      <span class="hint">Toque num músculo pra montar o treino na hora</span>
     </div>
-    <div id="sessionsList"></div>
+    <div id="homeMuscleMapWrap"></div>
   </div>
 
-  <div class="card">
+  <div class="card" data-asec="progresso">
     <div class="card-head">
-      <h2><span class="chip">📈</span>Volume semanal</h2>
+      <h2><span class="chip">📈</span>Total levantado por semana</h2>
       <span class="hint">Peso × repetições somados por semana</span>
     </div>
     <div id="volumeWrap"></div>
   </div>
 
-  <div class="card" id="energyCard" hidden>
+  <div class="card" data-asec="progresso" id="energyCard" hidden>
     <div class="card-head">
-      <h2><span class="chip">🔥</span>Gasto de energia</h2>
+      <h2><span class="chip">🔥</span>Calorias gastas</h2>
       <span class="hint">Estimativa em kcal a partir do peso e das repetições de cada treino</span>
     </div>
     <div id="energyWrap"></div>
   </div>
 
-  <div class="card">
+  <div class="card" data-asec="progresso">
     <div class="card-head">
-      <h2><span class="chip">Δ</span>Rendimento</h2>
-      <span class="hint">1RM estimado (Epley) — compara a última sessão com a anterior</span>
+      <h2><span class="chip">Δ</span>Evolução</h2>
+      <span class="hint">Força máxima estimada (carga para 1 repetição) — compara o último treino com o anterior</span>
     </div>
     <div id="progressWrap"></div>
   </div>
 
-  <div class="card" id="assessCard">
+  <div class="card" data-asec="perfil" id="assessCard">
     <div class="card-head">
       <h2><span class="chip">📏</span>Avaliação física</h2>
-      <span class="hint">Peso, medidas, % de gordura e anamnese</span>
+      <span class="hint">Peso, medidas, % de gordura e ficha de saúde</span>
     </div>
     <button class="primary small" id="openAssessBtn">Abrir avaliação física</button>
   </div>
 
-  <div class="card">
+  <div class="card" data-asec="perfil">
     <div class="card-head">
       <h2><span class="chip">⬇</span>Exportar</h2>
-      <span class="hint">Gera um PDF com todas as sessões registradas e o relatório de rendimento</span>
+      <span class="hint">Gera um PDF com todos os treinos registrados e o relatório de evolução</span>
     </div>
     <button class="primary small" id="exportPdfBtn">Baixar relatório em PDF</button>
   </div>
@@ -318,7 +328,7 @@
         <div class="msection-title" style="margin:0 0 10px;">Treino montado (<span id="builderCount">0</span>)</div>
         <div id="builderSelectedList" class="builder-selected-list"></div>
         <div class="builder-finalize">
-          <input type="text" id="builderSessionName" placeholder="nome da sessão (ex.: Treino A — Peito)">
+          <input type="text" id="builderSessionName" placeholder="nome do treino (ex.: Treino A — Peito)">
           <input type="date" id="builderSessionDate">
           <select id="builderProtocolSelect"></select>
           <button class="primary" id="builderSaveBtn" style="justify-content:center;">Salvar treino</button>

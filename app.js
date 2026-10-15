@@ -15,13 +15,13 @@ const I18N = {
     homeTab:'Início', profileTab:'Perfil',
     codePlaceholder:'Ex.: K7M2QX', enter:'Entrar', accessAsCoach:'Acessar como professor',
     coachHintToast:'Digite seu código de professor no campo acima.',
-    nextWorkout:'Próximo treino', startWorkout:'Ir para o treino',
-    weeksLabel:'semanas', sessionsLabel:'Sessões', exercisesLabel:'Exercícios',
-    muscleMap:'Mapa Muscular', muscleMapHint:'Toque num músculo pra montar o treino na hora',
+    nextWorkout:'Próximo treino', startWorkout:'Abrir treino',
+    weeksLabel:'semanas', sessionsLabel:'Treinos', exercisesLabel:'Exercícios',
+    muscleMap:'Escolher pelo músculo', muscleMapHint:'Toque num músculo pra montar o treino na hora',
     front:'Frente', back:'Costas', importPdf:'↥ Importar / escanear PDF',
     workoutsTab:'Treinos', progressTab:'Progresso',
-    newSession:'+ nova sessão', buildWorkout:'🎯 montar treino',
-    noSessionsYet:'Nenhuma sessão ainda', importHint:'Importe um PDF ou crie manualmente.',
+    newSession:'+ novo treino', buildWorkout:'🎯 montar treino',
+    noSessionsYet:'Nenhum treino ainda', importHint:'Importe um PDF ou crie manualmente.',
     importPdfCta:'Importe sua ficha para começar',
     logout:'sair', tourBtnTitle:'Tour do app',
   },
@@ -483,8 +483,8 @@ function coachFilters(){
   const named = coachStudents.filter(s=> s.name);
   return [
     ['all', 'Todos', coachStudents.length],
-    ['stale', 'Parados há +7 dias', named.filter(isStale).length],
-    ['drops', 'Carga caindo', named.filter(s=> (s.loadDrops||[]).length).length],
+    ['stale', 'Sem treinar há 7+ dias', named.filter(isStale).length],
+    ['drops', 'Perdendo carga', named.filter(s=> (s.loadDrops||[]).length).length],
     ['records', 'Bateram recorde', named.filter(s=> (s.records30||[]).length).length]
   ];
 }
@@ -493,7 +493,7 @@ function renderCoachSummary(){
   const kpis = [
     ['Alunos', named.length, coachStudents.length>named.length ? `${coachStudents.length-named.length} código(s) ainda sem nome` : ''],
     ['Treinaram nesta semana', named.filter(s=> s.weekDone>0).length, `de ${named.length}`],
-    ['Parados há +7 dias', named.filter(isStale).length, 'precisam de contato'],
+    ['Sem treinar há 7+ dias', named.filter(isStale).length, 'precisam de contato'],
     ['Recordes nos últimos 30 dias', named.reduce((n,s)=> n+(s.records30||[]).length, 0), `${named.filter(s=> (s.records30||[]).length).length} aluno(s)`]
   ];
   const alertIdx = { 2: 'warn' };
@@ -503,7 +503,7 @@ function renderCoachSummary(){
     <div class="coach-tools-row">
       <label class="search-box"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="6"/><path d="M20 20l-4-4"/></svg><span class="sr-only">Buscar aluno</span><input type="search" id="coachSearch" placeholder="Buscar aluno" value="${escapeAttr(coachView.q)}" autocomplete="off"></label>
       <label class="coach-sort"><span class="sr-only">Ordenar</span><select id="coachSort">
-        ${[['name','Nome (A–Z)'],['stale','Parados primeiro'],['active','Mais ativos primeiro']].map(([k,l])=> `<option value="${k}" ${coachView.sort===k?'selected':''}>${l}</option>`).join('')}
+        ${[['name','Nome (A–Z)'],['stale','Quem está parado primeiro'],['active','Mais ativos primeiro']].map(([k,l])=> `<option value="${k}" ${coachView.sort===k?'selected':''}>${l}</option>`).join('')}
       </select></label>
     </div>`;
 }
@@ -528,9 +528,9 @@ function renderStudentRows(){
   studentsList.innerHTML = rows.map(s=>{
     const stale = isStale(s);
     const badges = [];
-    if(s.name && stale) badges.push(`<span class="badge badge-warn">${s.lastTrainedAt ? `Parado há ${daysSince(s.lastTrainedAt)} dias` : 'Ainda não treinou'}</span>`);
+    if(s.name && stale) badges.push(`<span class="badge badge-warn">${s.lastTrainedAt ? `Sem treinar há ${daysSince(s.lastTrainedAt)} dias` : 'Ainda não treinou'}</span>`);
     if((s.records30||[]).length) badges.push(`<span class="badge badge-ok" title="${escapeAttr(s.records30.join(', '))}">🏆 ${s.records30.length} ${s.records30.length===1?'recorde':'recordes'}</span>`);
-    if((s.loadDrops||[]).length) badges.push(`<span class="badge badge-bad" title="${escapeAttr(s.loadDrops.join(', '))}">▼ Carga caindo: ${escapeHtml(s.loadDrops.slice(0,2).join(', '))}${s.loadDrops.length>2?'…':''}</span>`);
+    if((s.loadDrops||[]).length) badges.push(`<span class="badge badge-bad" title="${escapeAttr(s.loadDrops.join(', '))}">▼ Perdendo carga: ${escapeHtml(s.loadDrops.slice(0,2).join(', '))}${s.loadDrops.length>2?'…':''}</span>`);
     const freq = s.name ? `${s.weekDone}${s.weekPlanned?'/'+s.weekPlanned:''} ${s.weekPlanned? 'treinos na semana' : (s.weekDone===1?'treino nesta semana':'treinos nesta semana')} · ${s.done28} nos últimos 28 dias` : '';
     // anilha de estado: vermelha = carga caindo, amarela = parado, verde = treinando, cinza = ainda não treinou
     const state = !s.name ? 'wait' : ((s.loadDrops||[]).length ? 'drop' : (stale ? (s.lastTrainedAt ? 'stale' : 'none') : 'ok'));
@@ -681,7 +681,7 @@ document.addEventListener('click', e=>{
   renderAll();
 });
 
-/* ---------- Modelos de treino (montar a ficha e enviar pra vários alunos) ---------- */
+/* ---------- Fichas prontas (montar a ficha e enviar pra vários alunos) ---------- */
 const WEEKDAYS = ['Segunda','Terça','Quarta','Quinta','Sexta','Sábado','Domingo'];
 const tplCounts = t=> ({ days: t.days.length, ex: t.days.reduce((n,d)=> n+d.exercises.length, 0) });
 async function renderTemplateManager(container){
@@ -691,17 +691,17 @@ async function renderTemplateManager(container){
     const res = await fetch('/api/professor/templates', { headers: apiHeaders() });
     if(!res.ok) throw new Error('bad status');
     list = await res.json();
-  }catch(e){ container.innerHTML = `<div class="empty">Não consegui carregar os modelos agora.</div>`; return; }
+  }catch(e){ container.innerHTML = `<div class="empty">Não consegui carregar as fichas prontas agora.</div>`; return; }
   container.innerHTML = `
-    <div class="tpl-top"><p class="hint" style="margin:0;">Monte a divisão de treino uma vez e envie para quantos alunos quiser. Cada aluno recebe um protocolo novo, com as semanas já criadas.</p>
-      <button type="button" class="primary" data-tpl="new">+ Novo modelo</button></div>
+    <div class="tpl-top"><p class="hint" style="margin:0;">Monte a divisão de treino uma vez e envie para quantos alunos quiser. Cada aluno recebe uma ficha nova, com as semanas já criadas.</p>
+      <button type="button" class="primary" data-tpl="new">+ Nova ficha pronta</button></div>
     ${list.length ? `<div class="tpl-grid">${list.map(t=>{ const c = tplCounts(t); return `<div class="tpl-card">
       <div class="tpl-name">${escapeHtml(t.name)}</div>
       <div class="mitem-sub">${plural(c.days,'treino','treinos')} por semana · ${plural(c.ex,'exercício','exercícios')} · ${plural(t.weeks,'semana','semanas')}</div>
       <div class="tpl-actions"><button type="button" class="small primary" data-tpl="send" data-id="${escapeAttr(t.id)}">Enviar para alunos</button>
         <button type="button" class="small ghost" data-tpl="edit" data-id="${escapeAttr(t.id)}">Editar</button>
         <button type="button" class="small ghost" data-tpl="del" data-id="${escapeAttr(t.id)}" data-name="${escapeAttr(t.name)}">Excluir</button></div></div>`; }).join('')}</div>`
-    : `<div class="empty"><strong>Nenhum modelo ainda</strong>Crie o primeiro: dias da semana, exercícios, séries e alvo de repetições.</div>`}`;
+    : `<div class="empty"><strong>Nenhuma ficha pronta ainda</strong>Crie o primeiro: dias da semana, exercícios, séries e meta de repetições.</div>`}`;
   container.onclick = async e=>{
     const b = e.target.closest('[data-tpl]');
     if(!b) return;
@@ -710,9 +710,9 @@ async function renderTemplateManager(container){
     else if(b.dataset.tpl==='edit' && t) openTemplateEditor(t, ()=> renderTemplateManager(container));
     else if(b.dataset.tpl==='send' && t) openSendTemplate(t);
     else if(b.dataset.tpl==='del'){
-      if(!(await confirmDialog(`Excluir o modelo "${b.dataset.name}"? As fichas que já foram enviadas não mudam.`))) return;
+      if(!(await confirmDialog(`Excluir a ficha pronta "${b.dataset.name}"? As fichas que já foram enviadas não mudam.`))) return;
       const res = await fetch(`/api/professor/templates/${b.dataset.id}`, { method:'DELETE', headers: apiHeaders() });
-      if(!res.ok){ alert('Não consegui excluir o modelo.'); return; }
+      if(!res.ok){ alert('Não consegui excluir a ficha pronta.'); return; }
       renderTemplateManager(container);
     }
   };
@@ -734,8 +734,8 @@ function openTemplateEditor(tpl, onSaved){
   const ed = tplToEditor(tpl);
   const overlay = document.createElement('div');
   overlay.className = 'af-overlay';
-  overlay.innerHTML = `<div class="af-box" role="dialog" aria-modal="true" aria-label="Modelo de treino">
-    <div class="af-head"><div><div class="overline">Modelo de treino</div><h2 class="af-title">${tpl ? 'Editar modelo' : 'Novo modelo'}</h2></div><button type="button" class="af-close" aria-label="Fechar">✕</button></div>
+  overlay.innerHTML = `<div class="af-box" role="dialog" aria-modal="true" aria-label="Ficha pronta">
+    <div class="af-head"><div><div class="overline">Ficha pronta</div><h2 class="af-title">${tpl ? 'Editar ficha pronta' : 'Nova ficha pronta'}</h2></div><button type="button" class="af-close" aria-label="Fechar">✕</button></div>
     <div class="af-body"></div></div>`;
   document.body.appendChild(overlay);
   const body = overlay.querySelector('.af-body');
@@ -746,7 +746,7 @@ function openTemplateEditor(tpl, onSaved){
   function draw(){
     body.innerHTML = `<form class="af-form" novalidate>
       <section class="af-section"><div class="af-row3">
-        <label class="vf-field"><span>Nome do modelo</span><input data-p="name" value="${escapeAttr(ed.name)}" maxlength="60" placeholder="Ex.: Hipertrofia ABC" autocomplete="off"></label>
+        <label class="vf-field"><span>Nome da ficha pronta</span><input data-p="name" value="${escapeAttr(ed.name)}" maxlength="60" placeholder="Ex.: Hipertrofia ABC" autocomplete="off"></label>
         <label class="vf-field"><span>Duração (semanas)</span><input data-p="weeks" type="number" min="1" max="52" value="${ed.weeks}" inputmode="numeric"></label>
       </div></section>
       ${ed.days.map((d,di)=> `<section class="af-section tpl-day">
@@ -755,18 +755,18 @@ function openTemplateEditor(tpl, onSaved){
           <label class="vf-field"><span>Dia da semana</span><select data-p="days.${di}.offset">${WEEKDAYS.map((w,i)=> `<option value="${i}" ${d.offset===i?'selected':''}>${w}</option>`).join('')}</select></label>
           ${ed.days.length>1 ? `<button type="button" class="ghost small" data-ted="rmday" data-di="${di}">Remover treino</button>` : ''}
         </div>
-        <div class="tpl-ex-head" aria-hidden="true"><span>Exercício</span><span>Séries</span><span>Alvo de reps</span><span>Carga (kg)</span><span></span></div>
+        <div class="tpl-ex-head" aria-hidden="true"><span>Exercício</span><span>Séries</span><span>Meta de reps</span><span>Carga (kg)</span><span></span></div>
         ${d.exercises.map((e,ei)=> `<div class="tpl-ex">
           <input data-p="days.${di}.exercises.${ei}.name" list="exerciseNameList" value="${escapeAttr(e.name)}" placeholder="Exercício" maxlength="80" aria-label="Exercício" autocomplete="off">
           <input data-p="days.${di}.exercises.${ei}.sets" type="number" min="1" max="12" value="${escapeAttr(e.sets)}" inputmode="numeric" aria-label="Séries">
-          <input data-p="days.${di}.exercises.${ei}.target" value="${escapeAttr(e.target)}" maxlength="20" placeholder="8 a 12" aria-label="Alvo de repetições" autocomplete="off">
+          <input data-p="days.${di}.exercises.${ei}.target" value="${escapeAttr(e.target)}" maxlength="20" placeholder="8 a 12" aria-label="Meta de repetições" autocomplete="off">
           <input data-p="days.${di}.exercises.${ei}.weight" value="${escapeAttr(e.weight)}" inputmode="decimal" placeholder="opcional" aria-label="Carga sugerida" autocomplete="off">
           <button type="button" class="micon-btn" data-ted="rmex" data-di="${di}" data-ei="${ei}" aria-label="Remover exercício">✕</button></div>`).join('')}
         <button type="button" class="ghost small" data-ted="addex" data-di="${di}">+ exercício</button>
       </section>`).join('')}
       <div class="af-actions"><button type="button" class="ghost" data-ted="addday">+ Outro treino</button></div>
       <div class="vf-msg" role="alert"></div>
-      <div class="af-actions"><button type="submit" class="primary">Salvar modelo</button><button type="button" class="ghost" data-ted="cancel">Cancelar</button></div>
+      <div class="af-actions"><button type="submit" class="primary">Salvar ficha pronta</button><button type="button" class="ghost" data-ted="cancel">Cancelar</button></div>
     </form>`;
   }
   draw();
@@ -791,13 +791,13 @@ function openTemplateEditor(tpl, onSaved){
   body.addEventListener('submit', async e=>{
     e.preventDefault();
     const msg = body.querySelector('.vf-msg');
-    if(!ed.name.trim()){ msg.textContent = 'Dê um nome ao modelo.'; return; }
+    if(!ed.name.trim()){ msg.textContent = 'Dê um nome à ficha pronta.'; return; }
     const payload = editorToTpl(ed);
     if(!payload.days.some(d=> d.exercises.length)){ msg.textContent = 'Adicione pelo menos um exercício com nome.'; return; }
     try{
       const res = await fetch(`/api/professor/templates${ed.id ? '/'+ed.id : ''}`, { method: ed.id ? 'PUT' : 'POST', headers: apiHeaders({'Content-Type':'application/json'}), body: JSON.stringify(payload) });
       if(!res.ok) throw new Error(res.status);
-      showToast('Modelo salvo!');
+      showToast('Ficha pronta salva!');
       close(); onSaved && onSaved();
     }catch(err){ msg.textContent = 'Não consegui salvar agora. Tente de novo.'; }
   });
@@ -812,19 +812,19 @@ async function openSendTemplate(tpl){
   const students = (coachStudents.length ? coachStudents : await loadStudents()).filter(s=> s.name);
   const overlay = document.createElement('div');
   overlay.className = 'af-overlay';
-  overlay.innerHTML = `<div class="af-box af-box-sm" role="dialog" aria-modal="true" aria-label="Enviar modelo">
-    <div class="af-head"><div><div class="overline">Enviar modelo</div><h2 class="af-title">${escapeHtml(tpl.name)}</h2></div><button type="button" class="af-close" aria-label="Fechar">✕</button></div>
+  overlay.innerHTML = `<div class="af-box af-box-sm" role="dialog" aria-modal="true" aria-label="Enviar ficha">
+    <div class="af-head"><div><div class="overline">Enviar ficha</div><h2 class="af-title">${escapeHtml(tpl.name)}</h2></div><button type="button" class="af-close" aria-label="Fechar">✕</button></div>
     <div class="af-body"><form class="af-form" novalidate>
       ${students.length ? `
       <section class="af-section"><div class="af-row3">
         <label class="vf-field"><span>Semana de início</span><input type="date" name="start" value="${nextMondayISO()}"></label>
         <label class="vf-field"><span>Duração (semanas)</span><input type="number" name="weeks" min="1" max="52" value="${tpl.weeks}" inputmode="numeric"></label>
-      </div><p class="dim af-help">Os treinos caem nos dias da semana do modelo, a partir da semana da data escolhida.</p></section>
+      </div><p class="dim af-help">Os treinos caem nos dias da semana da ficha pronta, a partir da semana da data escolhida.</p></section>
       <section class="af-section"><div class="msec-head"><h3 style="margin:0;">Alunos</h3><button type="button" class="mlink" data-send="all">Marcar todos</button></div>
         <div class="send-list">${students.map(s=> `<label class="af-check"><input type="checkbox" name="stu" value="${escapeAttr(s.id)}"> ${escapeHtml(s.name)}</label>`).join('')}</div></section>
       <div class="vf-msg" role="alert"></div>
-      <div class="af-actions"><button type="submit" class="primary">Enviar modelo</button><button type="button" class="ghost" data-send="cancel">Cancelar</button></div>`
-      : '<div class="empty"><strong>Nenhum aluno com nome ainda</strong>Cadastre alunos antes de enviar o modelo.</div>'}
+      <div class="af-actions"><button type="submit" class="primary">Enviar ficha</button><button type="button" class="ghost" data-send="cancel">Cancelar</button></div>`
+      : '<div class="empty"><strong>Nenhum aluno com nome ainda</strong>Cadastre alunos antes de enviar a ficha.</div>'}
     </form></div></div>`;
   document.body.appendChild(overlay);
   const close = ()=>{ overlay.remove(); document.removeEventListener('keydown', onKey); };
@@ -847,7 +847,7 @@ async function openSendTemplate(tpl){
       if(!res.ok) throw new Error(res.status);
       const r = await res.json();
       close();
-      showToast(`Modelo enviado para ${plural(r.sent.length,'aluno','alunos')}${r.skipped.length ? ` (${r.skipped.length} sem espaço na ficha)` : ''}.`);
+      showToast(`Ficha enviada para ${plural(r.sent.length,'aluno','alunos')}${r.skipped.length ? ` (${r.skipped.length} sem espaço na ficha)` : ''}.`);
       renderProfessorDashboard();
     }catch(err){ msg.textContent = 'Não consegui enviar agora. Tente de novo.'; btn.disabled = false; }
   });
@@ -1827,7 +1827,7 @@ const stageProtocolWeeks = document.getElementById('stageProtocolWeeks');
 
 function renderStageProtocol(){
   stageProtocolSelect.innerHTML =
-    `<option value="__new">➕ Novo protocolo</option>` +
+    `<option value="__new">➕ Nova ficha</option>` +
     state.protocols.map(p=> `<option value="${escapeAttr(p.id)}" ${stageProtocol.id===p.id?'selected':''}>${escapeHtml(p.name)}</option>`).join('');
   stageProtocolSelect.value = stageProtocol.mode==='new' ? '__new' : stageProtocol.id;
   stageProtocolName.value = stageProtocol.name;
@@ -1870,7 +1870,7 @@ function renderStageGroups(){
     card.className = 'stage-group';
     card.innerHTML = `
       <div class="row-fields" style="grid-template-columns:1fr 160px 90px;">
-        <div><label class="hint">Nome da sessão</label><input type="text" data-gfield="name" value="${escapeAttr(group.name)}"></div>
+        <div><label class="hint">Nome do treino</label><input type="text" data-gfield="name" value="${escapeAttr(group.name)}"></div>
         <div><label class="hint">Data</label><input type="date" data-gfield="date" value="${group.date}"></div>
         <div style="display:flex;align-items:flex-end;gap:8px;">
           <span class="badge-count">${group.rows.length} linhas</span>
@@ -1879,7 +1879,7 @@ function renderStageGroups(){
       </div>
       <div class="tbl-scroll">
         <table>
-          <thead><tr><th>Exercício</th><th style="width:70px">Séries</th><th style="width:100px">Alvo (reps)</th><th style="width:80px">Reps</th><th style="width:90px">Carga (kg)</th><th></th></tr></thead>
+          <thead><tr><th>Exercício</th><th style="width:70px">Séries</th><th style="width:100px">Meta (reps)</th><th style="width:80px">Reps</th><th style="width:90px">Carga (kg)</th><th></th></tr></thead>
           <tbody></tbody>
         </table>
       </div>
@@ -1957,7 +1957,7 @@ function commitStagedSessions(){
     stageGroups.forEach(group=>{
       const exercises = buildExercisesFromRows(group.rows);
       if(exercises.length===0) return;
-      const name = group.name.trim() || 'Sessão';
+      const name = group.name.trim() || 'Treino';
       const date = addDaysISO(group.date || todayISO(), 7*w);
       if(sessionExists(name, date)) return;
       const session = { id: uid(), protocolId, date, name, exercises };
@@ -1993,7 +1993,7 @@ function newManualSession(){
     state.protocols.push(prot);
     protocolId = prot.id;
   }
-  const session = { id: uid(), protocolId, date: todayISO(), name: 'Nova sessão', exercises: [
+  const session = { id: uid(), protocolId, date: todayISO(), name: 'Novo treino', exercises: [
     { id: uid(), name: 'Exercício', sets:[{reps:10, weight:0, target:''}] }
   ]};
   state.sessions.push(session);
@@ -2042,7 +2042,7 @@ function getWeekLabel(mondayIso){
 /* ---------- Repetir semana / sessão ----------
    O treino é mensal e se repete toda semana, então copiar a estrutura evita
    reimportar o PDF. A carga vai zerada de propósito: assim a cópia ainda não
-   treinada não entra no relatório de rendimento (1RM só conta com peso > 0)
+   treinada não entra no relatório de evolução (1RM só conta com peso > 0)
    e não finge um resultado que não aconteceu. */
 function cloneSessionTo(session, newDate){
   return {
@@ -2105,7 +2105,7 @@ function diffDays(a, b){
 async function addProtocolWeek(protocolId){
   const base = protocolDivision(protocolId);
   if(base.length===0){
-    alert('Este protocolo ainda não tem treinos para repetir. Importe a ficha ou crie uma sessão primeiro.');
+    alert('Esta ficha ainda não tem treinos para repetir. Importe o PDF ou crie um treino primeiro.');
     return false;
   }
   const keys = protocolWeekKeys(protocolId);
@@ -2123,7 +2123,7 @@ async function addProtocolWeek(protocolId){
     pushCopy(cloneSessionTo(s, newDate));
     added++;
   });
-  if(added===0){ alert('Essas sessões já existem na semana seguinte.'); return false; }
+  if(added===0){ alert('Esses treinos já existem na semana seguinte.'); return false; }
   const prot = state.protocols.find(p=> p.id===protocolId);
   if(prot) prot.weeks = protocolWeekKeys(protocolId).length;
   save(); renderAll();
@@ -2149,7 +2149,7 @@ function ensureProtocols(){
 function suggestProtocolName(iso){
   const d = new Date((iso||todayISO())+'T00:00:00');
   const mes = d.toLocaleDateString('pt-BR',{month:'short'}).replace('.','').trim();
-  return `Protocolo ${mes}/${d.getFullYear()}`;
+  return `Ficha ${mes}/${d.getFullYear()}`;
 }
 function newestProtocolId(){
   if(!state.protocols.length) return null;
@@ -2174,7 +2174,7 @@ function groupByProtocol(sessions){
     blocks.push({
       key: k,
       protocol: prot,
-      name: prot ? prot.name : 'Sem protocolo',
+      name: prot ? prot.name : 'Sem ficha',
       sessions: list,
       start: dates[0],
       end: dates[dates.length-1],
@@ -2213,7 +2213,7 @@ function groupSessions(sessions){
 
 function renderSessions(){
   if(state.sessions.length===0){
-    sessionsList.innerHTML = `<div class="empty"><strong>Nenhuma sessão ainda</strong>Importe um PDF acima ou crie uma sessão manual.</div>`;
+    sessionsList.innerHTML = `<div class="empty"><strong>Nenhum treino ainda</strong>Importe um PDF acima ou crie um treino manual.</div>`;
     return;
   }
   const blocks = groupByProtocol(state.sessions);
@@ -2243,7 +2243,7 @@ function renderSessions(){
     if(!isOpen) return;
     const body = protEl.querySelector('.protocol-body');
     if(block.months.length===0){
-      body.innerHTML = `<div class="empty" style="padding:18px;">Nenhuma sessão neste protocolo ainda. Importe o PDF da ficha ou crie uma sessão manual.</div>`;
+      body.innerHTML = `<div class="empty" style="padding:18px;">Nenhum treino nesta ficha ainda. Importe o PDF da ficha ou crie um treino manual.</div>`;
       return;
     }
     const ordem = protocolWeekKeys(block.key);
@@ -2274,7 +2274,7 @@ function renderMonthGroups(container, months, weekNumber){
     monthEl.innerHTML = `
       <div class="month-head" data-month="${month.key}">
         <span class="chev">›</span><span class="group-label">${month.label}</span>
-        <span class="group-meta">${sessionCount} ${sessionCount===1?'sessão':'sessões'}</span>
+        <span class="group-meta">${sessionCount} ${sessionCount===1?'treino':'treinos'}</span>
       </div>
       <div class="month-body"></div>`;
     container.appendChild(monthEl);
@@ -2307,8 +2307,8 @@ function renderWeekGroups(container, weeks, weekNumber){
         <div class="session-head" data-open="${session.id}">
           <span class="session-name">${escapeHtml(session.name)} ${session.feedback?'<span class="feedback-flag" title="Tem feedback do professor">💬</span>':''}</span>
           <div style="display:flex;align-items:center;gap:4px;">
-            ${LOCKED() ? '' : `<button class="ghost small repeat" data-repeatsession="${session.id}" title="Repetir esta sessão daqui a 7 dias">⟳</button>`}
-            ${LOCKED() ? '' : `<button class="ghost small" data-quickdel="${session.id}" title="Excluir sessão">✕</button>`}
+            ${LOCKED() ? '' : `<button class="ghost small repeat" data-repeatsession="${session.id}" title="Repetir este treino daqui a 7 dias">⟳</button>`}
+            ${LOCKED() ? '' : `<button class="ghost small" data-quickdel="${session.id}" title="Excluir treino">✕</button>`}
             <span class="chev">›</span>
           </div>
         </div>
@@ -2328,7 +2328,7 @@ function feedbackBlockHtml(session){
   if(READONLY){
     return `<div class="feedback-block feedback-editing">
       <label class="hint">💬 Feedback para o aluno</label>
-      <textarea data-feedback rows="2" placeholder="Deixe um comentário sobre esta sessão...">${escapeHtml(fb)}</textarea>
+      <textarea data-feedback rows="2" placeholder="Deixe um comentário sobre este treino...">${escapeHtml(fb)}</textarea>
     </div>`;
   }
   if(!fb) return '';
@@ -2351,7 +2351,7 @@ function renderSessionBody(container, session){
     <div class="row-fields" style="grid-template-columns:1fr 160px 90px;">
       <div><label class="hint">Nome</label><input type="text" data-sfield="name" value="${escapeAttr(session.name)}" ${roAttr}></div>
       <div><label class="hint">Data</label><input type="date" data-sfield="date" value="${session.date}" ${roAttr}></div>
-      <div style="display:flex;align-items:flex-end;">${ro?'':'<button class="ghost small" data-delsession="1">✕ excluir sessão</button>'}</div>
+      <div style="display:flex;align-items:flex-end;">${ro?'':'<button class="ghost small" data-delsession="1">✕ excluir treino</button>'}</div>
     </div>
     ${feedbackBlockHtml(session)}
     <div id="exList-${session.id}"></div>
@@ -2377,7 +2377,7 @@ function renderSessionBody(container, session){
       });
     });
     container.querySelector('[data-delsession]').addEventListener('click', async ()=>{
-      if(!(await confirmDialog(`Excluir a sessão "${session.name}"?`))) return;
+      if(!(await confirmDialog(`Excluir o treino "${session.name}"?`))) return;
       state.sessions = state.sessions.filter(s=> s.id!==session.id);
       save(); renderAll();
     });
@@ -2398,7 +2398,7 @@ function renderSessionBody(container, session){
       block.innerHTML = `
         <div class="ex-head">
           <input type="text" class="ex-name-input" value="${escapeAttr(ex.name)}" ${roAttr}>
-          <span class="ex-target hint">${targetLabel ? 'alvo '+escapeHtml(targetLabel)+' reps' : ''}</span>
+          <span class="ex-target hint">${targetLabel ? 'meta '+escapeHtml(targetLabel)+' reps' : ''}</span>
           ${record ? `<span class="pr-badge">🏆 ${record.weight}kg × ${record.reps}</span>` : ''}
           ${videoButtonHtml(ex.name, 'small')}
           ${ro?'':`<button class="ghost small" data-delex="${ex.id}">✕</button>`}
@@ -2430,7 +2430,7 @@ function renderSessionBody(container, session){
           row.className = 'set-row';
           row.innerHTML = `
             <span class="set-idx">${i+1}</span>
-            <input type="text" class="set-target" placeholder="alvo" value="${escapeAttr(s.target||'')}" data-k="target" ${roAttr}>
+            <input type="text" class="set-target" placeholder="meta" value="${escapeAttr(s.target||'')}" data-k="target" ${roAttr}>
             <input type="number" min="0" placeholder="reps" value="${s.reps}" data-k="reps" ${roAttr}>
             <input type="number" min="0" step="0.5" placeholder="kg" value="${s.weight}" data-k="weight" ${roAttr}>
             ${ro?'':`<button class="ghost small" data-delset="${i}">✕</button>`}`;
@@ -2439,7 +2439,7 @@ function renderSessionBody(container, session){
             row.querySelector('[data-k="target"]').addEventListener('input', e=>{
               s.target = cleanTarget(e.target.value);
               save();
-              block.querySelector('.ex-target').textContent = exerciseTarget(ex) ? 'alvo '+exerciseTarget(ex)+' reps' : '';
+              block.querySelector('.ex-target').textContent = exerciseTarget(ex) ? 'meta '+exerciseTarget(ex)+' reps' : '';
             });
             function updatePrBadge(){
               const record = recordFor(ex.name);
@@ -2486,7 +2486,7 @@ sessionsList.addEventListener('click', async e=>{
   if(quickDel){
     const id = quickDel.dataset.quickdel;
     const session = state.sessions.find(s=> s.id===id);
-    if(session && (await confirmDialog(`Excluir a sessão "${session.name}"?`))){
+    if(session && (await confirmDialog(`Excluir o treino "${session.name}"?`))){
       state.sessions = state.sessions.filter(s=> s.id!==id);
       if(openSessionId===id) openSessionId = null;
       save(); renderAll();
@@ -2630,7 +2630,7 @@ function renderProgress(){
   const wrap = document.getElementById('progressWrap');
   const data = computeProgress();
   if(data.length===0){
-    wrap.innerHTML = `<div class="empty"><strong>Sem dados suficientes</strong>Registre pelo menos uma sessão para ver a evolução do rendimento.</div>`;
+    wrap.innerHTML = `<div class="empty"><strong>Sem dados suficientes</strong>Registre pelo menos um treino para ver a evolução.</div>`;
     return;
   }
   wrap.innerHTML = `<div class="prog-grid">${data.map(progressCard).join('')}</div>`;
@@ -2697,7 +2697,7 @@ function renderDashboard(){
   if(next){
     label.textContent = next.name;
     btn.disabled = false;
-    btn.onclick = ()=> openSessionFromDashboard(next.id);
+    btn.onclick = ()=> { showAppTab('treinos'); openSessionFromDashboard(next.id); };
   }else{
     label.textContent = state.sessions.length ? 'Tudo em dia 🎉' : 'Importe sua ficha para começar';
     btn.disabled = true;
@@ -2772,7 +2772,7 @@ function renderVolumeChart(){
   if(!wrap) return;
   const data = computeWeeklyVolume();
   if(data.length===0){
-    wrap.innerHTML = `<div class="empty" style="padding:16px;"><strong>Sem volume ainda</strong>Registre cargas para ver o total levantado por semana.</div>`;
+    wrap.innerHTML = `<div class="empty" style="padding:16px;"><strong>Nada levantado ainda</strong>Registre cargas para ver o total levantado por semana.</div>`;
     return;
   }
   const max = Math.max(...data.map(d=> d.volume));
@@ -2783,7 +2783,7 @@ function renderVolumeChart(){
   }).join('')}</div>`;
 }
 
-/* ---------- Gasto de energia (kcal) — só para quem o admin liberou ----------
+/* ---------- Calorias gastas (kcal) — só para quem o admin liberou ----------
    Estimativa pelo trabalho mecânico: cada repetição desloca a carga ~0,5 m
    (peso × g × 0,5 m, em joules) e o músculo converte só ~20% da energia em
    movimento; 1 kcal = 4184 J. Dá ≈ 0,006 kcal por kg levantado por repetição. */
@@ -2896,7 +2896,7 @@ function assessmentDetailsHtml(a){
 }
 
 function anamneseHtml(p){
-  if(!p) return '<div class="empty">Anamnese ainda não preenchida.</div>';
+  if(!p) return '<div class="empty">Ficha de saúde ainda não preenchida.</div>';
   const yn = (v, d)=> v ? `Sim${d ? ' — '+escapeHtml(d) : ''}` : 'Não';
   const items = [];
   items.push(['Idade', p.idade!=null ? p.idade+' anos' : '—'], ['Sexo', p.sexo ? (p.sexo==='masculino'?'Masculino':'Feminino') : '—']);
@@ -2949,10 +2949,10 @@ async function openAssessment(studentId, canEdit){
     const needsProfile = !data.profile || !data.profile.sexo || !data.profile.idade;
     let html = `<div class="af-actions">
       ${canEdit ? `<button type="button" class="primary" data-af="new">+ Nova avaliação</button>
-        <button type="button" class="ghost" data-af="profile">${data.profile ? 'Editar anamnese' : 'Preencher anamnese'}</button>` : ''}
+        <button type="button" class="ghost" data-af="profile">${data.profile ? 'Editar ficha de saúde' : 'Preencher ficha de saúde'}</button>` : ''}
       <button type="button" class="${canEdit ? 'ghost' : 'primary'}" data-af="pdf">⬇ Exportar PDF</button></div>`;
     if(canEdit){
-      if(needsProfile) html += `<p class="af-note">Preencha <strong>idade e sexo</strong> na anamnese para o app calcular o % de gordura (Pollock 7 dobras).</p>`;
+      if(needsProfile) html += `<p class="af-note">Preencha <strong>idade e sexo</strong> na ficha de saúde para o app calcular o % de gordura (Pollock 7 dobras).</p>`;
     }
     html += `<div class="kpi-grid">
       ${stat('Peso', last&&last.peso, 'kg', last ? delta(last.peso, first.peso) : '')}
@@ -2975,7 +2975,7 @@ async function openAssessment(studentId, canEdit){
           ${canEdit ? `<div class="af-item-actions"><button type="button" class="ghost small" data-af="edit" data-id="${escapeAttr(a.id)}">Editar</button><button type="button" class="ghost small" data-af="del" data-id="${escapeAttr(a.id)}">Excluir</button></div>` : ''}
         </div></details>`).join('');
     }
-    html += `</section><section class="af-section"><h3>Anamnese</h3>${anamneseHtml(data.profile)}</section>`;
+    html += `</section><section class="af-section"><h3>Ficha de saúde</h3>${anamneseHtml(data.profile)}</section>`;
     if(canEdit){
       const pr = data.professor || {};
       html += `<section class="af-section"><h3>Contato no PDF</h3><p class="dim af-help">Aparece no cabeçalho do PDF da avaliação, no lugar do Instagram e do WhatsApp da planilha.</p>
@@ -3053,7 +3053,7 @@ async function openAssessment(studentId, canEdit){
       set('imc', r.imc==null ? '—' : fmtN(r.imc,2)); set('cls', imcBadge(r.classificacaoImc));
       set('pg', r.percentualGordura==null ? '—' : fmtN(r.percentualGordura,1)+'%');
       set('mg', r.massaGorda==null ? '—' : fmtN(r.massaGorda,1)+' kg'); set('mm', r.massaMagra==null ? '—' : fmtN(r.massaMagra,1)+' kg');
-      set('warn', (!p.sexo || !p.idade) ? 'Sem idade e sexo na anamnese não dá para calcular o % de gordura.' : (AF.somarDobras(dob)==null ? 'Preencha as 7 dobras para calcular o % de gordura.' : ''));
+      set('warn', (!p.sexo || !p.idade) ? 'Sem idade e sexo na ficha de saúde não dá para calcular o % de gordura.' : (AF.somarDobras(dob)==null ? 'Preencha as 7 dobras para calcular o % de gordura.' : ''));
     };
     form.addEventListener('input', refresh); refresh();
     form.addEventListener('submit', async e=>{
@@ -3079,13 +3079,13 @@ async function openAssessment(studentId, canEdit){
         <label class="vf-field"><span>Sexo</span><select name="sexo"><option value="">Selecione</option><option value="masculino" ${p.sexo==='masculino'?'selected':''}>Masculino</option><option value="feminino" ${p.sexo==='feminino'?'selected':''}>Feminino</option></select></label>
         ${field('Frequência semanal (dias)','frequenciaSemanal', p.frequenciaSemanal, 'type="number" min="0" max="7" inputmode="numeric"')}
       </div></section>
-      <section class="af-section"><h3>Anamnese</h3>
+      <section class="af-section"><h3>Ficha de saúde</h3>
         <div class="af-grid2">${AF.TEXT_FIELDS.map(([k,l])=> field(l, k, p[k], 'maxlength="200" autocomplete="off"')).join('')}</div>
         <div class="af-checks">${AF.YES_NO.map(([k,l])=> `<label class="af-check"><input type="checkbox" name="${k}" ${p[k]?'checked':''}> ${l}</label>`).join('')}</div>
         <div class="af-detail">${AF.YES_NO_DETAIL.map(([k,dk,l,ph])=> `<label class="af-check"><input type="checkbox" name="${k}" ${p[k]?'checked':''}> ${l}</label><input name="${dk}" value="${escapeAttr(p[dk]||'')}" placeholder="${ph}" maxlength="200" aria-label="${escapeAttr(l+' '+ph)}">`).join('')}</div>
       </section>
       <div class="vf-msg" role="alert"></div>
-      <div class="af-actions"><button type="submit" class="primary">Salvar anamnese</button><button type="button" class="ghost" data-af="back">Cancelar</button></div>
+      <div class="af-actions"><button type="submit" class="primary">Salvar ficha de saúde</button><button type="button" class="ghost" data-af="back">Cancelar</button></div>
     </form>`;
     const form = body.querySelector('form');
     form.addEventListener('submit', async e=>{
@@ -3098,7 +3098,7 @@ async function openAssessment(studentId, canEdit){
       try{
         const res = await fetch(`/api/assessment/${studentId}/profile`, { method:'PUT', headers: apiHeaders({'Content-Type':'application/json'}), body: JSON.stringify(out) });
         if(!res.ok) throw new Error(res.status);
-        showToast('Anamnese salva!');
+        showToast('Ficha de saúde salva!');
         view = {name:'summary'}; await load();
       }catch(err){ msg.textContent = 'Não consegui salvar agora. Tente de novo.'; }
     });
@@ -3202,7 +3202,7 @@ function buildAssessmentPdf(data){
   y += 27 + 8;
 
   // ----- anamnese -----
-  section('Anamnese', 40);
+  section('Ficha de saúde', 40);
   const yn = (v, d)=> v ? ('Sim' + (d ? ' — ' + d : '')) : 'Não';
   const qa = [];
   if(data.profile){
@@ -3214,7 +3214,7 @@ function buildAssessmentPdf(data){
       ['Consumo de álcool?', yn(P.consomeAlcool)], ['Fuma?', yn(P.fuma)]);
   }
   if(!qa.length){
-    card(12); ink(C.muted); font('normal', 9); doc.text('Anamnese ainda não preenchida.', M+5, y+7.3); y += 12 + 8;
+    card(12); ink(C.muted); font('normal', 9); doc.text('Ficha de saúde ainda não preenchida.', M+5, y+7.3); y += 12 + 8;
   }else{
     const colW = (CW - 15)/2, rows = Math.ceil(qa.length/2);
     // altura de cada linha = a maior das duas células (respostas longas quebram)
@@ -3397,7 +3397,7 @@ function exportAssessmentPdf(data){
 
 document.getElementById('openAssessBtn').addEventListener('click', ()=> openAssessment(activeStudentId(), READONLY));
 
-/* ---------- Vídeos de execução (links do YouTube) ----------
+/* ---------- Vídeos dos exercícios (links do YouTube) ----------
    A biblioteca do admin vale para todos; o professor pode trocar ou completar
    para os alunos dele. O vídeo é achado pelo nome do exercício normalizado —
    mesma regra de exerciseKey() em lib/videos.js. */
@@ -3657,7 +3657,7 @@ builderOverlay.addEventListener('click', e=>{ if(e.target===builderOverlay) clos
 
 function renderBuilderProtocolSelect(){
   const sel = document.getElementById('builderProtocolSelect');
-  sel.innerHTML = `<option value="__new">➕ Novo protocolo</option>` +
+  sel.innerHTML = `<option value="__new">➕ Nova ficha</option>` +
     state.protocols.map(p=> `<option value="${escapeAttr(p.id)}">${escapeHtml(p.name)}</option>`).join('');
   const latest = newestProtocolId();
   if(latest) sel.value = latest;
@@ -3712,7 +3712,7 @@ function renderBuilderExerciseList(){
   }
   list.innerHTML = filtered.map((ex,i)=> `
     <div class="ex-pick-row" data-pickex="${escapeAttr(ex.name)}">
-      <div><div class="epn">${escapeHtml(ex.name)}</div><div class="epm">${MUSCLE_LABELS[ex.muscle]} · alvo ${escapeHtml(ex.target)}</div></div>
+      <div><div class="epn">${escapeHtml(ex.name)}</div><div class="epm">${MUSCLE_LABELS[ex.muscle]} · meta ${escapeHtml(ex.target)}</div></div>
       <span class="epadd">+</span>
     </div>`).join('');
   list.querySelectorAll('[data-pickex]').forEach(row=>{
@@ -3737,7 +3737,7 @@ function renderBuilderSelected(){
       <div class="sen"><span>${escapeHtml(s.name)}</span><button class="ghost small" data-rmsel="${i}" style="padding:0 4px;">✕</button></div>
       <div class="sefields">
         <input type="number" min="1" max="10" value="${s.sets}" data-selfield="${i}:sets" title="séries" style="width:60px;">
-        <input type="text" value="${escapeAttr(s.target)}" data-selfield="${i}:target" title="alvo (reps)" placeholder="alvo" style="flex:1;">
+        <input type="text" value="${escapeAttr(s.target)}" data-selfield="${i}:target" title="meta (reps)" placeholder="meta" style="flex:1;">
       </div>
     </div>`).join('');
   list.querySelectorAll('[data-rmsel]').forEach(btn=>{
@@ -3779,6 +3779,7 @@ document.getElementById('builderSaveBtn').addEventListener('click', ()=>{
   save();
   closeBuilder();
   renderAll();
+  showAppTab('treinos');
   const list = document.getElementById('sessionsList');
   if(list) list.scrollIntoView({behavior:'smooth', block:'start'});
 });
@@ -3887,13 +3888,13 @@ if(new URLSearchParams(location.search).get('tab')==='progresso') mobile.tab = '
 // visto uma versão anterior, sem precisar de um fluxo de "novidades" à parte.
 const TOUR_VERSION = 4;
 const TOUR_STEPS = [
-  { target: null, title: 'Bem-vindo ao Sobrecarga 👋', text: 'O app foi reorganizado em quatro abas. Vamos dar uma volta rápida — leva menos de um minuto.' },
+  { target: null, title: 'Bem-vindo ao Sobrecarga 👋', text: 'Quatro abas, tudo à mão. Uma volta rápida, leva menos de um minuto.' },
   { target: '.mweek', title: 'Sua semana', text: 'Os dias em que você treinou ficam preenchidos; hoje aparece com contorno.' },
   { target: '.mtoday', title: 'Treino de hoje', text: 'O próximo treino da sua ficha, com os primeiros exercícios e um botão pra começar direto.' },
   { target: '.mstat-grid', title: 'Suas estatísticas', text: 'Semanas seguidas treinando, treinos no mês e recordes novos dos últimos 30 dias.' },
-  { target: '[data-mtab="treinos"]', title: 'Aba Treinos', text: 'Importe a ficha em PDF, monte um treino pelo mapa muscular e veja cada semana do protocolo.' },
+  { target: '[data-mtab="treinos"]', title: 'Aba Treinos', text: 'Importe a ficha em PDF, monte um treino pelo mapa muscular e veja cada semana da ficha.' },
   { target: null, title: 'Botões − e + ✨', text: 'Ao registrar uma série, ajuste peso e repetições com um toque. O app já sugere a carga da última vez.' },
-  { target: '[data-mtab="progresso"]', title: 'Aba Progresso', text: 'Volume por semana, evolução do 1RM estimado em cada exercício e, se liberado, o gasto de energia.' },
+  { target: '[data-mtab="progresso"]', title: 'Aba Progresso', text: 'Total levantado por semana, evolução da força máxima estimada em cada exercício e, se liberado, as calorias gastas.' },
   { target: '[data-mtab="perfil"]', title: 'Aba Perfil', text: 'Relatório em PDF, idioma, o tour de novo e o botão de sair ficam aqui.' },
 ];
 let tourIndex = -1;
@@ -4045,7 +4046,7 @@ function mThisWeekSessions(){
 
 function mRenderHistoryScreen(){
   mHeader('Treinos');
-  let html = '<div class="mpage mpage-flush">' + mSegmented([['list','Esta semana'],['history','Histórico']], 'history', 'treinosview') + '</div>';
+  let html = '<div class="mpage mpage-flush">' + mSegmented([['list','Esta semana'],['history','Anteriores']], 'history', 'treinosview') + '</div>';
   if(!LOCKED()){
     html += `<div style="padding:0 20px 4px;display:flex;gap:8px;flex-wrap:wrap;">
       <button class="mghostbtn" data-maction="addsession">${t('newSession')}</button>
@@ -4117,7 +4118,7 @@ function mFeedbackBlockHtml(session){
   if(READONLY){
     return `<div class="feedback-block feedback-editing">
       <label class="hint">💬 Feedback para o aluno</label>
-      <textarea data-mfeedback rows="2" placeholder="Deixe um comentário sobre esta sessão...">${escapeHtml(fb)}</textarea>
+      <textarea data-mfeedback rows="2" placeholder="Deixe um comentário sobre este treino...">${escapeHtml(fb)}</textarea>
     </div>`;
   }
   if(!fb) return '';
@@ -4130,13 +4131,13 @@ function mFeedbackBlockHtml(session){
 function mRenderSessionScreen(){
   const session = state.sessions.find(s=> s.id===mobile.sessionId);
   if(!session){ mobile.screen='list'; return mRenderSessionsList(); }
-  mHeader('Sessão', {back: true, sub: fmtDate(session.date)});
+  mHeader('Treino', {back: true, sub: fmtDate(session.date)});
   const ro = LOCKED();
   let html = `<div style="padding:4px 20px 6px;">
     <input type="text" class="minput" data-msessname value="${escapeAttr(session.name)}" ${ro?'disabled':''}>
     ${ro?'':`<div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;">
       <button class="mghostbtn" data-maction="repeatsession">⟳ repetir (+7 dias)</button>
-      <button class="mghostbtn mdanger" data-mdel-session="${session.id}">✕ excluir sessão</button>
+      <button class="mghostbtn mdanger" data-mdel-session="${session.id}">✕ excluir treino</button>
     </div>`}
   </div>
   <div style="padding:0 20px;">${mFeedbackBlockHtml(session)}</div>
@@ -4147,7 +4148,7 @@ function mRenderSessionScreen(){
     const targetLabel = exerciseTarget(ex);
     const record = recordFor(ex.name);
     const parts = [`${setCount} séries`];
-    if(targetLabel) parts.push(`alvo ${targetLabel}`);
+    if(targetLabel) parts.push(`meta ${targetLabel}`);
     if(done) parts.push(`${done}/${setCount} feitas`);
     const meta = parts.join(' · ');
     html += `<div class="mrow">
@@ -4218,17 +4219,17 @@ function mRenderImportScreen(){
         <div style="font-size:13px;color:var(--text-dim);margin-bottom:14px;">Escolha um PDF do treino</div>
         <button class="mghostbtn" data-maction="pickfile">📄 Escolher arquivo</button>
       </div>
-      <div class="mrow-sub">Detecta cada treino como uma sessão separada.</div>
+      <div class="mrow-sub">Detecta cada treino como um treino separado.</div>
     </div>`;
     return;
   }
   let html = `<div style="padding:16px 16px 20px;">
-    <div class="mrow-sub" style="margin-bottom:6px;">Protocolo</div>
+    <div class="mrow-sub" style="margin-bottom:6px;">Ficha</div>
     <select class="minput" data-mstageprot style="margin-bottom:8px;">
-      <option value="__new" ${stageProtocol.mode==='new'?'selected':''}>➕ Novo protocolo</option>
+      <option value="__new" ${stageProtocol.mode==='new'?'selected':''}>➕ Nova ficha</option>
       ${state.protocols.map(p=> `<option value="${escapeAttr(p.id)}" ${stageProtocol.id===p.id?'selected':''}>${escapeHtml(p.name)}</option>`).join('')}
     </select>
-    ${stageProtocol.mode==='new' ? `<input type="text" class="minput" data-mstageprotname value="${escapeAttr(stageProtocol.name)}" placeholder="nome do protocolo" style="margin-bottom:8px;">` : ''}
+    ${stageProtocol.mode==='new' ? `<input type="text" class="minput" data-mstageprotname value="${escapeAttr(stageProtocol.name)}" placeholder="nome da ficha" style="margin-bottom:8px;">` : ''}
     <div class="mrow-sub" style="margin-bottom:6px;">Duração (semanas)</div>
     <input type="number" min="1" max="52" class="minput mmono" data-mstageweeks value="${stageProtocol.weeks}" style="margin-bottom:12px;">
     <div class="mrow-sub" style="margin-bottom:12px;">Revise a divisão de treino — ela vai se repetir em todas as semanas:</div>`;
@@ -4248,7 +4249,7 @@ function mRenderImportScreen(){
   });
   html += `<div style="display:flex;gap:10px;margin-top:14px;">
     <button class="mghostbtn" style="flex:1;" data-maction="cancelimport">Cancelar</button>
-    <button class="mprimarybtn" style="flex:1;" data-maction="confirmimport">Adicionar sessões</button>
+    <button class="mprimarybtn" style="flex:1;" data-maction="confirmimport">Adicionar treinos</button>
   </div></div>`;
   mContent.innerHTML = html;
 }
@@ -4274,7 +4275,7 @@ function mRenderProgressDetail(){
   const path = mBigSparkPath(e.points);
   let html = `<div style="padding:16px 16px 24px;">
     <div class="mbig-num">${cur.rm.toFixed(1)}kg</div>
-    <div style="font-size:13px;font-weight:600;margin:4px 0 16px;">${deltaHtml} desde a sessão anterior</div>
+    <div style="font-size:13px;font-weight:600;margin:4px 0 16px;">${deltaHtml} desde o treino anterior</div>
     <svg width="100%" height="120" viewBox="0 0 280 110" style="background:var(--surface);border-radius:var(--radius-md);border:1px solid var(--border);">
       <path d="${path}" fill="none" stroke="var(--accent)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
     </svg>
@@ -4347,10 +4348,9 @@ function mRenderInicio(){
   for(let i=0;i<7;i++){
     const d = addDaysISO(monday, i);
     const cls = trained.has(d) ? 'done' : (d===today ? 'today' : '');
-    html += `<div class="mweek-day"><span class="mweek-l">${DOW_SHORT[dowOf(d)].charAt(0)}</span><span class="mweek-n ${cls}">${+d.slice(8,10)}</span></div>`;
+    html += `<div class="mweek-day"><span class="mweek-l">${DOW_SHORT[dowOf(d)]}</span><span class="mweek-n ${cls}">${+d.slice(8,10)}</span></div>`;
   }
   html += '</div>';
-  if(!READONLY) html += announcementsHtml();
 
   const next = findNextSession();
   if(next){
@@ -4375,6 +4375,7 @@ function mRenderInicio(){
   const month = today.slice(0,7);
   const monthCount = state.sessions.filter(s=> s.date.slice(0,7)===month && s.exercises.some(e=> e.sets.some(x=> x.weight>0))).length;
   const records = recentRecords();
+  if(!READONLY) html += announcementsHtml();
   html += `<div class="mstat-grid">
     <div class="mstat"><div class="n">${computeStreak()}</div><div class="l">semanas seguidas</div></div>
     <div class="mstat"><div class="n">${monthCount}</div><div class="l">treinos no mês</div></div>
@@ -4405,7 +4406,7 @@ function mRenderSessionsList(){
       <button class="mtile" data-maction="openbuilder"><span class="micon-tile">${ICONS.target}</span><span class="mtile-title">Montar treino</span><span class="mtile-sub">pelo mapa muscular</span></button>
     </div>`;
   }
-  html += mSegmented([['list','Esta semana'],['history','Histórico']], 'list', 'treinosview');
+  html += mSegmented([['list','Esta semana'],['history','Anteriores']], 'list', 'treinosview');
 
   const next = findNextSession();
   const protId = (next && next.protocolId) || newestProtocolId();
@@ -4416,7 +4417,7 @@ function mRenderSessionsList(){
     const pct = idx>=0 ? Math.round(((idx+1)/weeks.length)*100) : (todayISO() > weeks[weeks.length-1] ? 100 : 0);
     html += `<section class="mprot">
       <div class="mprot-top">
-        <div><div class="overline">Protocolo</div><div class="mprot-name">${escapeHtml(prot.name)}</div></div>
+        <div><div class="overline">Ficha</div><div class="mprot-name">${escapeHtml(prot.name)}</div></div>
         <span class="mmeta">${idx>=0 ? `semana ${idx+1} de ${weeks.length}` : plural(weeks.length,'semana','semanas')}</span>
       </div>
       <div class="mbar"><div style="width:${pct}%;"></div></div>
@@ -4509,7 +4510,7 @@ function mRenderEntryScreen(){
   html += `<section>
     <div class="mex-head"><h1 class="mex-name">${escapeHtml(ex.name)}</h1>${videoButtonHtml(ex.name)}</div>
     <div class="mchips">
-      <span class="mchip-pill strong">${editing ? `Série ${mobile.setIdx+1}` : 'Nova série'}${curTarget ? ' · alvo '+escapeHtml(curTarget)+' reps' : ''}</span>
+      <span class="mchip-pill strong">${editing ? `Série ${mobile.setIdx+1}` : 'Nova série'}${curTarget ? ' · meta '+escapeHtml(curTarget)+' reps' : ''}</span>
       <span class="mchip-pill">${lastLoad ? `Última vez: ${lastLoad.weight}kg × ${lastLoad.reps}` : 'Sem histórico anterior'}</span>
     </div>
   </section>
@@ -4537,7 +4538,7 @@ function mRenderEntryScreen(){
       html += `<div class="mset ${sel?'sel':''}" data-mselset="${i}">
         <span class="mset-dot ${feito?'done':(sel?'cur':'')}">${feito ? ICONS.check : i+1}</span>
         <span class="mset-name">Série ${i+1}</span>
-        <span class="mset-val">${feito ? `${s.weight}kg × ${s.reps}` : (sel ? 'agora' : (s.target ? 'alvo '+escapeHtml(s.target) : '—'))}</span>
+        <span class="mset-val">${feito ? `${s.weight}kg × ${s.reps}` : (sel ? 'agora' : (s.target ? 'meta '+escapeHtml(s.target) : '—'))}</span>
         ${ro?'':`<button class="micon-btn" data-mdelset="${i}" aria-label="Remover série ${i+1}">✕</button>`}
       </div>`;
     });
@@ -4562,7 +4563,7 @@ function mRenderProgresso(){
   if(mobile.screen==='detail') return mRenderProgressDetail();
   mHeader('Progresso');
   const views = [['resumo','Resumo'],['forca','Força']];
-  if(energyEnabled) views.push(['energia','Energia']);
+  if(energyEnabled) views.push(['energia','Calorias']);
   if(!views.some(v=> v[0]===mobile.progView)) mobile.progView = 'resumo';
   let html = '<div class="mpage">' + mSegmented(views, mobile.progView, 'progview');
   const data = computeProgress();
@@ -4573,15 +4574,15 @@ function mRenderProgresso(){
     const weekSessions = state.sessions.filter(s=> getWeekKey(s.date)===wk && s.exercises.some(e=> e.sets.some(x=> x.weight>0)));
     const fmtN = v=> Math.round(v).toLocaleString('pt-BR');
     const second = energyEnabled
-      ? `<div class="kpi"><div class="kpi-l">Energia na semana</div><div class="kpi-v">${fmtN(computeSessionEnergy(weekSessions).reduce((n,d)=> n+d.kcal,0))} kcal</div><div class="kpi-s">${plural(weekSessions.length,'treino','treinos')}</div></div>`
+      ? `<div class="kpi"><div class="kpi-l">Calorias na semana</div><div class="kpi-v">${fmtN(computeSessionEnergy(weekSessions).reduce((n,d)=> n+d.kcal,0))} kcal</div><div class="kpi-s">${plural(weekSessions.length,'treino','treinos')}</div></div>`
       : `<div class="kpi"><div class="kpi-l">Treinos na semana</div><div class="kpi-v">${weekSessions.length}</div><div class="kpi-s">${computeStreak()} semanas seguidas</div></div>`;
     html += `<div class="kpi-grid two">
-      <div class="kpi"><div class="kpi-l">Volume na semana</div><div class="kpi-v">${fmtN(cur)} kg</div>
+      <div class="kpi"><div class="kpi-l">Total levantado na semana</div><div class="kpi-v">${fmtN(cur)} kg</div>
         ${prev>0 && cur>0 ? `<div class="kpi-s trend ${cur>=prev?'up':'down'}">${fmtPct(((cur-prev)/prev)*100)} vs. anterior</div>` : `<div class="kpi-s">${prev>0 ? 'semana anterior: '+fmtN(prev)+' kg' : 'peso × repetições'}</div>`}</div>
       ${second}
     </div>`;
     const vol = computeWeeklyVolume();
-    html += `<section class="mcard-lg"><div class="msec-head"><h2>Volume por semana</h2><span class="mmeta">kg</span></div>`;
+    html += `<section class="mcard-lg"><div class="msec-head"><h2>Total levantado por semana</h2><span class="mmeta">kg</span></div>`;
     if(vol.length===0){
       html += `<div class="mempty">Registre cargas para ver o total levantado por semana.</div>`;
     }else{
@@ -4592,9 +4593,9 @@ function mRenderProgresso(){
     html += `</section>`;
   }else if(mobile.progView==='forca'){
     if(data.length===0){
-      html += `<div class="mempty"><strong>Sem dados suficientes</strong>Registre sessões para ver a evolução.</div>`;
+      html += `<div class="mempty"><strong>Sem dados suficientes</strong>Registre treinos para ver a evolução.</div>`;
     }else{
-      html += '<h2 class="overline">1RM estimado</h2><div class="mstack">';
+      html += '<h2 class="overline">Força máxima estimada</h2><div class="mstack">';
       data.forEach(e=>{
         const pts = e.points, cur = pts[pts.length-1], prev = pts.length>1 ? pts[pts.length-2] : null;
         const pct = prev ? ((cur.rm-prev.rm)/prev.rm)*100 : null;
@@ -4607,7 +4608,7 @@ function mRenderProgresso(){
       html += '</div>';
     }
   }else{
-    html += `<section class="mcard-lg"><div class="msec-head"><h2>Gasto de energia por treino</h2><span class="mmeta">kcal</span></div>${energyChartHtml()}</section>`;
+    html += `<section class="mcard-lg"><div class="msec-head"><h2>Calorias gastas por treino</h2><span class="mmeta">kcal</span></div>${energyChartHtml()}</section>`;
   }
   html += '</div>';
   mContent.innerHTML = html;
@@ -4628,7 +4629,7 @@ function mRenderPerfil(){
       <div class="mlist">
         <button class="mlist-row" data-maction="exportpdf"><span class="accent">${ICONS.download}</span><span class="mlist-label">Baixar relatório em PDF</span><span class="faint">${ICONS.chevron}</span></button>
         <button class="mlist-row" data-maction="assessment"><span class="accent">${ICONS.ruler}</span><span class="mlist-label">${READONLY ? 'Avaliação física do aluno' : 'Minha avaliação física'}</span><span class="faint">${ICONS.chevron}</span></button>
-        ${energyEnabled ? `<div class="mlist-row"><span class="accent">${ICONS.flame}</span><span class="mlist-label">Gasto de energia</span><span class="badge badge-ok">Liberado</span></div>` : ''}
+        ${energyEnabled ? `<div class="mlist-row"><span class="accent">${ICONS.flame}</span><span class="mlist-label">Calorias gastas</span><span class="badge badge-ok">Liberado</span></div>` : ''}
       </div>
     </section>
     <section class="mstack">
@@ -4753,7 +4754,7 @@ mContent.addEventListener('click', async e=>{
   if(delSession){
     const id = delSession.dataset.mdelSession;
     const session = state.sessions.find(s=> s.id===id);
-    if(session && (await confirmDialog(`Excluir a sessão "${session.name}"?`))){
+    if(session && (await confirmDialog(`Excluir o treino "${session.name}"?`))){
       state.sessions = state.sessions.filter(s=> s.id!==id);
       mobile.screen='list'; mobile.sessionId=null;
       save(); renderAll();
@@ -4924,7 +4925,36 @@ mContent.addEventListener('input', e=>{
   }
 });
 
+/* ---------- Abas do app no computador (mesmas 4 abas do celular) ---------- */
+function showAppTab(tab){
+  document.querySelectorAll('#appTabs [data-atab]').forEach(b=>{
+    const on = b.dataset.atab===tab;
+    b.classList.toggle('active', on);
+    b.setAttribute('aria-selected', on ? 'true' : 'false');
+  });
+  document.querySelectorAll('#appWrap [data-asec]').forEach(el=>{ el.classList.toggle('sec-off', el.dataset.asec!==tab); });
+}
+document.getElementById('appTabs').addEventListener('click', e=>{
+  const b = e.target.closest('[data-atab]');
+  if(b) showAppTab(b.dataset.atab);
+});
+showAppTab('inicio');
+function renderDesktopWeek(){
+  const box = document.getElementById('dWeek');
+  if(!box) return;
+  const today = todayISO();
+  const monday = getWeekKey(today);
+  const trained = new Set(state.sessions.filter(s=> s.exercises.some(e=> e.sets.some(x=> x.weight>0))).map(s=> s.date));
+  let html = '';
+  for(let i=0;i<7;i++){
+    const d = addDaysISO(monday, i);
+    const cls = trained.has(d) ? 'done' : (d===today ? 'today' : '');
+    html += `<div class="dweek-day"><span class="dweek-l">${DOW_SHORT[dowOf(d)]}</span><span class="dweek-n ${cls}">${+d.slice(8,10)}</span></div>`;
+  }
+  box.innerHTML = html;
+}
 function renderAll(){
+  renderDesktopWeek();
   renderSessions();
   renderProgress();
   renderStats();
@@ -5028,7 +5058,7 @@ function fmtW(w){ return w>0 ? (w+'kg') : '—'; }
 // não havia como exportar. Agora o mesmo relatório sai pelos dois lugares.
 document.getElementById('exportPdfBtn').addEventListener('click', exportPdf);
 function exportPdf(){
-  if(state.sessions.length===0){ alert('Registre pelo menos uma sessão antes de exportar.'); return; }
+  if(state.sessions.length===0){ alert('Registre pelo menos um treino antes de exportar.'); return; }
   if(!(window.jspdf && window.jspdf.jsPDF && window.jspdf.jsPDF.API && window.jspdf.jsPDF.API.autoTable)){
     alert('Não consegui carregar o gerador de PDF. Confira a internet e tente de novo.');
     return;
@@ -5079,7 +5109,7 @@ function buildPdfReport(){
 
   doc.setTextColor(20);
   doc.setFontSize(11);
-  doc.text(`${sorted.length} sessões · ${exSet.size} exercícios · ${totalSets} séries registradas`, marginX, y);
+  doc.text(`${sorted.length} treinos · ${exSet.size} exercícios · ${totalSets} séries registradas`, marginX, y);
   if(sorted.length){
     doc.setFontSize(9); doc.setTextColor(110);
     doc.text(`Período: ${fmtDate(sorted[0].date)} a ${fmtDate(sorted[sorted.length-1].date)}`, marginX, y+5);
@@ -5088,7 +5118,7 @@ function buildPdfReport(){
   if(energyEnabled){
     const kcal = computeSessionEnergy(sorted).reduce((n,d)=> n+d.kcal, 0);
     doc.setFontSize(9); doc.setTextColor(110);
-    doc.text(`Gasto de energia estimado (peso × repetições): ${Math.round(kcal).toLocaleString('pt-BR')} kcal no total`, marginX, y-4);
+    doc.text(`Calorias gastas (estimativa) (peso × repetições): ${Math.round(kcal).toLocaleString('pt-BR')} kcal no total`, marginX, y-4);
     y += 4;
   }
 
@@ -5096,7 +5126,7 @@ function buildPdfReport(){
   const progress = computeProgress();
   doc.setTextColor(20);
   doc.setFont('helvetica','bold'); doc.setFontSize(13);
-  doc.text('Rendimento', marginX, y);
+  doc.text('Evolução', marginX, y);
   y += 4;
   if(progress.length===0){
     doc.setFont('helvetica','normal'); doc.setFontSize(9); doc.setTextColor(110);
@@ -5115,7 +5145,7 @@ function buildPdfReport(){
     });
     doc.autoTable({
       startY: y, margin:{left:marginX, right:marginX},
-      head: [['Exercício','Atual','Anterior','1RM est.','Variação']],
+      head: [['Exercício','Atual','Anterior','Força máx.','Variação']],
       body: rows,
       styles:{fontSize:8.5, cellPadding:2.5},
       headStyles:{fillColor:[59,112,61], textColor:255},
@@ -5127,7 +5157,7 @@ function buildPdfReport(){
   // Sessões
   if(y > 260){ doc.addPage(); y = 20; }
   doc.setFont('helvetica','bold'); doc.setFontSize(13); doc.setTextColor(20);
-  doc.text('Sessões registradas', marginX, y);
+  doc.text('Treinos registrados', marginX, y);
   y += 8;
 
   sorted.forEach(session=>{
@@ -5146,7 +5176,7 @@ function buildPdfReport(){
 
     doc.autoTable({
       startY: y, margin:{left:marginX, right:marginX},
-      head: [['Exercício','Série','Alvo','Reps','Carga']],
+      head: [['Exercício','Série','Meta','Reps','Carga']],
       body: rows,
       styles:{fontSize:8.5, cellPadding:2.2},
       headStyles:{fillColor:[59,112,61], textColor:255},
